@@ -62,6 +62,8 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     return (await readVaultContext()).snapshot;
   }
 
+  const avatarCache = new WeakMap<object, Map<string, Promise<string | null>>>();
+
   async function crystalImages(context: Awaited<ReturnType<typeof readVaultContext>>, nodeId: string) {
     const [avatar, portrait] = await Promise.all([avatarUrl(context, nodeId), portraitUrl(context, nodeId)]);
     return { avatarUrl: avatar, portraitUrl: portrait };
@@ -102,8 +104,15 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     search: async (_event, query, filter) => (await readVault()).search(query, filter),
     searchNodes: async (_event, query) => {
       const context = await readVaultContext();
-      return Promise.all(context.snapshot.searchNodes(query).slice(0, 50).map(async (hit) =>
-        ({ ...hit, avatarUrl: await avatarUrl(context, hit.nodeId) })));
+      // Avatar lookups touch the file system; reuse them while the snapshot (vault version) is the same.
+      let avatars = avatarCache.get(context.snapshot);
+      if (!avatars) avatarCache.set(context.snapshot, avatars = new Map());
+      const cache = avatars;
+      return Promise.all(context.snapshot.searchNodes(query).slice(0, 50).map(async (hit) => {
+        let url = cache.get(hit.nodeId);
+        if (!url) cache.set(hit.nodeId, url = avatarUrl(context, hit.nodeId));
+        return { ...hit, avatarUrl: await url };
+      }));
     },
     listCrystals: async () => {
       const context = await readVaultContext();

@@ -179,11 +179,15 @@ interface Props {
   onNode?: (nodeId: string) => void;
   /** Issued after arriving downstairs; each requestId opens its entry at most once. */
   openRequest?: { path: string; requestId: number };
+  /** The user opened a scroll; a jump still waiting to land must not override it. */
+  onUserOpen?: () => void;
+  /** The scroll named by openRequest no longer exists (moved to the recycle bin or renamed since the jump began). */
+  onRequestMissing?: () => void;
   active: boolean;
   refreshToken: number;
 }
 
-export function Library({ query, deskMode, onToggleMode, onNode, openRequest, active, refreshToken }: Props) {
+export function Library({ query, deskMode, onToggleMode, onNode, openRequest, onUserOpen, onRequestMissing, active, refreshToken }: Props) {
   const [allEntries, setAllEntries] = useState<MemoryEntry[] | null>(null);
   const [nodes, setNodes] = useState<ReadonlyMap<string, NodeCrystal>>(new Map());
   const [loadError, setLoadError] = useState(false);
@@ -318,11 +322,16 @@ export function Library({ query, deskMode, onToggleMode, onNode, openRequest, ac
     return Boolean(card);
   }
 
-  const openEntry = useCallback((path: string, trigger?: HTMLButtonElement) => {
+  const openPath = useCallback((path: string, trigger?: HTMLButtonElement) => {
     if (!savedPosition.current || trigger) savedPosition.current = { path, trigger, top: scroller.current?.scrollTop ?? 0 };
     setStack(null);
     setSelected(path);
   }, []);
+  /** Opening by the user (as opposed to a jump request) cancels a jump that has not landed yet (M5b review S2). */
+  const openEntry = useCallback((path: string, trigger?: HTMLButtonElement) => {
+    onUserOpen?.();
+    openPath(path, trigger);
+  }, [onUserOpen, openPath]);
   const toggleStack = useCallback((path: string) => setStack((current) => current === path ? null : path), []);
   const goToNode = useCallback((node: NodeCrystal) => onNode?.(node.nodeId), [onNode]);
   const nodeLink = onNode ? goToNode : undefined;
@@ -339,8 +348,9 @@ export function Library({ query, deskMode, onToggleMode, onNode, openRequest, ac
   useEffect(() => {
     if (!active || !openRequest || !allEntries || consumedOpen.current.has(openRequest.requestId)) return;
     consumedOpen.current.add(openRequest.requestId);
-    if (allEntries.some((entry) => entry.path === openRequest.path)) openEntry(openRequest.path);
-  }, [active, openRequest, allEntries, openEntry]);
+    if (allEntries.some((entry) => entry.path === openRequest.path)) openPath(openRequest.path);
+    else onRequestMissing?.();
+  }, [active, openRequest, allEntries, openPath, onRequestMissing]);
 
   function closeEntry() {
     restore.current = true;

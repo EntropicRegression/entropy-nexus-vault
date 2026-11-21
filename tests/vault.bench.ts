@@ -80,3 +80,54 @@ describe('記憶庫（500 筆合成判例）', () => {
     });
   }, 60_000);
 });
+
+describe('節點搜尋（60 個側寫 + 500 筆判例）', () => {
+  let nodeRoot: string;
+  const nodes = 60;
+
+  beforeAll(async () => {
+    nodeRoot = await mkdtemp(join(tmpdir(), 'entropy-vault-node-bench-'));
+    await mkdir(join(nodeRoot, 'nodes'), { recursive: true });
+    await mkdir(join(nodeRoot, 'cases', 'bench'), { recursive: true });
+    const paragraph = '比對資料來源與時間戳，整理任務紀錄並驗證處理順序。'.repeat(40);
+    for (let index = 0; index < nodes; index++) {
+      await writeFile(join(nodeRoot, 'nodes', '節點' + index + '.md'), [
+        '---', '種類: node', '節點ID: bench-node-' + index, '節點: 節點' + index, '角色: art-' + (index % 7), '---',
+        '# 節點' + index, '', '## 特長', '', '擅長第 ' + index + ' 類工作。', '', '## 任務紀錄', '', paragraph,
+        '', '## 解決問題的流程', '', paragraph, '', '## 回顧', '', '回顧不參與搜尋。',
+      ].join('\n'));
+    }
+    for (let index = 1; index <= count; index++) {
+      await writeFile(join(nodeRoot, 'cases', 'bench', '2026-' + String(index).padStart(4, '0') + '.md'), [
+        '---', '種類: case', '專案: bench', '節點ID: bench-node-' + index % nodes, '狀態: 已確認', '---', '摘要: 合成判例',
+      ].join('\n'));
+    }
+  });
+
+  afterAll(async () => {
+    await rm(nodeRoot, { recursive: true, force: true });
+  });
+
+  it('量測第一次查詢（建立索引）與之後每次按鍵的查詢', async () => {
+    const reader = new VaultReader(nodeRoot, now);
+    await reader.read();
+    // The first query on a snapshot builds the index; this is what every keystroke cost before the cache.
+    const builds: number[] = [];
+    for (let sample = 0; sample < 7; sample++) {
+      reader.invalidate();
+      const fresh = await reader.read();
+      const start = performance.now();
+      if (fresh.searchNodes('時間戳').length !== nodes) throw new Error('節點搜尋筆數不符');
+      builds.push(performance.now() - start);
+    }
+    builds.sort((a, b) => a - b);
+    console.log('新快照第一次查詢（建立索引）｜7 組｜中位數 ' + builds[3].toFixed(2) + ' ms｜範圍 ' +
+      builds[0].toFixed(2) + '–' + builds[6].toFixed(2) + ' ms');
+    const snapshot = await reader.read();
+    snapshot.searchNodes('暖機');
+    const queries = ['節', '節點', '節點1', '節點12', '時間', '時間戳', 'art', 'art-3'];
+    await measure('同一快照連續 8 次按鍵查詢（合計）', 15, async () => {
+      for (const query of queries) snapshot.searchNodes(query);
+    });
+  }, 60_000);
+});

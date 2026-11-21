@@ -116,13 +116,20 @@ describe('記憶庫唯讀契約', () => {
     const snapshot = await new VaultReader(root, now).read();
     const ids = (query: string) => snapshot.searchNodes(query).map(({ nodeId }) => nodeId);
     expect(snapshot.searchNodes('星砂')).toEqual([{ nodeId: 'fixture-node-sand', name: '星砂', role: '潮汐校對', status: '未知', matchedIn: '名稱' }]);
-    expect(snapshot.searchNodes('潮汐')[0]).toMatchObject({ nodeId: 'fixture-node-sand', matchedIn: '角色' });
+    expect(snapshot.searchNodes('潮汐')[0]).toMatchObject({ nodeId: 'fixture-node-sand', matchedIn: '立繪角色' });
     expect(snapshot.searchNodes('潮位曲線')[0]).toMatchObject({ matchedIn: '特長' });
     expect(snapshot.searchNodes('鹽度計')[0]).toMatchObject({ matchedIn: '側寫' });
     expect(ids('星砂 鹽度計')).toEqual(['fixture-node-sand']);
     expect(ids('回顧專屬詞')).toEqual([]);
     expect(ids('   ')).toEqual([]);
     expect(snapshot.searchNodes(42 as unknown as string)).toEqual([]);
+    // S5: the lower-cased fields are built once per snapshot and reused by later keystrokes.
+    const index = (snapshot as unknown as { nodeSearchIndex: unknown }).nodeSearchIndex;
+    expect(index).toBeDefined();
+    snapshot.searchNodes('星砂');
+    expect((snapshot as unknown as { nodeSearchIndex: unknown }).nodeSearchIndex).toBe(index);
+    const next = await new VaultReader(root, now).read();
+    expect((next as unknown as { nodeSearchIndex?: unknown }).nodeSearchIndex).toBeUndefined();
   });
 
   it('依封存時間合併同節點的兩份檔，另保留接回的新 ID 與四種連線', async () => {

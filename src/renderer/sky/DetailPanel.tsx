@@ -2,7 +2,8 @@ import type { MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/t
 import { CrystalPortrait, crystalBadge } from './Crystal';
 import styles from './Sky.module.css';
 
-const notRejectedHint = '正常完成的任務預設通過,使用者按退回才算未通過;數值為 1 − 退回 ÷ 完成。';
+const notRejectedHint = '以主控台統計的完成數與退回數計算:1 − 退回 ÷ 完成。正常完成的任務預設通過,使用者按退回才算未通過;'
+  + '退回數也包含失敗或中斷任務上的退回,所以數值可能偏低。';
 
 function Rate({ label, rate, amber, hint }: { label: string; rate: number | null; amber?: boolean; hint?: string }) {
   if (rate === null) return <div className={styles.barRow} title={hint}>
@@ -30,14 +31,13 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
     aria-label="節點履歷" aria-hidden={!crystal} inert={!crystal}>
     {crystal && <>
       <header className={styles.panelHeader}>
-        {crystal.role && <span>{crystal.role}</span>}
         <button className={styles.closePanel} type="button" onClick={onDismiss} aria-label="收起節點履歷">✕</button>
       </header>
       <div className={styles.crystalHero}>
         <div className={styles.heroPortrait}><CrystalPortrait key={crystal.nodeId} src={crystal.portraitUrl} /></div>
         <div className={styles.heroText}>
           <h2>{crystal.name}</h2>
-          <p>{[crystal.role, crystalBadge(crystal).text].filter(Boolean).join(' · ')}</p>
+          <p>{[crystal.role && '立繪 ' + crystal.role, crystalBadge(crystal).text].filter(Boolean).join(' · ')}</p>
           {detail?.specialty && <p>{detail.specialty}</p>}
           {Boolean(detail?.consoleAppendixCount) && <small>另有主控台補充 {detail!.consoleAppendixCount} 段</small>}
         </div>

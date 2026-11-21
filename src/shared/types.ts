@@ -82,6 +82,7 @@ export interface MemoryEntryDetail extends MemoryEntry {
 export interface NodeCrystal {
   nodeId: string;
   name: string;
+  /** The console's 角色: the portrait folder name (e.g. claude), not a job title. null when there is none. */
   role: string | null;
   /** 未知: no console statistics exist for this live profile, so its presence on the console cannot be told. */
   status: '線上' | '休眠' | '封存' | '未知';
@@ -93,13 +94,16 @@ export interface NodeCrystal {
   glow?: 'white';
 }
 
-/** A node matched by the downstairs search. matchedIn names the first field that contains the first term. */
+/**
+ * A node matched by the downstairs search. matchedIn names the first field that contains the first term.
+ * 立繪角色: the console's 角色 field is the node's portrait folder name, not a job title.
+ */
 export interface NodeHit {
   nodeId: string;
   name: string;
   role: string | null;
   status: NodeCrystal['status'];
-  matchedIn: '名稱' | '角色' | '特長' | '側寫';
+  matchedIn: '名稱' | '立繪角色' | '特長' | '側寫';
   avatarUrl?: string | null;
 }
 

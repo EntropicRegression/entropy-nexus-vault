@@ -117,6 +117,22 @@
 .recovery { display: flex; justify-content: center; gap: 12px; }
 .recovery button { border-color: var(--wood-warm); }
 .recovery button:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
+.notice {
+  position: absolute;
+  z-index: 31;
+  top: 66px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 16px;
+  color: var(--text-night);
+  font-size: 12.5px;
+  background: rgba(14,20,48,.9);
+  border: 1px solid rgba(217,164,65,.45);
+  pointer-events: none;
+}
+/* Kept in the tree while empty so the live region announces the next message. */
+.notice:empty { padding: 0; border: 0; }
 .settingError {
   position: absolute;
   z-index: 6;

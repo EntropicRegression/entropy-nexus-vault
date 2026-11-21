@@ -64,23 +64,34 @@ export class VaultSnapshot {
     }).map(({ entry }) => entry);
   }
 
-  /** Nodes whose name, role, specialty or profile body (never 回顧) contain every term (DESIGN.md §6.6.3). */
+  /** Lower-cased search fields per node, built once per snapshot (a snapshot is one vault version). */
+  private nodeSearchIndex: { hit: Omit<NodeHit, 'matchedIn'>; fields: [NodeHit['matchedIn'], string][] }[] | undefined;
+
+  private searchIndex() {
+    this.nodeSearchIndex ??= [...this.crystals.records.values()].map(({ crystal, profile, stats }) => ({
+      hit: { nodeId: crystal.nodeId, name: crystal.name, role: crystal.role, status: crystal.status },
+      fields: ([
+        ['名稱', crystal.name], ['立繪角色', crystal.role ?? ''],
+        ['特長', profileHighlights(profile, stats).specialty], ['側寫', profile?.body ?? ''],
+      ] as [NodeHit['matchedIn'], string][]).map(([label, text]) => [label, text.toLowerCase()]),
+    }));
+    return this.nodeSearchIndex;
+  }
+
+  /**
+   * Nodes whose name, portrait role, specialty or profile body (never 回顧) contain every term (DESIGN.md §6.6.3).
+   * The console's 角色 is the name of the node's portrait folder, not a job title (M5b review S6).
+   */
   searchNodes(query: string): NodeHit[] {
     if (typeof query !== 'string') return [];
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (!terms.length) return [];
     const hits: NodeHit[] = [];
-    for (const { crystal, profile, stats } of this.crystals.records.values()) {
-      const fields: [NodeHit['matchedIn'], string][] = [
-        ['名稱', crystal.name], ['角色', crystal.role ?? ''],
-        ['特長', profileHighlights(profile, stats).specialty], ['側寫', profile?.body ?? ''],
-      ];
-      const lowered = fields.map(([label, text]) => [label, text.toLowerCase()] as const);
-      if (!terms.every((term) => lowered.some(([, text]) => text.includes(term)))) continue;
-      const matchedIn = lowered.find(([, text]) => text.includes(terms[0]))![0];
-      hits.push({ nodeId: crystal.nodeId, name: crystal.name, role: crystal.role, status: crystal.status, matchedIn });
+    for (const { hit, fields } of this.searchIndex()) {
+      if (!terms.every((term) => fields.some(([, text]) => text.includes(term)))) continue;
+      hits.push({ ...hit, matchedIn: fields.find(([, text]) => text.includes(terms[0]))![0] });
     }
-    const rank = ['名稱', '角色', '特長', '側寫'];
+    const rank: NodeHit['matchedIn'][] = ['名稱', '立繪角色', '特長', '側寫'];
     return hits.sort((a, b) => rank.indexOf(a.matchedIn) - rank.indexOf(b.matchedIn) || a.name.localeCompare(b.name, 'zh-Hant'));
   }
 

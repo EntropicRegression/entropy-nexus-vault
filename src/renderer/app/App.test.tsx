@@ -256,6 +256,8 @@ describe('典藏室', () => {
     expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(vault.readCrystal).toHaveBeenCalledWith('node-test');
     expect(container.querySelector('[aria-label="節點履歷"]')?.getAttribute('aria-hidden')).toBe('false');
+    // S1: focus follows the jump's target, not the first link toggle.
+    expect(document.activeElement).toBe(container.querySelector('[data-crystal="node-test"]'));
   });
 
   it('跳轉一(鍵盤):閱讀紙的節點名稱連結也上樓選中', async () => {
@@ -288,6 +290,7 @@ describe('典藏室', () => {
     await act(async () => row.querySelector<HTMLButtonElement>('[data-node-hit="node-test"]')!.click());
     await travel();
     expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(document.activeElement).toBe(container.querySelector('[data-crystal="node-test"]'));
     await act(async () => button('俯瞰圖書館').click());
     await travel();
     act(() => typeSearch('沒有'));
@@ -310,6 +313,122 @@ describe('典藏室', () => {
     await frame(start, 1);
     expect(vault.readEntry).toHaveBeenCalledWith(baseEntry.path);
     expect(container.querySelector('[role="dialog"]')?.textContent).toContain('整理採樣記錄');
+    // S1: the reading desk's title receives focus.
+    expect(document.activeElement?.tagName).toBe('H2');
+    expect(document.activeElement?.textContent).toBe('整理採樣記錄');
+    expect(document.activeElement?.closest('[role="dialog"]')).not.toBeNull();
+  });
+
+  it('S2:平移中使用者在樓上點了別的水晶,抵達時不被跳轉請求蓋掉,焦點也留在使用者點的水晶', async () => {
+    const other = { ...crystal, nodeId: 'node-b', name: '銀杏', position: [-120, 30, 90] as [number, number, number] };
+    const vault = await renderApp(bridge({ listCrystals: vi.fn(async () => ({ crystals: [crystal, other], links: [] })),
+      readCrystal: vi.fn(async (id: string) => id === 'node-b' ? { ...crystalDetail, ...other } : crystalDetail) }));
+    await act(async () => sealOf(baseEntry).click());
+    const start = manual.now();
+    await frame(start, 0);
+    await frame(start, 0.5);
+    const b = container.querySelector<HTMLButtonElement>('[data-crystal="node-b"]')!;
+    await act(async () => { b.focus(); b.click(); });
+    expect(b.getAttribute('aria-pressed')).toBe('true');
+    await frame(start, 1);
+    expect(b.getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('false');
+    expect(document.activeElement).toBe(b);
+    expect(vault.readCrystal).not.toHaveBeenCalledWith('node-test');
+  });
+
+  it('S2:平移中使用者在樓下開了別的卷宗,抵達時不被關聯卷宗請求蓋掉', async () => {
+    await renderApp(bridge({ readCrystal: vi.fn(async () => crystalDetail) }));
+    await act(async () => sealOf(baseEntry).click());
+    await travel();
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-related-entry]')!.click());
+    const start = manual.now();
+    await frame(start, 0);
+    await frame(start, 0.6);
+    await act(async () => button('直式頁碼', card(archive)).click());
+    await frame(start, 1);
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('直式頁碼');
+    expect(container.querySelector('[role="dialog"]')?.textContent).not.toContain('整理採樣記錄');
+  });
+
+  it('S5:快速連打只在停手 120ms 後查一次節點', async () => {
+    vi.useFakeTimers();
+    const vault = await renderApp();
+    for (const value of ['霧', '霧苔', '霧苔一', '霧苔']) {
+      act(() => typeSearch(value));
+      await act(async () => vi.advanceTimersByTimeAsync(60));
+    }
+    expect(vault.searchNodes).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(120));
+    expect(vault.searchNodes).toHaveBeenCalledTimes(1);
+    expect(vault.searchNodes).toHaveBeenCalledWith('霧苔');
+  });
+
+  it('S3:跳轉目標已不存在時,顯示一行提示並停在抵達的樓層', async () => {
+    const removed: NodeHit[] = [{ nodeId: 'gone', name: '已移除', role: null, status: '休眠', matchedIn: '名稱' }];
+    vi.useFakeTimers();
+    await renderApp(bridge({ searchNodes: vi.fn(async () => removed), readCrystal: vi.fn(async () => crystalDetail) }));
+    act(() => typeSearch('已移除'));
+    await act(async () => vi.advanceTimersByTimeAsync(120));
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-node-hit="gone"]')!.click());
+    await travel();
+    const notice = container.querySelector('[data-jump-notice]')!;
+    expect(notice.getAttribute('role')).toBe('status');
+    expect(notice.textContent).toBe('找不到該節點，可能已被移除。');
+    expect(shell().dataset.floor).toBe('sky');
+    expect(world().style.transform).toBe('translateY(0%)');
+    expect(container.querySelector('[data-crystal][aria-pressed="true"]')).toBeNull();
+    expect(document.activeElement?.matches('button[data-kind]')).toBe(true);
+    await act(async () => vi.advanceTimersByTimeAsync(6000));
+    expect(notice.textContent).toBe('');
+  });
+
+  it('S3:關聯卷宗在跳轉途中被移除時,提示找不到卷宗、不開閱讀桌', async () => {
+    const ghost = { ...baseEntry, path: 'cases/試驗/2026-0099.md', caseId: '2026-0099', title: '已回收的卷' };
+    await renderApp(bridge({ readCrystal: vi.fn(async () => ({ ...crystalDetail, relatedEntries: [ghost] })) }));
+    await act(async () => sealOf(baseEntry).click());
+    await travel();
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-related-entry]')!.click());
+    await travel();
+    expect(shell().dataset.floor).toBe('library');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector('[data-jump-notice]')!.textContent).toBe('找不到該卷宗，可能已被移除。');
+  });
+
+  it('S1:目標水晶本來就是選取狀態時,再跳一次焦點仍落在水晶', async () => {
+    await renderApp(bridge({ readCrystal: vi.fn(async () => crystalDetail) }));
+    await act(async () => sealOf(baseEntry).click());
+    await travel();
+    await act(async () => button('俯瞰圖書館').click());
+    await travel();
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => sealOf(baseEntry).click());
+    await travel();
+    expect(document.activeElement).toBe(container.querySelector('[data-crystal="node-test"]'));
+  });
+
+  it('低動態下的跳轉:請求仍在抵達後執行,焦點落在水晶', async () => {
+    await renderApp(bridge({ readCrystal: vi.fn(async () => crystalDetail) }, { reducedMotion: true }));
+    await act(async () => sealOf(baseEntry).click());
+    expect(manual.count()).toBe(0);
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(document.activeElement).toBe(container.querySelector('[data-crystal="node-test"]'));
+  });
+
+  it('跳上樓時水晶資料尚未載入:等資料到了才選取', async () => {
+    let resolve!: (value: CrystalList) => void;
+    const pending = new Promise<CrystalList>((done) => { resolve = done; });
+    const listCrystals = vi.fn()
+      .mockResolvedValueOnce({ crystals: [crystal], links: [] })
+      .mockReturnValueOnce(pending)
+      .mockResolvedValue({ crystals: [crystal], links: [] });
+    await renderApp(bridge({ listCrystals, readCrystal: vi.fn(async () => crystalDetail) }));
+    await act(async () => sealOf(baseEntry).click());
+    await travel();
+    expect(container.querySelector('[data-crystal="node-test"]')).toBeNull();
+    await act(async () => resolve({ crystals: [crystal], links: [] }));
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(document.activeElement).toBe(container.querySelector('[data-crystal="node-test"]'));
   });
 
   it('跳轉四:樓上底部天窗回到樓下;選取請求只消耗一次', async () => {

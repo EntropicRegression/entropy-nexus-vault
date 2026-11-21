@@ -22,16 +22,22 @@ interface Props {
   selectionRequest?: { nodeId: string; requestId: number };
   onReturn: () => void;
   onOpenEntry?: (entry: MemoryEntry) => void;
+  /** The user picked or cleared a crystal; a jump still waiting to land must not override it. */
+  onUserSelect?: () => void;
+  /** The node named by selectionRequest is not on the map (removed or renamed since the jump began). */
+  onRequestMissing?: () => void;
 }
 
 export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = browserFrameClock,
-  selectionRequest, onReturn, onOpenEntry }: Props) {
+  selectionRequest, onReturn, onOpenEntry, onUserSelect, onRequestMissing }: Props) {
   const [data, setData] = useState<CrystalList>();
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ nodeId: string; result: NodeCrystalDetail | null }>();
   const [visible, setVisible] = useState<ReadonlySet<LinkKind>>(() => new Set(linkKinds));
   const consumedSelection = useRef(new Set<number>());
+  /** A jump's target crystal receives focus once rendered (M5b review S1), also when it was already selected. */
+  const [jumpFocus, setJumpFocus] = useState<{ nodeId: string; requestId: number }>();
   const scene = useRef<HTMLDivElement>(null);
   const systemReduced = useSystemMotion();
   const reduced = reducedMotion || systemReduced;
@@ -53,8 +59,17 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
   useEffect(() => {
     if (!active || !vaultExists || !selectionRequest || !data || consumedSelection.current.has(selectionRequest.requestId)) return;
     consumedSelection.current.add(selectionRequest.requestId);
-    if (data.crystals.some((node) => node.nodeId === selectionRequest.nodeId)) setSelected(selectionRequest.nodeId);
-  }, [active, vaultExists, selectionRequest, data]);
+    if (data.crystals.some((node) => node.nodeId === selectionRequest.nodeId)) {
+      setSelected(selectionRequest.nodeId);
+      setJumpFocus(selectionRequest);
+    } else onRequestMissing?.();
+  }, [active, vaultExists, selectionRequest, data, onRequestMissing]);
+
+  useEffect(() => {
+    if (!jumpFocus) return;
+    Array.from(scene.current?.querySelectorAll<HTMLButtonElement>('button[data-crystal]') ?? [])
+      .find((button) => button.dataset.crystal === jumpFocus.nodeId)?.focus({ preventScroll: true });
+  }, [jumpFocus]);
 
   useEffect(() => {
     if (!active || !inspectedId) return;
@@ -73,6 +88,7 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
   }
 
   function select(next: string | null) {
+    onUserSelect?.();
     if (next === null && inspectedId) {
       const buttons = scene.current?.querySelectorAll<HTMLButtonElement>('button[data-crystal]');
       const previous = buttons && Array.from(buttons).find((button) => button.dataset.crystal === inspectedId);

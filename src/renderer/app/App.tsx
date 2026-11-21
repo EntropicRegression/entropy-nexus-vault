@@ -30,6 +30,8 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
   const [quietFade, setQuietFade] = useState(0);
   const [arrived, setArrived] = useState<{ floor: Floor; token: number }>();
   const [announcement, setAnnouncement] = useState('');
+  /** A quiet one-line notice, e.g. when a jump's target no longer exists (M5b review S3). */
+  const [notice, setNotice] = useState('');
   const [skyRequest, setSkyRequest] = useState<{ nodeId: string; requestId: number }>();
   const [libraryRequest, setLibraryRequest] = useState<{ path: string; requestId: number }>();
   const [vaultInfo, setVaultInfo] = useState<VaultInfo | null>(null);
@@ -88,16 +90,20 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
     return () => camera.current?.cancel();
   }, [swapBars]);
 
-  // Runs after React has committed the arrival: focus first, then pending jumps (an opened desk may take focus).
+  // Runs after React has committed the arrival: focus first, then pending jumps, which move focus to their target
+  // (the selected crystal, or the reading desk). If the user already acted on the new floor during the pan, their
+  // focus stays where it is.
   useEffect(() => {
     if (!arrived) return;
-    firstControl(arrived.floor === 'sky' ? upstairs.current : downstairs.current, arrived.floor)?.focus({ preventScroll: true });
+    const layer = arrived.floor === 'sky' ? upstairs.current : downstairs.current;
+    if (!layer?.contains(document.activeElement)) firstControl(layer, arrived.floor)?.focus({ preventScroll: true });
     const pending = arrival.current;
     arrival.current = null;
     if (pending?.floor === arrived.floor) pending.run();
   }, [arrived]);
 
   const go = useCallback((to: Floor, then?: () => void) => {
+    setNotice('');
     arrival.current = then ? { floor: to, run: then } : null;
     const cam = camera.current!;
     if (to === floor && !cam.running) {
@@ -124,6 +130,21 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
   const openInLibrary = useCallback((entry: MemoryEntry) => {
     go('library', () => setLibraryRequest({ path: entry.path, requestId: ++requestId.current }));
   }, [go]);
+
+  // An explicit choice made on the arriving floor during the pan wins over the jump that started it (M5b review S2).
+  const userChoseOn = useCallback((floor: Floor) => {
+    if (arrival.current?.floor === floor) arrival.current = null;
+  }, []);
+  const skyUserSelect = useCallback(() => userChoseOn('sky'), [userChoseOn]);
+  const libraryUserOpen = useCallback(() => userChoseOn('library'), [userChoseOn]);
+  const nodeMissing = useCallback(() => setNotice('找不到該節點，可能已被移除。'), []);
+  const entryMissing = useCallback(() => setNotice('找不到該卷宗，可能已被移除。'), []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     const refresh = () => setAttempt((value) => value + 1);
@@ -218,6 +239,7 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
     <SkyHud barRef={skyBar} reducedMotion={settings.reducedMotion} settingsDisabled={!settingsReady || saving}
       onLibrary={() => go('library')} onToggleMotion={toggleMotion} />
     <main className={styles.stage}>
+      <p className={styles.notice} role="status" data-jump-notice="">{notice}</p>
       {(settingsError || (vaultInfo?.exists && vaultError)) &&
         <p className={styles.settingError} role="alert">{settingsError || vaultError}</p>}
       <div ref={world} className={styles.world} data-floor-world="">
@@ -225,7 +247,7 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
           aria-hidden={!skyShown} inert={floor !== 'sky'}>
           <Sky key={vaultInfo?.key} active={floor === 'sky'} reducedMotion={settings.reducedMotion}
             refreshToken={attempt} vaultExists={vaultInfo?.exists ?? false} selectionRequest={skyRequest}
-            onReturn={() => go('library')} onOpenEntry={openInLibrary} />
+            onReturn={() => go('library')} onOpenEntry={openInLibrary} onUserSelect={skyUserSelect} onRequestMissing={nodeMissing} />
         </section>
         <section ref={downstairs} className={styles.downstairs} aria-label="樓下典藏室" data-shown={libraryShown}
           aria-hidden={!libraryShown} inert={floor !== 'library'}>
@@ -242,7 +264,8 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
             </div>
           </section>}
           {vaultInfo?.exists && <Library key={vaultInfo.key} query={query} deskMode={settings.deskMode} refreshToken={attempt}
-            onToggleMode={toggleDesk} active={floor === 'library'} onNode={goToNode} openRequest={libraryRequest} />}
+            onToggleMode={toggleDesk} active={floor === 'library'} onNode={goToNode} openRequest={libraryRequest}
+            onUserOpen={libraryUserOpen} onRequestMissing={entryMissing} />}
         </section>
       </div>
     </main>
