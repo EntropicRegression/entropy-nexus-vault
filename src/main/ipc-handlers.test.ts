@@ -133,13 +133,15 @@ describe('主程序 IPC 來源驗證', () => {
     const found = await invoke('search', '索引標記', { projectId: project.projectId });
     expect(found).toMatchObject([{ path, projectId: project.projectId }]);
     const entry = await invoke('readEntry', path);
-    expect(entry?.attributes.filter(([key]) => ['專案ID', 'project-id', '工作目錄', '其他'].includes(key))).toEqual([]);
+    expect(entry?.attributes.filter(([key]) => ['專案ID', 'project-id', '工作目錄'].includes(key))).toEqual([]);
+    // List attributes lose only the items that are local paths.
+    expect(entry?.attributes).toContainEqual(['其他', ['公開']]);
     expect(entry?.attributes).toContainEqual(['公開欄位', '保留下來']);
     expect(entry?.body).toContain('[本機路徑已隱藏]');
     const crystal = await invoke('readCrystal', 'fixture-private');
     expect(crystal?.profile?.path).toBe(archive);
     expect(crystal).toMatchObject({ workflow: '參考 [本機路徑已隱藏]',
-      stats: { accepted: 3, completed: 0, rejected: null, cases: null }, acceptanceRate: null });
+      stats: { accepted: 3, completed: 0, rejected: null, cases: null }, notRejectedRate: null });
     const fixtures = await invoke('readCrystal', 'fixture-node-moss');
     const snapshot = [rows, found, entry, crystal, fixtures, await invoke('listCrystals'), await invoke('getVaultInfo')];
     expect(JSON.stringify(snapshot)).not.toMatch(/[a-z]:[\\/]|\/(?:Users|home|tmp|Volumes)\/|file:\/\/|test-server|RelativeName/i);
@@ -186,7 +188,7 @@ describe('主程序 IPC 來源驗證', () => {
       specialty: '擅長核對合成脈衝的時間戳。',
       workflow: '先比對時鐘，再核對合成時間序列。',
       review: '同一批觀測記錄要對齊測試基準。',
-      acceptanceRate: 0.75,
+      notRejectedRate: 0.75,
       consoleAppendixCount: 1,
       archives: [{ archivedAt: '2026-11-21 08:00' }],
       confirmedCaseCount: 1,

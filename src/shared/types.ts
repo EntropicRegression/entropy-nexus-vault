@@ -83,7 +83,8 @@ export interface NodeCrystal {
   nodeId: string;
   name: string;
   role: string | null;
-  status: '線上' | '休眠' | '封存';
+  /** 未知: no console statistics exist for this live profile, so its presence on the console cannot be told. */
+  status: '線上' | '休眠' | '封存' | '未知';
   canWake: boolean;
   cliRecordExists?: boolean;
   projectNames: string[];
@@ -96,7 +97,8 @@ export type CrystalLink =
   | { kind: 'lineage'; from: string; to: string }
   | { kind: 'delegate'; from: string; to: string; count: number; lastAt: string }
   | { kind: 'meeting'; nodeIds: string[]; count: number }
-  | { kind: 'project'; nodeIds: string[]; projectName: string };
+  /** projectKey is an opaque p_ key (from 專案ID, or the name for older data); projectName is for display only. */
+  | { kind: 'project'; nodeIds: string[]; projectKey: string; projectName: string };
 
 export interface CrystalList {
   crystals: (NodeCrystal & { position: Point3 })[];
@@ -121,7 +123,8 @@ export interface NodeCrystalDetail extends NodeCrystal {
   specialty: string;
   workflow: string;
   review: string;
-  acceptanceRate: number | null;
+  /** 1 − 退回/完成. The console accepts finished tasks by default, so only rejections carry a user signal. */
+  notRejectedRate: number | null;
   consoleAppendixCount: number;
 }
 

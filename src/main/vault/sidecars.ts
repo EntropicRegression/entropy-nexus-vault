@@ -2,6 +2,7 @@ import { lstat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { HeatRecall } from '../../shared/heat';
 import type { CrystalLink, CrystalStats, NodeCrystal } from '../../shared/types';
+import { opaqueKey } from './privacy';
 import { memoryPath } from './scan';
 
 export const heatFilename = '.nexus-heat.json';
@@ -15,6 +16,8 @@ export interface VaultStatsNode {
   status: NodeCrystal['status'];
   stats: CrystalStats;
   projectNames: string[];
+  /** Opaque project keys aligned with projectNames: from 專案ID when present, otherwise from the name. */
+  projects: { key: string; name: string }[];
   avatarPath: string | null;
   portraitPath: string | null;
   backend: string | null;
@@ -77,6 +80,9 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
     名稱: name, 狀態: status, 任務數: tasks, 完成數: completed, 完成率: completionRate,
     驗收數: accepted, 退回數: rejected, 判例數: cases, 專案: projectNames,
   } = value;
+  // 專案ID (console 2026-11-22) runs parallel to 專案; older files omit it, and a mismatched list is ignored.
+  const projectIds = isStringList(value.專案ID) && isStringList(projectNames) && value.專案ID.length === projectNames.length
+    ? value.專案ID : null;
   if (typeof name !== 'string' || (status !== '線上' && status !== '休眠' && status !== '封存') ||
       !isCount(tasks) || !isCount(completed) || !(completionRate === null || isRate(completionRate)) ||
       !isCount(accepted) || !isCount(rejected) || !isCount(cases) || !isStringList(projectNames)) return undefined;
@@ -86,6 +92,9 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
     status,
     stats: { tasks, completed, completionRate, accepted, rejected, cases },
     projectNames,
+    projects: projectNames.map((name, index) => ({
+      key: opaqueKey('p', (projectIds && projectIds[index]) || name), name,
+    })),
     avatarPath: stringValue(value.頭像路徑),
     portraitPath: stringValue(value.立繪路徑),
     backend: stringValue(value.session.後台),

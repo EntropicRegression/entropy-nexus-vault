@@ -117,7 +117,7 @@ describe('記憶庫唯讀契約', () => {
       { kind: 'lineage', from: moss, to: heron },
       { kind: 'delegate', from: moss, to: heron, count: 2, lastAt: '2026-11-17T06:00:00.000Z' },
       { kind: 'meeting', nodeIds: [heron, moss], count: 1 },
-      { kind: 'project', projectName: '月汐溫室', nodeIds: expect.arrayContaining([heron, moss]) },
+      { kind: 'project', projectKey: expect.stringMatching(/^p_/), projectName: '月汐溫室', nodeIds: expect.arrayContaining([heron, moss]) },
     ]));
     expect(await snapshot.readCrystal(moss)).toMatchObject({
       name: '夜苔', status: '封存', canWake: true, profile: { path: archives[0] },
@@ -285,5 +285,44 @@ describe('記憶庫唯讀契約', () => {
     });
     expect(snapshot.listEntries({ nodeId: legacyLabel })).toEqual([]);
     expect(snapshot.listEntries({ nodeLabel: legacyLabel }).map(({ path }) => path)).toEqual([casePaths[2]]);
+  });
+});
+
+describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
+  const consoleStats = resolve('fixtures/console-stats');
+  const id = (n: number) => '0b6f1c2e-0000-4000-8000-00000000000' + n;
+
+  it('解析不丟節點:null 欄位、缺 專案ID 的舊版節點與協作、同席都保留', async () => {
+    const snapshot = await new VaultReader(consoleStats, now).read();
+    expect(snapshot.sidecars.stats?.nodes.size).toBe(5);
+    const { crystals, links } = snapshot.listCrystals();
+    expect(crystals.map((crystal) => crystal.nodeId).sort()).toEqual([1, 2, 3, 4, 5].map(id));
+    expect(crystals.find((crystal) => crystal.nodeId === id(2))).toMatchObject({ role: null, status: '休眠', canWake: false });
+    expect(crystals.find((crystal) => crystal.nodeId === id(4))).toMatchObject({ status: '封存', canWake: true, projectNames: ['舊專案'] });
+    expect(links).toEqual(expect.arrayContaining([
+      { kind: 'delegate', from: id(1), to: id(2), count: 3, lastAt: '2026-11-21T10:00:00.000Z' },
+      { kind: 'meeting', nodeIds: [id(1), id(3)], count: 2 },
+    ]));
+    const third = await snapshot.readCrystal(id(3));
+    expect(third).toMatchObject({ stats: { completed: 0, rejected: 0, completionRate: null }, notRejectedRate: null });
+    expect((await snapshot.readCrystal(id(1)))?.notRejectedRate).toBeCloseTo(0.9);
+  });
+
+  it('同專案以 專案ID 分組:同名不同 ID 不連線、同 ID 連線、舊版退回用名稱;代號不含原始路徑', async () => {
+    const snapshot = await new VaultReader(consoleStats, now).read();
+    const projectLinks = snapshot.listCrystals().links.filter((link) => link.kind === 'project');
+    expect(projectLinks.map((link) => link.kind === 'project' && [link.projectName, [...link.nodeIds].sort()])).toEqual(
+      expect.arrayContaining([['共用庫', [id(1), id(3)]], ['舊專案', [id(4), id(5)]]]));
+    expect(projectLinks.some((link) => link.kind === 'project' && link.projectName === 'app')).toBe(false);
+    for (const link of projectLinks) if (link.kind === 'project') expect(link.projectKey).toMatch(/^p_[a-f0-9]{24}$/);
+    expect(JSON.stringify(snapshot.listCrystals())).not.toMatch(/synthetic|[a-z]:\//i);
+  });
+
+  it('沒有統計檔時,只有現役側寫的節點顯示「未知」,封存檔仍是封存', async () => {
+    const root = await copyVault();
+    await unlink(join(root, statsFilename));
+    const { crystals } = (await new VaultReader(root, now).read()).listCrystals();
+    expect(crystals.find((crystal) => crystal.nodeId === heron)?.status).toBe('未知');
+    expect(crystals.find((crystal) => crystal.nodeId === moss)?.status).toBe('封存');
   });
 });

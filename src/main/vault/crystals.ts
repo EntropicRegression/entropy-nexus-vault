@@ -38,12 +38,12 @@ export function profileHighlights(profile: ParsedEntry | undefined, stats: Cryst
   }
   const paragraph = section('特長').split(/\n[ \t]*\n/, 1)[0].replace(/^[-+*]\s+/, '').replace(/\s+/g, ' ').trim();
   const specialty = /^.+?(?:[。！？!?]|\.(?=\s|$)|$)/.exec(paragraph)?.[0] ?? '';
-  const { accepted, rejected } = stats ?? {};
-  const acceptanceRate = accepted != null && rejected != null && accepted + rejected > 0
-    ? accepted / (accepted + rejected) : null;
+  const { completed, rejected } = stats ?? {};
+  const notRejectedRate = completed != null && rejected != null && completed > 0
+    ? Math.max(0, 1 - rejected / completed) : null;
   return {
     specialty, workflow: section('解決問題的流程'), review: section('回顧'),
-    acceptanceRate,
+    notRejectedRate,
     consoleAppendixCount: sections.filter(({ level, title }) => level === 2 && isAppendix(title)).length,
   };
 }
@@ -111,7 +111,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
 
   const records = new Map<string, CrystalRecord>();
   const nodeIds = new Set([...files.keys(), ...(snapshot?.nodes.keys() ?? [])]);
-  const projectMembers = new Map<string, string[]>();
+  const projectMembers = new Map<string, { name: string; members: string[] }>();
   for (const nodeId of nodeIds) {
     const statsNode = snapshot?.nodes.get(nodeId);
     const node = files.get(nodeId);
@@ -119,13 +119,16 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       b.parsed.entry.path.localeCompare(a.parsed.entry.path, 'zh-Hant', { numeric: true })) ?? [];
     const latestArchive = archives[0]?.parsed;
     const liveProfile = node?.profiles.sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)[0];
-    const status = statsNode?.status ?? (liveProfile ? '休眠' : '封存');
+    // Without console statistics a live profile could be on the board or long deleted; do not claim it is dormant.
+    const status = statsNode?.status ?? (liveProfile ? '未知' : '封存');
     const profile = status === '封存' ? latestArchive ?? liveProfile : liveProfile ?? latestArchive;
     const relatedEntries = casesByNode.get(nodeId) ?? [];
-    const projectNames = [...new Set([
-      ...(statsNode?.projectNames ?? []),
-      ...relatedEntries.map((caseEntry) => caseEntry.projectName).filter(Boolean),
-    ])];
+    const projects = new Map<string, string>();
+    for (const { key, name } of statsNode?.projects ?? []) if (key && !projects.has(key)) projects.set(key, name);
+    for (const caseEntry of relatedEntries) {
+      if (caseEntry.projectId && !projects.has(caseEntry.projectId)) projects.set(caseEntry.projectId, caseEntry.projectName);
+    }
+    const projectNames = [...new Set([...projects.values()].filter(Boolean))];
     const fileName = profile && field(profile.attributes, '節點', '名稱', 'name');
     const fileRole = profile && field(profile.attributes, '角色', 'role');
     const crystal: NodeCrystal = {
@@ -146,10 +149,10 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       archives: archives.map(({ parsed, archivedAt }) => ({ path: parsed.entry.path, archivedAt })),
       relatedEntries,
     });
-    for (const project of projectNames) {
-      const members = projectMembers.get(project) ?? [];
-      members.push(nodeId);
-      projectMembers.set(project, members);
+    for (const [key, name] of projects) {
+      const project = projectMembers.get(key) ?? { name, members: [] };
+      project.members.push(nodeId);
+      projectMembers.set(key, project);
     }
   }
 
@@ -169,8 +172,8 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       if (participants.length > 1) crystalLinks.push({ ...link, nodeIds: participants });
     }
   }
-  for (const [projectName, members] of projectMembers) {
-    if (members.length > 1) crystalLinks.push({ kind: 'project', projectName, nodeIds: members });
+  for (const [projectKey, { name, members }] of projectMembers) {
+    if (members.length > 1) crystalLinks.push({ kind: 'project', projectKey, projectName: name, nodeIds: members });
   }
 
   return { records, links: crystalLinks };

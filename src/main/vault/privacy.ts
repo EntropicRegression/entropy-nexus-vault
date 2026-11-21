@@ -16,9 +16,11 @@ const sensitiveKeys = new Set([
   'projectpath', 'projectdir', 'projectroot', 'rootpath', 'vaultpath', 'reporoot',
 ]);
 
-// Consume the path to the next text delimiter, including spaces in folder names.
-// URL and relative Markdown links keep their own classification.
-const localPath = /(?<![a-z0-9_])(?:file:(?:[/\\]|%2f|%5c)+|[a-z]:[\\/]|\\\\)[^\r\n\x60"'<>()[\]]*|(?<![\p{L}\p{N}_.%/\\])(?:\.{1,2}\\|[\p{L}\p{N}_-]+\\)(?=[\p{L}\p{N}_.-])[^\r\n\x60"'<>()[\]]*|(?<![\p{L}\p{N}_.~:/\\])\/(?:\/)?[\p{L}\p{N}_.~-][^\r\n\x60"'<>()[\]]*/giu;
+// Paths that reveal the machine or the user are hidden: drive paths, UNC shares, file: URLs, POSIX absolute paths,
+// and relative paths that walk into a Users/home folder (they carry the account name). Ordinary relative paths
+// such as src\main\core.ts or cases/x.md are kept (docs/架構.md §11). The match runs to the next text delimiter
+// so folder names with spaces are covered.
+const localPath = /(?<![a-z0-9_])(?:file:(?:[/\\]|%2f|%5c)+|[a-z]:[\\/]|\\\\)[^\r\n\x60"'<>()[\]（）「」『』【】、，。；：]*|(?<![\p{L}\p{N}_.%/\\])(?:\.{1,2}[\\/])*(?:users|home)[\\/](?=[^\\/\s])[^\r\n\x60"'<>()[\]（）「」『』【】、，。；：]*|(?<![\p{L}\p{N}_.~:/\\])\/(?:\/)?[\p{L}\p{N}_.~-][^\r\n\x60"'<>()[\]（）「」『』【】、，。；：]*/giu;
 
 export function isPrivateVaultField(key: string): boolean {
   return sensitiveKeys.has(key.normalize('NFKC').toLowerCase().replace(/[\s_-]/g, ''));
@@ -28,9 +30,17 @@ function containsLocalPath(value: string): boolean {
   return value.search(localPath) !== -1;
 }
 
+/** Drops private keys; list values lose only the items that contain a local path (a list left empty is dropped). */
 export function publicAttributes(attributes: ReadonlyMap<string, FrontMatterValue>): [string, FrontMatterValue][] {
-  return [...attributes].filter(([key, value]) => !isPrivateVaultField(key) && !containsLocalPath(key) &&
-    !(Array.isArray(value) ? value.some(containsLocalPath) : containsLocalPath(value)));
+  const result: [string, FrontMatterValue][] = [];
+  for (const [key, value] of attributes) {
+    if (isPrivateVaultField(key) || containsLocalPath(key)) continue;
+    if (Array.isArray(value)) {
+      const kept = value.filter((item) => !containsLocalPath(item));
+      if (kept.length || !value.length) result.push([key, kept]);
+    } else if (!containsLocalPath(value)) result.push([key, value]);
+  }
+  return result;
 }
 
 /** Final IPC boundary for vault DTOs, including future profile or archive fields. */
