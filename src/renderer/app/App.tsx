@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeCrystal, VaultInfo, ViewSettings } from '../../shared/types';
 import { Library } from '../library/Library';
 import { useDelayed } from '../library/use-delayed';
@@ -23,9 +23,15 @@ export function App() {
   const showLoading = useDelayed(!vaultInfo && !vaultError ? 'vault' : null);
 
   useEffect(() => {
+    const refresh = () => setAttempt((value) => value + 1);
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, []);
+
+  useEffect(() => {
     let current = true;
     void window.vault.getVaultInfo().then(
-      (info) => { if (current) setVaultInfo(info); },
+      (info) => { if (current) { setVaultInfo(info); setVaultError(''); } },
       () => { if (current) setVaultError('無法讀取記憶庫資訊。'); },
     );
     return () => { current = false; };
@@ -76,11 +82,11 @@ export function App() {
     void updateSettings({ deskMode: settings.deskMode === 'A' ? 'B' : 'A' });
   }
 
-  function openNode(selected: NodeCrystal) {
+  const openNode = useCallback((selected: NodeCrystal) => {
     setNode(selected);
     setFloor('sky');
     up.current?.focus();
-  }
+  }, []);
 
   return <div className={styles.shell} data-floor={floor} data-reduced-motion={settings.reducedMotion}>
     <header className={styles.topBar}>
@@ -97,6 +103,7 @@ export function App() {
           <button type="button" disabled={!settingsReady || saving} onClick={toggleDesk}>
             版式：{settings.deskMode === 'A' ? 'A 寬幅閱讀桌' : 'B 右側 420px 欄'}
           </button>
+          <button type="button" onClick={() => setAttempt((value) => value + 1)}>重新整理</button>
         </>}
         <button type="button" aria-pressed={settings.reducedMotion} disabled={!settingsReady || saving}
           onClick={() => void updateSettings({ reducedMotion: !settings.reducedMotion })}>低動態：{settings.reducedMotion ? '開' : '關'}</button>
@@ -104,7 +111,8 @@ export function App() {
       </div>
     </header>
     <main className={styles.stage}>
-      {settingsError && <p className={styles.settingError} role="alert">{settingsError}</p>}
+      {(settingsError || (vaultInfo?.exists && vaultError)) &&
+        <p className={styles.settingError} role="alert">{settingsError || vaultError}</p>}
       {floor === 'sky' && <section className={styles.center}>
         <h2>星象召喚盤</h2>
         {node && <p>{node.name}</p>}
@@ -112,15 +120,17 @@ export function App() {
       </section>}
       <div className={styles.downstairs} hidden={floor !== 'library'}>
         {showLoading && <p className={styles.center} role="status">正在翻閱…</p>}
-        {(vaultError || vaultInfo?.exists === false) && <section className={styles.center}>
-          {vaultError ? <p role="alert">{vaultError}</p> : <h2>找不到記憶庫資料夾</h2>}
-          {vaultInfo && <p className={styles.path}>{vaultInfo.path}</p>}
-          <div className={styles.recovery}>
-            <button type="button" disabled={choosing} onClick={() => void chooseVault()}>選擇資料夾…</button>
-            <button type="button" onClick={() => { setVaultError(''); setAttempt((value) => value + 1); }}>重新偵測</button>
+        {!vaultInfo?.exists && (vaultError || vaultInfo) && <section className={styles.center}>
+          <div className={styles.recoveryPaper}>
+            {vaultError ? <p role="alert">{vaultError}</p> : <h2>找不到記憶庫資料夾</h2>}
+            {vaultInfo && <p className={styles.path}>{vaultInfo.path}</p>}
+            <div className={styles.recovery}>
+              <button type="button" disabled={choosing} onClick={() => void chooseVault()}>選擇資料夾…</button>
+              <button type="button" onClick={() => { setVaultError(''); setAttempt((value) => value + 1); }}>重新偵測</button>
+            </div>
           </div>
         </section>}
-        {vaultInfo?.exists && !vaultError && <Library key={vaultInfo.path} query={query} deskMode={settings.deskMode}
+        {vaultInfo?.exists && <Library key={vaultInfo.key} query={query} deskMode={settings.deskMode} refreshToken={attempt}
           onToggleMode={toggleDesk} onNode={openNode} active={floor === 'library'} />}
       </div>
     </main>

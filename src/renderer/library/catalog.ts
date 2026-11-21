@@ -5,7 +5,15 @@ export const shelfNames: Record<Shelf, string> = { case: '判例', decision: '�
 export const tabs = ['all', 'case', 'decision', 'bookmark', 'archive', 'pending'] as const;
 export type CatalogTab = (typeof tabs)[number];
 export const tabNames: Record<CatalogTab, string> = { ...shelfNames, all: '全部', pending: '待處理' };
-export const writeLater = '寫入功能將於 M4 開放';
+export function projectDisplayName(entry: Pick<MemoryEntry, 'projectName' | 'projectId'>): string {
+  const name = entry.projectName.trim();
+  if (name && !/^(?:[a-z]:|[/\\]|file:)/i.test(name)) return name;
+  return entry.projectId ? '未命名書閣' : '';
+}
+
+export function isProjectIdAttribute(key: string): boolean {
+  return /^(?:專案id|project-?id)$/i.test(key.trim());
+}
 
 export function dateLabel(timestamp: number): string {
   const date = new Date(timestamp);

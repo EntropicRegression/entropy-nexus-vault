@@ -6,10 +6,11 @@
   color: var(--text-night);
   font: 500 13px/1.5 var(--font-serif);
   --paper-fade: 240ms;
+  --stamp-duration: 260ms;
 }
 
-.shell[data-reduced-motion='true'] { --paper-fade: 0ms; }
-@media (prefers-reduced-motion: reduce) { .shell { --paper-fade: 0ms; } }
+.shell[data-reduced-motion='true'] { --paper-fade: 0ms; --stamp-duration: 0ms; }
+@media (prefers-reduced-motion: reduce) { .shell { --paper-fade: 0ms; --stamp-duration: 0ms; } }
 
 .topBar {
   position: relative;
@@ -72,8 +73,18 @@
 .shell[data-floor='sky'] .stage::before { background: radial-gradient(ellipse at 50% 25%, #121e39, #080e23 80%); }
 .center { display: grid; min-height: 100%; place-content: center; gap: 12px; text-align: center; margin: 0; }
 .center h2, .center p { margin: 0; }
-.path { color: var(--text-night-muted); overflow-wrap: anywhere; }
+.recoveryPaper {
+  width: min(520px, calc(100vw - 48px));
+  padding: 24px 28px;
+  background: var(--paper-2);
+  color: var(--ink-paper);
+  border: 1.5px solid var(--wood-warm);
+  box-shadow: 0 12px 28px rgba(0,0,0,.65);
+}
+.recoveryPaper .path { margin: 10px 0; color: var(--ink-paper-muted); overflow-wrap: anywhere; }
 .recovery { display: flex; justify-content: center; gap: 12px; }
+.recovery button { border-color: var(--wood-warm); }
+.recovery button:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
 .settingError {
   position: absolute;
   z-index: 6;

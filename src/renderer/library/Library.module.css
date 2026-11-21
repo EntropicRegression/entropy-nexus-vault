@@ -1,16 +1,22 @@
 .library {
   height: 100%;
   display: flex;
+  flex-direction: column;
   --scene-gutter: 28px;
 }
 
+.libraryWorkspace { position: relative; display: flex; flex: 1; min-height: 0; }
 .libraryPanel {
   min-width: 0;
+  min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
   padding: 18px var(--scene-gutter) 0;
   gap: 12px;
+  overflow: auto;
+  overflow-anchor: none;
+  scrollbar-width: thin;
 }
 
 .grain, .srOnly {
@@ -97,9 +103,10 @@
   font-size: 12.5px;
   line-height: 1.55;
 }
-.paperButton:hover:not(:disabled), .previousButton:hover { border-color: var(--wood-warm); background: rgba(107,74,46,.10); }
+.paperButton:hover:not(:disabled, [aria-disabled='true']), .previousButton:hover { border-color: var(--wood-warm); background: rgba(107,74,46,.10); }
 .primaryButton { background: var(--wood-dark); border-color: var(--wood-warm); color: var(--amber-bright); }
 .primaryButton:disabled, .paperButton:disabled { cursor: not-allowed; }
+.primaryButton[aria-disabled='true'], .paperButton[aria-disabled='true'] { opacity: .62; cursor: not-allowed; }
 .noteActions button { white-space: nowrap; }
 
 .filters, .tabs, .projects {
@@ -133,7 +140,7 @@
   border: 1px solid rgba(217,164,65,.38);
   font: inherit;
 }
-.shelves { min-height: 0; flex: 1; padding: 0 4px 12px; overflow: auto; scrollbar-width: thin; }
+.shelves { flex: none; padding: 0 4px 12px; }
 .shelf { position: relative; margin-bottom: 20px; }
 .shelf h2 {
   position: relative;
@@ -326,24 +333,26 @@
   z-index: 4;
   inset: 0;
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   padding: 26px 48px;
   background: rgba(10,14,34,.8);
   animation: reveal var(--paper-fade) ease-out both;
 }
 @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
-.deskSidebar { width: 420px; flex: 0 0 420px; min-width: 0; }
+.deskSidebar { width: 420px; flex: 0 0 420px; min-width: 0; animation: reveal var(--paper-fade) ease-out both; }
 .readingPaper {
   color-scheme: light;
   width: min(1100px, calc(100vw - 96px));
   min-height: 128px;
-  max-height: calc(100vh - 106px);
+  max-height: 100%;
   overflow: auto;
   color: var(--ink-paper);
   background: var(--paper-2);
   border: 1.5px solid var(--wood-warm);
   box-shadow: 0 24px 56px rgba(0,0,0,.82);
   scrollbar-width: thin;
+  scrollbar-color: var(--wood-warm) var(--paper-1);
   font-variant-numeric: oldstyle-nums;
 }
 .deskSidebar .readingPaper { width: 100%; height: 100%; max-height: none; border: 0; border-left: 2px solid var(--wood-warm); }
@@ -358,6 +367,7 @@
 .sheetHeader { border-bottom: 1px solid rgba(107,74,46,.3); }
 .sheetHeading { min-width: 0; }
 .sheetHeading h2 { margin: 5px 0 0; font-size: 20px; line-height: 1.45; overflow-wrap: anywhere; }
+.sheetHeading h2:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
 .sheetMeta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--ink-paper-muted); }
 .sheetHeaderActions, .writeControls { display: flex; gap: 6px; white-space: nowrap; }
 .deskSidebar .sheetHeaderActions button { font-size: 11.5px; padding-inline: 5px; }
@@ -396,6 +406,44 @@
 .library[data-side='true'] .board { padding: 10px 14px 12px; }
 .library[data-side='true'] .note { padding: 10px 12px; }
 .library[data-side='true'] .note p { display: none; }
+
+.note[data-processed='true'] { background: var(--paper-0); opacity: .82; }
+.stamp {
+  position: absolute;
+  right: 9px;
+  bottom: 7px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  color: var(--ember);
+  font-weight: 700;
+  opacity: .62;
+  pointer-events: none;
+  transform: rotate(-8deg);
+  animation: stamp-in var(--stamp-duration) ease-out;
+}
+@keyframes stamp-in { from { transform: rotate(-8deg) scale(1.45); } }
+.note:has(.stamp) .noteActions { padding-right: 47px; }
+.writeMessage { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.note > .writeMessage { margin-top: 6px; }
+.writeMessage[data-failed] { color: var(--ember); }
+.notice {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--night-deep);
+  border: 1px solid var(--gold-warm);
+  color: var(--text-night);
+}
+.notice button { border: 1px solid var(--brass); background: none; color: var(--amber-bright); }
+.notice .writeMessage[data-failed] { color: var(--text-night); }
+.undoPreview pre { max-height: 18vh; overflow: auto; margin: 4px 0 0; white-space: pre-wrap; }
 
 @media (max-width: 1460px) {
   .board { padding: 10px 14px 12px; }

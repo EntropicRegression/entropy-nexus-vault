@@ -1,8 +1,12 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { DeskMode, MemoryEntry, MemoryEntryDetail, NodeCrystal } from '../../shared/types';
-import { categoryLabel, dateLabel, entryIdentifier, writeLater } from './catalog';
+import { canSetStatus, primaryStatus } from '../../shared/vault-actions';
+import { categoryLabel, dateLabel, entryIdentifier, isProjectIdAttribute, projectDisplayName } from './catalog';
 import { HeatSlot, nodeName, PreviousVersion, StatusMark } from './Paper';
+import type { Feedback, WriteRequest } from './use-vault-writes';
+import { legacyWriteMessage } from './use-vault-writes';
+import { WriteFeedback } from './WriteFeedback';
 import styles from './Library.module.css';
 
 type OpenEntry = (path: string) => void;
@@ -71,6 +75,7 @@ interface Props {
   selectedPath: string;
   entry: MemoryEntryDetail | null;
   loading: boolean;
+  checking: boolean;
   showLoading: boolean;
   error: boolean;
   entries: ReadonlyMap<string, MemoryEntry>;
@@ -79,10 +84,13 @@ interface Props {
   onClose: () => void;
   onToggleMode: () => void;
   onNode: (node: NodeCrystal) => void;
+  writeState?: Feedback;
+  onWrite: (request: WriteRequest) => void;
+  onReload: (request: WriteRequest) => void;
 }
 
 export function ReadingDesk(props: Props) {
-  const { deskMode, selectedPath, entry, loading, showLoading, error, entries, nodes, onOpen, onClose, onToggleMode, onNode } = props;
+  const { deskMode, selectedPath, entry, loading, checking, showLoading, error, entries, nodes, onOpen, onClose, onToggleMode, onNode, writeState, onWrite, onReload } = props;
   const title = useRef<HTMLHeadingElement>(null);
   const paper = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -91,6 +99,11 @@ export function ReadingDesk(props: Props) {
   }, [selectedPath, entry?.path, deskMode]);
 
   const related = new Map<string, string>();
+  const name = entry && projectDisplayName(entry);
+  const attributes = entry?.attributes.filter(([key]) => !isProjectIdAttribute(key)) ?? [];
+  const primary = entry && primaryStatus(entry);
+  const blocked = error || checking || !entry?.writable || writeState?.phase === 'pending' ||
+    (writeState?.phase === 'failure' && ['conflict', 'missing', 'legacy'].includes(writeState.reason));
   for (const path of entry?.caseReferences ?? []) {
     const id = entries.get(path)?.caseId ?? /(?:^|\/)(\d{4}-\d{4})/.exec(path)?.[1];
     if (id) related.set(id, path);
@@ -106,7 +119,7 @@ export function ReadingDesk(props: Props) {
             <div className={styles.sheetMeta}>
               <span>{entryIdentifier(entry)}</span>
               {entry.shelf === 'case' && <><span>{categoryLabel(entry)}</span><time>{dateLabel(entry.updatedAt)}</time></>}
-              {entry.projectName && <span>{entry.projectName}</span>}
+              {name && <span>{name}</span>}
               <StatusMark status={entry.status} /><HeatSlot heat={entry.heat} />
               {entry.nodeIds.map((id) => {
                 const node = nodes.get(id);
@@ -130,7 +143,7 @@ export function ReadingDesk(props: Props) {
         </div>
       </header>
       {showLoading && <p className={styles.paperMessage} role="status">正在翻閱…</p>}
-      {error && <p className={styles.paperMessage} role="alert">無法讀取這卷記憶。</p>}
+      {error && <p className={styles.paperMessage} role="alert">{entry ? '無法重新讀取，以下是上次讀取的內容。' : '無法讀取這卷記憶。'}</p>}
       {entry && <>
         <div className={styles.sheetBody}>
           <div className={styles.document}>
@@ -159,9 +172,9 @@ export function ReadingDesk(props: Props) {
                 </li>)}
               </ul>
             </section>}
-            {entry.attributes.length > 0 && <details>
+            {attributes.length > 0 && <details>
               <summary>卷宗屬性</summary>
-              <dl className={styles.attributes}>{entry.attributes.map(([key, value]) => <div key={key}>
+              <dl className={styles.attributes}>{attributes.map(([key, value]) => <div key={key}>
                 <dt>{key}</dt><dd>{Array.isArray(value) ? value.join('、') : value}</dd>
               </div>)}</dl>
             </details>}
@@ -169,11 +182,17 @@ export function ReadingDesk(props: Props) {
         </div>
         <footer className={styles.sheetFooter}>
           <div className={styles.writeControls}>
-            <button type="button" className={styles.primaryButton} disabled title={writeLater}>{entry.shelf === 'bookmark' ? '標為完成' : '確認'}</button>
-            <button type="button" className={styles.paperButton} disabled title={writeLater}>退回</button>
-            <button type="button" className={styles.paperButton} disabled title={writeLater}>移入回收</button>
+            <button type="button" className={styles.primaryButton} aria-disabled={blocked || !primary} data-write-action={primary || undefined}
+              onClick={() => { if (!blocked && primary) onWrite({ kind: 'status', entry, status: primary }); }}>
+              {entry.shelf === 'bookmark' ? '標為完成' : '確認'}
+            </button>
+            <button type="button" className={styles.paperButton} aria-disabled={blocked || !canSetStatus(entry, '退回')} data-write-action="退回"
+              onClick={() => { if (!blocked && canSetStatus(entry, '退回')) onWrite({ kind: 'status', entry, status: '退回' }); }}>退回</button>
+            <button type="button" className={styles.paperButton} aria-disabled={blocked} data-write-action="recycle"
+              onClick={() => { if (!blocked) onWrite({ kind: 'recycle', entry }); }}>移入回收</button>
           </div>
-          <span>{writeLater}</span>
+          {!entry.writable && <span className={styles.writeMessage}>{legacyWriteMessage}</span>}
+          <WriteFeedback state={writeState} onRun={onWrite} onReload={onReload} retryDisabled={error || checking} />
         </footer>
       </>}
     </section>
