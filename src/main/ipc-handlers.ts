@@ -6,11 +6,12 @@ import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
 import type { VaultInfo, VaultWriteResult } from '../shared/types';
 import { appUrl } from './app-assets';
-import { avatarUrl } from './images';
+import { avatarUrl, portraitUrl } from './images';
 import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
 import { VaultReader } from './vault';
 import { VaultWriter } from './vault/write';
 import { opaqueKey, redactForRenderer } from './vault/privacy';
+import { CrystalLayoutStore } from './vault/crystal-layout-store';
 
 type VaultHandlers = {
   [Method in keyof VaultRequests]: (
@@ -38,6 +39,7 @@ export function isVaultFrameUrl(value: string): boolean {
 
 export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   const settingsFile = join(app.getPath('userData'), app.isPackaged ? 'settings.json' : 'settings.dev.json');
+  const crystalLayout = new CrystalLayoutStore(join(app.getPath('userData'), 'crystal-layout.json'));
   const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
     : join(app.getAppPath(), 'fixtures', 'memory-vault');
   let activeVault: { path: string; reader: VaultReader; writer: VaultWriter } | undefined;
@@ -58,6 +60,11 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
 
   async function readVault() {
     return (await readVaultContext()).snapshot;
+  }
+
+  async function crystalImages(context: Awaited<ReturnType<typeof readVaultContext>>, nodeId: string) {
+    const [avatar, portrait] = await Promise.all([avatarUrl(context, nodeId), portraitUrl(context, nodeId)]);
+    return { avatarUrl: avatar, portraitUrl: portrait };
   }
 
   async function getInfo(path: string): Promise<VaultInfo> {
@@ -96,14 +103,19 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     listCrystals: async () => {
       const context = await readVaultContext();
       const { crystals, links } = context.snapshot.listCrystals();
+      const positions = await crystalLayout.positions(opaqueKey('v', context.root), crystals.map(({ nodeId }) => nodeId));
       return {
         crystals: await Promise.all(crystals.map(async (crystal) => ({
-          ...crystal, avatarUrl: await avatarUrl(context, crystal.nodeId),
+          ...crystal, position: positions.get(crystal.nodeId)!, ...await crystalImages(context, crystal.nodeId),
         }))),
         links,
       };
     },
-    readCrystal: async (_event, nodeId) => (await readVault()).readCrystal(nodeId),
+    readCrystal: async (_event, nodeId) => {
+      const context = await readVaultContext();
+      const detail = await context.snapshot.readCrystal(nodeId);
+      return detail ? { ...detail, ...await crystalImages(context, nodeId) } : null;
+    },
     setStatus: async (_event, path, status, expected) => (await getActiveVault()).writer.setStatus(path, status, expected),
     saveEntry: writeUnavailable,
     moveToRecycle: async (_event, path, expected) => (await getActiveVault()).writer.moveToRecycle(path, expected),

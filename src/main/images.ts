@@ -70,10 +70,15 @@ async function* nodeImageCandidates({ root, snapshot }: VaultImageContext, nodeI
   }
 }
 
-export async function avatarUrl(context: VaultImageContext, nodeId: string): Promise<string | null> {
-  const first = await nodeImageCandidates(context, nodeId, 'avatar').next();
-  return first.done ? null : 'vault-image://node/' + encodeURIComponent(nodeId) + '/avatar';
+async function imageUrl(context: VaultImageContext, nodeId: string, kind: ImageKind): Promise<string | null> {
+  for await (const _candidate of nodeImageCandidates(context, nodeId, kind)) {
+    return 'vault-image://node/' + encodeURIComponent(nodeId) + '/' + kind;
+  }
+  return null;
 }
+
+export const avatarUrl = (context: VaultImageContext, nodeId: string) => imageUrl(context, nodeId, 'avatar');
+export const portraitUrl = (context: VaultImageContext, nodeId: string) => imageUrl(context, nodeId, 'portrait');
 
 function matchesImageFormat(bytes: Buffer, type: string): boolean {
   if (type === 'image/png') return bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));

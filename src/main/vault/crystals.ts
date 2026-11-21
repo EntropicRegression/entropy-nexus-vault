@@ -1,5 +1,5 @@
 import type { CrystalLink, CrystalStats, MemoryEntry, NodeCrystal } from '../../shared/types';
-import { memoryTimestamp } from './entry';
+import { markdownHeadings, memoryTimestamp } from './entry';
 import type { ParsedEntry } from './entry';
 import { field } from './frontmatter';
 import { lineageReference } from './links';
@@ -25,6 +25,29 @@ export interface CrystalRecord {
   relatedEntries: MemoryEntry[];
 }
 
+export function profileHighlights(profile: ParsedEntry | undefined, stats: CrystalStats | null) {
+  const lines = profile?.markdown.split(/\r?\n/) ?? [];
+  const sections = markdownHeadings(lines).filter(({ level }) => level <= 2);
+  const isAppendix = (title: string) => /^主控台補充(?:\s*[（(].*[）)])?$/.test(title);
+  const firstAppendix = sections.findIndex(({ level, title }) => level === 2 && isAppendix(title));
+  function section(title: string) {
+    const index = sections.findIndex((heading, offset) =>
+      heading.level === 2 && heading.title === title && (firstAppendix === -1 || offset < firstAppendix));
+    if (index < 0) return '';
+    return lines.slice(sections[index].line + 1, sections[index + 1]?.line ?? lines.length).join('\n').trim();
+  }
+  const paragraph = section('特長').split(/\n[ \t]*\n/, 1)[0].replace(/^[-+*]\s+/, '').replace(/\s+/g, ' ').trim();
+  const specialty = /^.+?(?:[。！？!?]|\.(?=\s|$)|$)/.exec(paragraph)?.[0] ?? '';
+  const { accepted, rejected } = stats ?? {};
+  const acceptanceRate = accepted != null && rejected != null && accepted + rejected > 0
+    ? accepted / (accepted + rejected) : null;
+  return {
+    specialty, workflow: section('解決問題的流程'), review: section('回顧'),
+    acceptanceRate,
+    consoleAppendixCount: sections.filter(({ level, title }) => level === 2 && isAppendix(title)).length,
+  };
+}
+
 function archiveInfo(parsed: ParsedEntry): Archive {
   const written = field(parsed.attributes, '封存時間', 'archivedAt');
   const fileDate = /-(\d{4}-\d{2}-\d{2})(?:-\d+)?\.md$/i.exec(parsed.entry.path)?.[1];
@@ -43,9 +66,10 @@ const countFields = {
 function archiveStats(archive: ParsedEntry | undefined): CrystalStats | null {
   const attributes = archive?.attributes;
   if (!attributes || !Object.values(countFields).some((key) => attributes.has(key))) return null;
-  const count = (key: string): number => {
-    const value = Number(field(attributes, key));
-    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  const count = (key: string): number | null => {
+    const raw = field(attributes, key);
+    const value = Number(raw);
+    return raw && Number.isSafeInteger(value) && value >= 0 ? value : null;
   };
   const rawRate = field(attributes, '完成率');
   const rate = rawRate ? Number(rawRate) : NaN;
@@ -110,7 +134,9 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       name: statsNode?.name || fileName || profile?.entry.title || nodeId,
       role: statsNode?.role ?? (fileRole && fileRole !== '(無)' ? fileRole : null),
       canWake: statsNode?.canWake ?? false,
+      cliRecordExists: statsNode?.cliRecordExists,
       projectNames,
+      glow: 'white',
     };
 
     records.set(nodeId, {

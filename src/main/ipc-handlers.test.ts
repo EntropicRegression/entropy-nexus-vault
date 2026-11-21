@@ -6,6 +6,7 @@ import type { BrowserWindow } from 'electron';
 import { appUrl } from './app-assets';
 import { isVaultFrameUrl, registerVaultIpc } from './ipc-handlers';
 import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
+import { serveNodeImage } from './images';
 import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
 
@@ -108,12 +109,15 @@ describe('主程序 IPC 來源驗證', () => {
     await writeFile(join(vault, path), [
       '---', '種類: 知識', '標題: 隱私驗證', '專案ID: ' + projectId, 'project-id: 隱藏別名',
       '工作目錄: /Users/Synthetic/Note', '其他: [公開, /home/user/private]', '公開欄位: 保留下來', '---',
-      '索引標記。位置是（' + projectId + '）。', '## 回顧', '開啟 file:///C:/Users/Synthetic/Nexus.txt',
+      '索引標記。位置是（' + projectId + '）。',
+      '相對位置：..\\..\\Users\\RelativeName\\Note.md', '附帶索引：Users\\RelativeName\\Index.md',
+      '## 回顧', '開啟 file:///C:/Users/Synthetic/Nexus.txt',
     ].join('\n'));
     const archive = 'nodes/封存/霜-2026-11-22.md';
     await writeFile(join(vault, archive), [
       '---', '種類: 節點側寫', '節點ID: fixture-private', '工作目錄: /tmp/private/vault',
-      '任意欄位: \\\\test-server\\share\\secret', '---', '# 霜', '位於 /Users/Synthetic/Archive',
+      '任意欄位: \\\\test-server\\share\\secret', '驗收數: 3', '完成數: 0', '---',
+      '# 霜', '位於 /Users/Synthetic/Archive', '## 解決問題的流程', '參考 ..\\..\\Users\\RelativeName\\Workflow.md',
     ].join('\n'));
     const sender = {};
     registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
@@ -134,8 +138,62 @@ describe('主程序 IPC 來源驗證', () => {
     expect(entry?.body).toContain('[本機路徑已隱藏]');
     const crystal = await invoke('readCrystal', 'fixture-private');
     expect(crystal?.profile?.path).toBe(archive);
+    expect(crystal).toMatchObject({ workflow: '參考 [本機路徑已隱藏]',
+      stats: { accepted: 3, completed: 0, rejected: null, cases: null }, acceptanceRate: null });
     const fixtures = await invoke('readCrystal', 'fixture-node-moss');
     const snapshot = [rows, found, entry, crystal, fixtures, await invoke('listCrystals'), await invoke('getVaultInfo')];
-    expect(JSON.stringify(snapshot)).not.toMatch(/[a-z]:[\\/]|\/(?:Users|home|tmp|Volumes)\/|file:\/\/|test-server/i);
+    expect(JSON.stringify(snapshot)).not.toMatch(/[a-z]:[\\/]|\/(?:Users|home|tmp|Volumes)\/|file:\/\/|test-server|RelativeName/i);
+  });
+
+  it('星圖合成庫提供四種徽章、關係、履歷及白名單內的實際合成立繪', async () => {
+    electron.userData = await mkdtemp(join(tmpdir(), 'nexus-sky-ipc-'));
+    const vault = join(electron.userData, 'sky');
+    await cp(resolve('fixtures/sky-vault'), vault, { recursive: true });
+    await saveVaultPath(join(electron.userData, 'settings.dev.json'), vault);
+    const cases = join(vault, 'cases', '合成觀測站');
+    const original = await readFile(join(cases, '2026-0001-對齊觀測時間.md'), 'utf8');
+    await writeFile(join(cases, '2026-0002-未確認.md'),
+      original.replace('2026-0001', '2026-0002').replace('已確認', '未確認').replace('對齊觀測時間', '未確認'));
+    await writeFile(join(cases, '2026-0003-只參與.md'), original.replace('2026-0001', '2026-0003')
+      .replace('節點ID: fixture-sky-iris', '節點ID: fixture-sky-quill\n參與節點ID: [fixture-sky-iris]')
+      .replace('對齊觀測時間', '只參與'));
+    const statsFile = join(vault, '.nexus-stats.json');
+    const stats = JSON.parse(await readFile(statsFile, 'utf8'));
+    stats.節點['fixture-sky-iris'].判例數 = 99;
+    await writeFile(statsFile, JSON.stringify(stats));
+    const sender = {};
+    const context = registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
+    const event = { sender, senderFrame: { url: appUrl, parent: null } };
+    function invoke<M extends keyof VaultRequests>(method: M, ...args: Parameters<VaultRequests[M]>): ReturnType<VaultRequests[M]> {
+      return electron.handle.mock.calls.find(([channel]) => channel === vaultChannels[method])![1](event, ...args) as ReturnType<VaultRequests[M]>;
+    }
+    const map = await invoke('listCrystals');
+    const iris = map.crystals.find((node) => node.nodeId === 'fixture-sky-iris')!;
+    expect(map.crystals).toHaveLength(4);
+    expect(new Set(map.links.map(({ kind }) => kind))).toEqual(new Set(['lineage', 'delegate', 'meeting', 'project']));
+    expect(iris).toMatchObject({ glow: 'white', status: '封存', canWake: true,
+      avatarUrl: 'vault-image://node/fixture-sky-iris/avatar', portraitUrl: 'vault-image://node/fixture-sky-iris/portrait' });
+    expect(iris.position).toHaveLength(3);
+    expect(iris.position.every(Number.isFinite)).toBe(true);
+    expect(map.crystals.filter(({ portraitUrl }) => portraitUrl === null)).toHaveLength(3);
+    const image = await serveNodeImage(new Request(iris.portraitUrl!), context);
+    expect(image.status).toBe(200);
+    expect(image.headers.get('content-type')).toBe('image/png');
+    const png = Buffer.from(await image.arrayBuffer());
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([96, 136]);
+    const detail = await invoke('readCrystal', iris.nodeId);
+    expect(detail).toMatchObject({
+      specialty: '擅長核對合成脈衝的時間戳。',
+      workflow: '先比對時鐘，再核對合成時間序列。',
+      review: '同一批觀測記錄要對齊測試基準。',
+      acceptanceRate: 0.75,
+      consoleAppendixCount: 1,
+      archives: [{ archivedAt: '2026-11-21 08:00' }],
+      confirmedCaseCount: 1,
+      relatedEntries: expect.arrayContaining([{ title: '對齊觀測時間' }, { title: '未確認' }, { title: '只參與' }]
+        .map((entry) => expect.objectContaining(entry))),
+      portraitUrl: iris.portraitUrl,
+    });
+    expect(JSON.stringify([map, detail])).not.toMatch(/(?<![a-z0-9-])[a-z]:[\\/]|\/Users\/|\.{2}\\/i);
   });
 });

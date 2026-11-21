@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, open, readFile, rm, truncate, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, open, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,6 +31,26 @@ describe('本機節點圖像協定', () => {
 
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });
+  });
+
+  it('立繪白名單使用真實路徑，拒絕透過目錄連結讀取並回退封存圖', async () => {
+    const allowed = join(root, 'allowed-portraits');
+    const outside = join(root, 'outside-portraits');
+    await mkdir(allowed);
+    await mkdir(outside);
+    await symlink(outside, join(allowed, 'redirected'), 'junction');
+    await writeFile(join(outside, 'portrait.png'), png);
+    const stats = JSON.parse(await readFile(source, 'utf8'));
+    stats.圖像目錄 = allowed;
+    stats.節點[node].立繪路徑 = join(allowed, 'redirected', 'portrait.png');
+    await writeFile(join(root, statsFilename), JSON.stringify(stats));
+
+    const request = new Request(url.replace('/avatar', '/portrait'));
+    expect((await serveNodeImage(request, context)).status).toBe(404);
+    await writeFile(join(archive, 'portrait.png'), png);
+    const response = await serveNodeImage(request, context);
+    expect(response.status).toBe(200);
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(png);
   });
 
   async function installStatsAvatar(bytes: Buffer | string) {

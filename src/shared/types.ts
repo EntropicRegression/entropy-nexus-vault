@@ -1,4 +1,5 @@
 import type { HeatInfo } from './heat';
+import type { Point3 } from './projection';
 import type { Shelf } from './shelves';
 
 export type { HeatInfo, HeatLevel } from './heat';
@@ -84,8 +85,11 @@ export interface NodeCrystal {
   role: string | null;
   status: '線上' | '休眠' | '封存';
   canWake: boolean;
+  cliRecordExists?: boolean;
   projectNames: string[];
   avatarUrl?: string | null;
+  portraitUrl?: string | null;
+  glow?: 'white';
 }
 
 export type CrystalLink =
@@ -95,17 +99,17 @@ export type CrystalLink =
   | { kind: 'project'; nodeIds: string[]; projectName: string };
 
 export interface CrystalList {
-  crystals: NodeCrystal[];
+  crystals: (NodeCrystal & { position: Point3 })[];
   links: CrystalLink[];
 }
 
 export interface CrystalStats {
-  tasks: number;
-  completed: number;
+  tasks: number | null;
+  completed: number | null;
   completionRate: number | null;
-  accepted: number;
-  rejected: number;
-  cases: number;
+  accepted: number | null;
+  rejected: number | null;
+  cases: number | null;
 }
 
 export interface NodeCrystalDetail extends NodeCrystal {
@@ -113,6 +117,12 @@ export interface NodeCrystalDetail extends NodeCrystal {
   stats: CrystalStats | null;
   archives: Array<{ path: string; archivedAt: string }>;
   relatedEntries: MemoryEntry[];
+  confirmedCaseCount: number;
+  specialty: string;
+  workflow: string;
+  review: string;
+  acceptanceRate: number | null;
+  consoleAppendixCount: number;
 }
 
 export type VaultWriteFailure = {

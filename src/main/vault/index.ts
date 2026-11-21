@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { heatDecayAt } from '../../shared/heat';
-import type { CrystalList, EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail } from '../../shared/types';
-import { buildCrystals } from './crystals';
+import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail } from '../../shared/types';
+import { buildCrystals, profileHighlights } from './crystals';
 import { entryFromFile } from './entry';
 import type { ParsedEntry } from './entry';
 import { field } from './frontmatter';
@@ -64,7 +64,7 @@ export class VaultSnapshot {
     }).map(({ entry }) => entry);
   }
 
-  listCrystals(): CrystalList {
+  listCrystals() {
     return {
       crystals: [...this.crystals.records.values()].map(({ crystal }) => crystal),
       links: this.crystals.links,
@@ -84,6 +84,9 @@ export class VaultSnapshot {
       stats: record.stats,
       archives: record.archives,
       relatedEntries: record.relatedEntries,
+        confirmedCaseCount: record.relatedEntries.filter((entry) =>
+          entry.path.startsWith('cases/') && entry.status === '已確認' && entry.nodeId === nodeId).length,
+      ...profileHighlights(record.profile, record.stats),
     };
   }
 

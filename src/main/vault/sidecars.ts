@@ -20,6 +20,7 @@ export interface VaultStatsNode {
   backend: string | null;
   sessionId: string | null;
   canWake: boolean;
+  cliRecordExists?: boolean;
 }
 
 export interface VaultStatsSnapshot {
@@ -90,6 +91,7 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
     backend: stringValue(value.session.後台),
     sessionId: stringValue(value.session.sessionId),
     canWake: status === '封存' && value.session.可接回 === true,
+    ...(typeof value.session.CLI有紀錄 === 'boolean' ? { cliRecordExists: value.session.CLI有紀錄 } : {}),
   };
 }
 
