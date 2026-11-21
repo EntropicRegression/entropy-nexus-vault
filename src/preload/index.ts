@@ -13,6 +13,8 @@ function invoke<Method extends keyof VaultRequests>(
 const vault: VaultApi = {
   getVaultInfo: () => invoke('getVaultInfo'),
   chooseVault: () => invoke('chooseVault'),
+  getSettings: () => invoke('getSettings'),
+  setSettings: (patch) => invoke('setSettings', patch),
   listEntries: (filter) => invoke('listEntries', filter),
   readEntry: (path) => invoke('readEntry', path),
   search: (query, filter) => invoke('search', query, filter),

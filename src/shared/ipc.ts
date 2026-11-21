@@ -8,12 +8,15 @@ import type {
   VaultInfo,
   VaultStatusUpdate,
   VaultWriteResult,
+  ViewSettings,
   WakeResult,
 } from './types';
 
 export interface VaultApi {
   getVaultInfo(): Promise<VaultInfo>;
   chooseVault(): Promise<VaultInfo | null>;
+  getSettings(): Promise<ViewSettings>;
+  setSettings(patch: Partial<ViewSettings>): Promise<ViewSettings>;
   listEntries(filter: EntryFilter): Promise<MemoryEntry[]>;
   readEntry(path: string): Promise<MemoryEntryDetail | null>;
   search(query: string, filter: EntryFilter): Promise<MemoryEntry[]>;
@@ -32,6 +35,8 @@ export type VaultRequests = Omit<VaultApi, 'onVaultChanged'>;
 export const vaultChannels = {
   getVaultInfo: 'vault:get-info',
   chooseVault: 'vault:choose',
+  getSettings: 'vault:get-settings',
+  setSettings: 'vault:set-settings',
   listEntries: 'vault:list-entries',
   readEntry: 'vault:read-entry',
   search: 'vault:search',

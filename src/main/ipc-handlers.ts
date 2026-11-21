@@ -6,7 +6,8 @@ import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
 import type { VaultInfo, VaultWriteResult } from '../shared/types';
 import { appUrl } from './app-assets';
-import { readVaultPath, saveVaultPath } from './settings';
+import { avatarUrl } from './images';
+import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
 import { VaultReader } from './vault';
 
 type VaultHandlers = {
@@ -20,15 +21,33 @@ function writeUnavailable(): Promise<VaultWriteResult> {
   return Promise.resolve({ ok: false, reason: 'io' });
 }
 
-export function registerVaultIpc(getWindow: () => BrowserWindow | null): void {
-  const settingsFile = join(app.getPath('userData'), 'settings.json');
-  const defaultPath = join(app.getPath('appData'), 'entropy-nexus', 'memory-vault');
+export function isVaultFrameUrl(value: string): boolean {
+  try {
+    const actual = new URL(value);
+    const expected = new URL(appUrl);
+    // URL.origin is "null" for custom schemes in Node. Check the origin components directly.
+    return actual.protocol === expected.protocol && actual.host === expected.host &&
+      !actual.username && !actual.password &&
+      (actual.pathname === expected.pathname || actual.pathname.startsWith(expected.pathname + '/'));
+  } catch {
+    return false;
+  }
+}
+
+export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
+  const settingsFile = join(app.getPath('userData'), app.isPackaged ? 'settings.json' : 'settings.dev.json');
+  const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
+    : join(app.getAppPath(), 'fixtures', 'memory-vault');
   let activeVault: { path: string; reader: VaultReader } | undefined;
 
-  async function readVault() {
+  async function readVaultContext() {
     const path = await readVaultPath(settingsFile, defaultPath);
     if (activeVault?.path !== path) activeVault = { path, reader: new VaultReader(path) };
-    return activeVault.reader.read();
+    return { root: path, snapshot: await activeVault.reader.read() };
+  }
+
+  async function readVault() {
+    return (await readVaultContext()).snapshot;
   }
 
   async function getInfo(path: string): Promise<VaultInfo> {
@@ -58,10 +77,21 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null): void {
       await saveVaultPath(settingsFile, chosenPath);
       return info;
     },
+    getSettings: () => readViewSettings(settingsFile),
+    setSettings: (_event, patch) => saveViewSettings(settingsFile, patch),
     listEntries: async (_event, filter) => (await readVault()).listEntries(filter),
     readEntry: async (_event, path) => (await readVault()).readEntry(path),
     search: async (_event, query, filter) => (await readVault()).search(query, filter),
-    listCrystals: async () => (await readVault()).listCrystals(),
+    listCrystals: async () => {
+      const context = await readVaultContext();
+      const { crystals, links } = context.snapshot.listCrystals();
+      return {
+        crystals: await Promise.all(crystals.map(async (crystal) => ({
+          ...crystal, avatarUrl: await avatarUrl(context, crystal.nodeId),
+        }))),
+        links,
+      };
+    },
     readCrystal: async (_event, nodeId) => (await readVault()).readCrystal(nodeId),
     setStatus: writeUnavailable,
     saveEntry: writeUnavailable,
@@ -73,7 +103,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null): void {
   function register<Method extends keyof VaultRequests>(method: Method): void {
     ipcMain.handle(vaultChannels[method], (event, ...args: Parameters<VaultRequests[Method]>) => {
       const frame = event.senderFrame;
-      if (event.sender !== getWindow()?.webContents || !frame || frame.parent || frame.url !== appUrl) {
+      if (event.sender !== getWindow()?.webContents || !frame || frame.parent || !isVaultFrameUrl(frame.url)) {
         throw new Error('無法驗證記憶庫 IPC 呼叫來源');
       }
       return handlers[method](event, ...args);
@@ -81,4 +111,5 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null): void {
   }
 
   for (const method of Object.keys(handlers) as Array<keyof VaultRequests>) register(method);
+  return readVaultContext;
 }
