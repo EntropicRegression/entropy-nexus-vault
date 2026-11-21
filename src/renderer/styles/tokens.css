@@ -10,6 +10,23 @@
   --night-plate: #121731;
   --starlight: #c9d6ff;
   --violet: #9b8cff;
+  --accent: var(--amber-bright);
+  --night-deep: #0e1430;
+  --text-night: #efe6d2;
+  --text-night-muted: #b8ad99;
+  --wood-dark: #2c1e14;
+  --wood-mid: #4b3423;
+  --wood-warm: #6b4a2e;
+  --paper-0: #ddd1b8;
+  --paper-1: #e3d8c1;
+  --paper-2: #e9dfca;
+  --paper-3: #efe6d4;
+  --ink-paper: #2b2118;
+  --ink-paper-muted: #5a4939;
+  --gold-warm: #d9a441;
+  --gem-on: #8c6232;
+  --gem-off: #8a7965;
+  --gem-on-stroke: #4b3423;
 
   --font-serif: 'Noto Serif TC Variable', 'Noto Serif TC', serif;
   --font-ui: 'Noto Sans TC Variable', 'Noto Sans TC', sans-serif;
