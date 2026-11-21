@@ -9,6 +9,8 @@ import { appUrl } from './app-assets';
 import { avatarUrl } from './images';
 import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
 import { VaultReader } from './vault';
+import { VaultWriter } from './vault/write';
+import { opaqueKey, redactForRenderer } from './vault/privacy';
 
 type VaultHandlers = {
   [Method in keyof VaultRequests]: (
@@ -38,12 +40,20 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   const settingsFile = join(app.getPath('userData'), app.isPackaged ? 'settings.json' : 'settings.dev.json');
   const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
     : join(app.getAppPath(), 'fixtures', 'memory-vault');
-  let activeVault: { path: string; reader: VaultReader } | undefined;
+  let activeVault: { path: string; reader: VaultReader; writer: VaultWriter } | undefined;
+
+  async function getActiveVault() {
+    const path = await readVaultPath(settingsFile, defaultPath);
+    if (activeVault?.path !== path) {
+      const reader = new VaultReader(path);
+      activeVault = { path, reader, writer: new VaultWriter(path, () => reader.invalidate()) };
+    }
+    return activeVault;
+  }
 
   async function readVaultContext() {
-    const path = await readVaultPath(settingsFile, defaultPath);
-    if (activeVault?.path !== path) activeVault = { path, reader: new VaultReader(path) };
-    return { root: path, snapshot: await activeVault.reader.read() };
+    const { path, reader } = await getActiveVault();
+    return { root: path, snapshot: await reader.read() };
   }
 
   async function readVault() {
@@ -53,7 +63,8 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   async function getInfo(path: string): Promise<VaultInfo> {
     const exists = await stat(path).then((info) => info.isDirectory(), () => false);
     return {
-      path,
+      key: opaqueKey('v', path),
+      path: path === defaultPath ? (app.isPackaged ? '%APPDATA%\\entropy-nexus\\memory-vault' : 'fixtures/memory-vault') : '自訂記憶庫',
       exists,
       wakeAvailable: Boolean(app.getApplicationNameForProtocol('entropy-nexus://wake')),
     };
@@ -93,10 +104,11 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       };
     },
     readCrystal: async (_event, nodeId) => (await readVault()).readCrystal(nodeId),
-    setStatus: writeUnavailable,
+    setStatus: async (_event, path, status, expected) => (await getActiveVault()).writer.setStatus(path, status, expected),
     saveEntry: writeUnavailable,
-    moveToRecycle: writeUnavailable,
-    restoreFromRecycle: writeUnavailable,
+    moveToRecycle: async (_event, path, expected) => (await getActiveVault()).writer.moveToRecycle(path, expected),
+    restoreFromRecycle: async (_event, path, expected) => (await getActiveVault()).writer.restoreFromRecycle(path, expected),
+    readRecycledEntry: async (_event, path, originalPath) => (await getActiveVault()).writer.readRecycledEntry(path, originalPath),
     wake: async () => ({ ok: false, nodeName: null, sessionId: null }),
   };
 
@@ -106,7 +118,9 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       if (event.sender !== getWindow()?.webContents || !frame || frame.parent || !isVaultFrameUrl(frame.url)) {
         throw new Error('無法驗證記憶庫 IPC 呼叫來源');
       }
-      return handlers[method](event, ...args);
+      return handlers[method](event, ...args).then(redactForRenderer, () => {
+        throw new Error('無法完成記憶庫操作');
+      });
     });
   }
 

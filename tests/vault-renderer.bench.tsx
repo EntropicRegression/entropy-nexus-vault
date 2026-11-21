@@ -7,6 +7,7 @@ import { VaultSnapshot } from '../src/main/vault';
 import { entryFromFile } from '../src/main/vault/entry';
 import { App } from '../src/renderer/app/App';
 import type { VaultApi } from '../src/shared/ipc';
+import type { MemoryEntry, VaultStatusUpdate } from '../src/shared/types';
 
 const count = 500;
 const samples = 7;
@@ -36,18 +37,31 @@ function makeSnapshot() {
 
 it('典藏室 500 筆合成卷宗，量測可見 DOM 更新', async () => {
   const snapshot = makeSnapshot();
+  const target = snapshot.listEntries().find((entry) => entry.caseId === '2026-0001')!;
+  let saved: { status: VaultStatusUpdate; mtime: number } | undefined;
+  const updated = <T extends MemoryEntry>(entry: T): T => entry.path === target.path && saved ? { ...entry, ...saved } : entry;
   let completeSearch: (() => void) | undefined;
-  const bridge: Pick<VaultApi, 'getVaultInfo' | 'getSettings' | 'listEntries' | 'search' | 'readEntry' | 'listCrystals'> = {
-    getVaultInfo: async () => ({ path: 'synthetic-fixture', exists: true, wakeAvailable: false }),
+  const bridge: Pick<VaultApi, 'getVaultInfo' | 'getSettings' | 'listEntries' | 'search' | 'readEntry' | 'listCrystals' | 'setStatus'> = {
+    getVaultInfo: async () => ({ key: 'synthetic-fixture', path: 'synthetic-fixture', exists: true, wakeAvailable: false }),
     getSettings: async () => ({ deskMode: 'A', reducedMotion: true }),
-    listEntries: async (filter) => snapshot.listEntries(filter),
+    listEntries: async (filter) => structuredClone(snapshot.listEntries(filter).map(updated)),
     search: async (query, filter) => {
       const entries = snapshot.search(query, filter);
       completeSearch?.();
       return entries;
     },
-    readEntry: async (path) => snapshot.readEntry(path),
+    readEntry: async (path) => {
+      const entry = await snapshot.readEntry(path);
+      return entry && updated(entry);
+    },
     listCrystals: async () => snapshot.listCrystals(),
+    setStatus: async (path, status, expected) => {
+      if (path !== target.path || expected.mtime !== (saved?.mtime ?? target.mtime) || expected.size !== target.size) {
+        throw new Error('benchmark write version mismatch');
+      }
+      saved = { status, mtime: expected.mtime + 1 };
+      return { ok: true, mtime: saved.mtime, size: expected.size };
+    },
   };
   vi.stubGlobal('vault', bridge);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -62,6 +76,7 @@ it('典藏室 500 筆合成卷宗，量測可見 DOM 更新', async () => {
 
   try {
     for (let sample = 0; sample < samples; sample++) {
+      saved = undefined;
       const host = document.createElement('div');
       document.body.append(host);
       const root = createRoot(host);
@@ -69,6 +84,42 @@ it('典藏室 500 筆合成卷宗，量測可見 DOM 更新', async () => {
         await measure('首批渲染', () => root.render(<App />));
         expect(host.querySelectorAll('[data-entry]')).toHaveLength(96);
         expect(host.textContent).toContain('凡 500 卷');
+
+        const cards = Array.from(host.querySelectorAll<HTMLElement>('[data-entry]'));
+        const targetCard = cards.find((item) => item.dataset.entry === target.path)!;
+        const board = host.querySelector('[aria-labelledby="draft-board"]')!;
+        const note = [...board.querySelectorAll('article')].find((item) => item.textContent.includes('2026-0001'))!;
+        const confirm = [...note.querySelectorAll('button')].find((item) => item.textContent.trim() === '確認')!;
+        const checkDOM = (before: Set<string>, records: MutationRecord[]) => {
+          for (const record of records) {
+            const element = record.target instanceof Element ? record.target : record.target.parentElement;
+            const path = element?.closest<HTMLElement>('[data-entry]')?.dataset.entry;
+            if (path) before.add(path);
+          }
+        };
+        const changed = new Set<string>();
+        const mutations = new MutationObserver((records) => checkDOM(changed, records));
+        mutations.observe(host, { subtree: true, childList: true, attributes: true, characterData: true });
+        try {
+          await measure('確認後 DOM 更新', () => confirm.click());
+          checkDOM(changed, mutations.takeRecords());
+          expect(targetCard.textContent).toContain('已收錄');
+          expect([...changed]).toEqual([target.path]);
+          expect(Array.from(host.querySelectorAll('[data-entry]')).every((node, index) => node === cards[index])).toBe(true);
+          await act(async () => targetCard.querySelector<HTMLButtonElement>('[data-entry-title]')!.click());
+          changed.clear();
+          mutations.takeRecords();
+          const footer = host.querySelector('[aria-label="閱讀桌"] footer')!;
+          const reject = [...footer.querySelectorAll('button')].find((item) => item.textContent.trim() === '退回')!;
+          await measure('退回後 DOM 更新', () => reject.click());
+          checkDOM(changed, mutations.takeRecords());
+          expect(targetCard.textContent).toContain('已退回');
+          expect([...changed]).toEqual([target.path]);
+          expect(Array.from(host.querySelectorAll('[data-entry]')).every((node, index) => node === cards[index])).toBe(true);
+        } finally {
+          mutations.disconnect();
+        }
+        await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="返回書架"]')!.click());
         const filters = host.querySelector('[aria-label="卷宗類別"]')!;
         const archive = [...filters.querySelectorAll('button')].find((item) => item.textContent === '典藏')!;
         await measure('切換典藏頁籤', () => archive.click());

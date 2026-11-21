@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import { VaultReader } from '../src/main/vault';
+import { VaultWriter } from '../src/main/vault/write';
 
 // npm exec --offline -- vitest run --config tests/vault-perf.config.mts
 const now = () => Date.parse('2026-11-22T04:00:00.000Z');
@@ -56,6 +57,26 @@ describe('記憶庫（500 筆合成判例）', () => {
         const results = (await warmReader.read()).search('2026-' + String(index * 31).padStart(4, '0'));
         if (results.length !== 1) throw new Error('查詢結果筆數不符');
       }
+    });
+  }, 60_000);
+
+  it('量測寫入以及寫入後的 500 筆資料快照', async () => {
+    const writer = new VaultWriter(root, () => warmReader.invalidate());
+    const target = (await warmReader.read()).listEntries({ kind: 'case' })[0];
+    let version = { mtime: target.mtime, size: target.size };
+    let confirmation = false;
+    await measure('真實檔案確認／退回（含暫存與同步）', 8, async () => {
+      const result = await writer.setStatus(target.path, confirmation ? '已確認' : '退回', version);
+      if (!result.ok) throw new Error(result.reason);
+      confirmation = !confirmation;
+      version = result;
+    });
+    await measure('寫入加快照更新（500 筆）', 7, async () => {
+      const result = await writer.setStatus(target.path, confirmation ? '已確認' : '退回', version);
+      if (!result.ok) throw new Error(result.reason);
+      confirmation = !confirmation;
+      version = result;
+      if ((await warmReader.read()).listEntries().length !== count) throw new Error('合成資料筆數不符');
     });
   }, 60_000);
 });

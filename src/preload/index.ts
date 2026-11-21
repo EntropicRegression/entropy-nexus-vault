@@ -23,7 +23,8 @@ const vault: VaultApi = {
   setStatus: (path, status, expected) => invoke('setStatus', path, status, expected),
   saveEntry: (path, text, expected) => invoke('saveEntry', path, text, expected),
   moveToRecycle: (path, expected) => invoke('moveToRecycle', path, expected),
-  restoreFromRecycle: (path) => invoke('restoreFromRecycle', path),
+  restoreFromRecycle: (path, expected) => invoke('restoreFromRecycle', path, expected),
+  readRecycledEntry: (path, originalPath) => invoke('readRecycledEntry', path, originalPath),
   wake: (nodeId) => invoke('wake', nodeId),
   onVaultChanged: (callback) => {
     const listener = (_event: IpcRendererEvent, paths: string[]) => callback(paths);

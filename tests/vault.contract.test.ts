@@ -45,15 +45,15 @@ describe('記憶庫唯讀契約', () => {
     expect(snapshot.listEntries({ kind: 'case', nodeId: moss }).map(({ path }) => path)).toEqual([casePaths[0]]);
     expect(snapshot.listEntries({ subtype: '書籤', status: '未完' }).map(({ path }) => path)).toEqual([knowledge('補齊開窗前後的讀值')]);
     expect(snapshot.listEntries({ subtype: '書籤', status: '已完成' })[0]).toMatchObject({
-      path: knowledge('確認測點代號'), projectId: 'd:/synthetic/moontide-greenhouse', nodeId: moss,
+      path: knowledge('確認測點代號'), projectId: expect.stringMatching(/^p_[a-f0-9]{24}$/), nodeId: moss,
       updatedAt: Date.parse('2026-11-12T04:30:00.000Z'),
     });
 
     const legacy = await snapshot.readEntry(casePaths[2]);
     const file = await stat(join(fixture, casePaths[2]));
     expect(legacy).toMatchObject({
-      kind: 'case', projectId: '月汐溫室', caseId: '2026-0003', status: '退回', summary: '',
-      attributes: expect.arrayContaining([['改過的檔案', ['src/gaps.ts']]]), mtime: Math.floor(file.mtimeMs), size: file.size,
+      kind: 'case', projectId: expect.stringMatching(/^p_[a-f0-9]{24}$/), caseId: '2026-0003', status: '退回', summary: '',
+      attributes: expect.arrayContaining([['改過的檔案', ['src/gaps.ts']]]), mtime: file.mtimeMs, size: file.size,
     });
     expect(await snapshot.readEntry('preferences/報表時間格式.md')).toMatchObject({
       title: '報表時間格式使用二十四小時制', kind: 'preference', scope: '全域', attributes: [],

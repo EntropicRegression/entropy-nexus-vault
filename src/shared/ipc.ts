@@ -5,7 +5,10 @@ import type {
   MemoryEntry,
   MemoryEntryDetail,
   NodeCrystalDetail,
+  RecycledEntry,
+  RecycledVersion,
   VaultInfo,
+  VaultRecycleResult,
   VaultStatusUpdate,
   VaultWriteResult,
   ViewSettings,
@@ -24,8 +27,9 @@ export interface VaultApi {
   readCrystal(nodeId: string): Promise<NodeCrystalDetail | null>;
   setStatus(path: string, status: VaultStatusUpdate, expected: FileVersion): Promise<VaultWriteResult>;
   saveEntry(path: string, text: string, expected: FileVersion): Promise<VaultWriteResult>;
-  moveToRecycle(path: string, expected: FileVersion): Promise<VaultWriteResult>;
-  restoreFromRecycle(path: string): Promise<VaultWriteResult>;
+  moveToRecycle(path: string, expected: FileVersion): Promise<VaultRecycleResult>;
+  restoreFromRecycle(path: string, expected: RecycledVersion): Promise<VaultWriteResult>;
+  readRecycledEntry(path: string, originalPath: string): Promise<RecycledEntry | null>;
   wake(nodeId: string): Promise<WakeResult>;
   onVaultChanged(callback: (paths: string[]) => void): () => void;
 }
@@ -46,6 +50,7 @@ export const vaultChannels = {
   saveEntry: 'vault:save-entry',
   moveToRecycle: 'vault:move-to-recycle',
   restoreFromRecycle: 'vault:restore-from-recycle',
+  readRecycledEntry: 'vault:read-recycled-entry',
   wake: 'vault:wake',
   onVaultChanged: 'vault:changed',
 } as const satisfies Record<keyof VaultApi, string>;

@@ -15,6 +15,8 @@ export interface ViewSettings {
 }
 
 export interface VaultInfo {
+  key: string;
+  /** Display alias; filesystem paths stay in the main process. */
   path: string;
   exists: boolean;
   wakeAvailable: boolean;
@@ -36,8 +38,9 @@ export interface EntryFilter {
   includeSuperseded?: boolean;
 }
 
-export interface MemoryEntry {
+export interface MemoryEntry extends FileVersion {
   path: string;
+  writable: boolean;
   title: string;
   summary: string;
   kind: MemoryKind;
@@ -45,6 +48,7 @@ export interface MemoryEntry {
   scope: MemoryScope;
   subtype: string;
   status: string;
+  /** Stable, opaque project key. */
   projectId: string;
   projectName: string;
   nodeId: string;
@@ -66,7 +70,7 @@ export interface SupersessionLink {
   status: 'available' | 'recycled' | 'missing';
 }
 
-export interface MemoryEntryDetail extends MemoryEntry, FileVersion {
+export interface MemoryEntryDetail extends MemoryEntry {
   attributes: [string, FrontMatterValue][];
   body: string;
   review: string;
@@ -111,9 +115,16 @@ export interface NodeCrystalDetail extends NodeCrystal {
   relatedEntries: MemoryEntry[];
 }
 
-export type VaultWriteResult =
-  | ({ ok: true } & FileVersion)
-  | { ok: false; reason: 'conflict' | 'missing' | 'io'; current?: FileVersion };
+export type VaultWriteFailure = {
+  ok: false;
+  reason: 'conflict' | 'missing' | 'occupied' | 'io' | 'legacy' | 'readonly' | 'recycle-io';
+  current?: FileVersion;
+  residualPath?: string;
+};
+export type VaultWriteResult = ({ ok: true } & FileVersion) | VaultWriteFailure;
+export interface RecycledVersion extends FileVersion { originalPath: string }
+export type VaultRecycleResult = ({ ok: true; recycledPath: string } & RecycledVersion) | VaultWriteFailure;
+export interface RecycledEntry extends FileVersion { title: string; body: string; review: string }
 
 export type WakeResult =
   | { ok: true }
