@@ -175,7 +175,9 @@ describe('主程序 IPC 來源驗證', () => {
     const iris = map.crystals.find((node) => node.nodeId === 'fixture-sky-iris')!;
     expect(map.crystals).toHaveLength(4);
     expect(new Set(map.links.map(({ kind }) => kind))).toEqual(new Set(['lineage', 'delegate', 'meeting', 'project']));
-    expect(iris).toMatchObject({ glow: 'white', status: '封存', canWake: true,
+    // 1 handled confirmed case (10) + 1 participated (1) + 1 project (4) + (8 − 2) / 10 completed (0) = 15 → green;
+    // the console's 判例數 (99 here) is not used.
+    expect(iris).toMatchObject({ glow: 'green', status: '封存', canWake: true,
       avatarUrl: 'vault-image://node/fixture-sky-iris/avatar', portraitUrl: 'vault-image://node/fixture-sky-iris/portrait' });
     expect(iris.position).toHaveLength(3);
     expect(iris.position.every(Number.isFinite)).toBe(true);
@@ -197,7 +199,27 @@ describe('主程序 IPC 來源驗證', () => {
       relatedEntries: expect.arrayContaining([{ title: '對齊觀測時間' }, { title: '未確認' }, { title: '只參與' }]
         .map((entry) => expect.objectContaining(entry))),
       portraitUrl: iris.portraitUrl,
+      richness: { score: 15, tier: 'green', parts: { confirmedCases: 10, participatedCases: 1, projects: 4, completed: 0 } },
+      award: null,
+      glow: 'green',
     });
     expect(JSON.stringify([map, detail])).not.toMatch(/(?<![a-z0-9-])[a-z]:[\\/]|\/Users\/|\.{2}\\/i);
+
+    // Rainbow award through IPC: the reason is masked on the way out; the glow changes only after the write.
+    expect(map.awards).toEqual({ version: null, corrupt: false });
+    expect(await invoke('setAward', 'no-such-node', { reason: '' }, null)).toEqual({ ok: false, reason: 'invalid' });
+    const granted = await invoke('setAward', iris.nodeId, { reason: '見 C:\\Users\\Someone\\筆記.md 的整理' }, null);
+    expect(granted).toMatchObject({ ok: true, award: { reason: '見 [本機路徑已隱藏]' } });
+    const after = await invoke('listCrystals');
+    expect(after.crystals.find((node) => node.nodeId === iris.nodeId)?.glow).toBe('rainbow');
+    const awarded = await invoke('readCrystal', iris.nodeId);
+    expect(awarded).toMatchObject({ glow: 'rainbow', award: { reason: '見 [本機路徑已隱藏]' }, richness: { tier: 'green' } });
+    expect(await invoke('setAward', iris.nodeId, null, null)).toMatchObject({ ok: false, reason: 'conflict' });
+    expect(await invoke('setAward', iris.nodeId, null, after.awards!.version)).toMatchObject({ ok: true, award: null });
+    expect((await invoke('listCrystals')).crystals.find((node) => node.nodeId === iris.nodeId)?.glow).toBe('green');
+    // App-owned files hold no paths.
+    const peaks = await readFile(join(electron.userData, 'glow-peaks.json'), 'utf8');
+    expect(peaks).not.toMatch(/[a-z]:[\\/]|\/Users\//i);
+    expect(Object.keys(JSON.parse(peaks).記憶庫)).toEqual([expect.stringMatching(/^v_[a-f0-9]{24}$/)]);
   });
 });

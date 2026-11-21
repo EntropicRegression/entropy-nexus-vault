@@ -21,6 +21,7 @@ const vault: VaultApi = {
   searchNodes: (query) => invoke('searchNodes', query),
   listCrystals: () => invoke('listCrystals'),
   readCrystal: (nodeId) => invoke('readCrystal', nodeId),
+  setAward: (nodeId, award, expected) => invoke('setAward', nodeId, award, expected),
   setStatus: (path, status, expected) => invoke('setStatus', path, status, expected),
   saveEntry: (path, text, expected) => invoke('saveEntry', path, text, expected),
   moveToRecycle: (path, expected) => invoke('moveToRecycle', path, expected),

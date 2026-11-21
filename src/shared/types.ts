@@ -23,6 +23,8 @@ export interface VaultInfo {
   wakeAvailable: boolean;
 }
 
+import type { GlowAward, GlowTier, Richness } from './glow';
+
 export interface FileVersion {
   mtime: number;
   size: number;
@@ -91,7 +93,8 @@ export interface NodeCrystal {
   projectNames: string[];
   avatarUrl?: string | null;
   portraitUrl?: string | null;
-  glow?: 'white';
+  /** Glow tier from the richness score, or rainbow when the user granted one (DESIGN.md §6.9). */
+  glow?: GlowTier;
 }
 
 /**
@@ -117,6 +120,8 @@ export type CrystalLink =
 export interface CrystalList {
   crystals: (NodeCrystal & { position: Point3 })[];
   links: CrystalLink[];
+  /** State of .vault-awards.json: the version for setAward, and whether the file is damaged (read as no awards). */
+  awards?: { version: FileVersion | null; corrupt: boolean };
 }
 
 export interface CrystalStats {
@@ -140,6 +145,9 @@ export interface NodeCrystalDetail extends NodeCrystal {
   /** 1 − 退回/完成. The console accepts finished tasks by default, so only rejections carry a user signal. */
   notRejectedRate: number | null;
   consoleAppendixCount: number;
+  /** Score, parts and caps behind the glow tier (M5c). */
+  richness?: Richness;
+  award?: GlowAward | null;
 }
 
 export type VaultWriteFailure = {
@@ -149,6 +157,10 @@ export type VaultWriteFailure = {
   residualPath?: string;
 };
 export type VaultWriteResult = ({ ok: true } & FileVersion) | VaultWriteFailure;
+/** setAward: corrupt = .vault-awards.json is damaged and is left untouched; invalid = bad node, version or reason. */
+export type AwardWriteResult =
+  | ({ ok: true; award: GlowAward | null } & FileVersion)
+  | { ok: false; reason: 'conflict' | 'corrupt' | 'invalid' | 'io'; current?: FileVersion | null };
 export interface RecycledVersion extends FileVersion { originalPath: string }
 export type VaultRecycleResult = ({ ok: true; recycledPath: string } & RecycledVersion) | VaultWriteFailure;
 export interface RecycledEntry extends FileVersion { title: string; body: string; review: string }

@@ -344,6 +344,27 @@ describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
     expect(JSON.stringify(snapshot.listCrystals())).not.toMatch(/synthetic|[a-z]:\//i);
   });
 
+  it('經歷計分的輸入:完成/退回取統計(驗收數不用),跨專案以 專案ID 代號去重,舊版退回用名稱', async () => {
+    const snapshot = await new VaultReader(consoleStats, now).read();
+    const inputs = snapshot.richnessInputs();
+    // Two projects named "app" with different IDs count as two.
+    expect(inputs.get(id(1))).toEqual({ confirmedCases: 0, participatedCases: 0, completedNow: 10, rejectedNow: 1, projects: 2 });
+    expect(inputs.get(id(4))).toMatchObject({ completedNow: 2, rejectedNow: 0, projects: 1 });
+    expect(inputs.get(id(3))).toMatchObject({ completedNow: 0, projects: 1 });
+  });
+
+  it('封存節點沒有統計專案時,跨專案改用其已確認判例的專案;判例數由寶庫自己計', async () => {
+    const root = await copyVault();
+    await unlink(join(root, statsFilename));
+    const snapshot = await new VaultReader(root, now).read();
+    const confirmedHandled = snapshot.listEntries({ kind: 'case', status: '已確認' }).filter((entry) => entry.nodeId === moss);
+    const input = snapshot.richnessInputs().get(moss)!;
+    expect(input.confirmedCases).toBe(confirmedHandled.length);
+    expect(input.projects).toBe(new Set(snapshot.listEntries({ kind: 'case', status: '已確認' })
+      .filter((entry) => entry.nodeIds.includes(moss)).map((entry) => entry.projectId).filter(Boolean)).size);
+    expect(input.projects).toBeGreaterThan(0);
+  });
+
   it('沒有統計檔時,只有現役側寫的節點顯示「未知」,封存檔仍是封存', async () => {
     const root = await copyVault();
     await unlink(join(root, statsFilename));

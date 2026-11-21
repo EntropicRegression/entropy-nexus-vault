@@ -102,6 +102,15 @@ export class VaultSnapshot {
     };
   }
 
+  /** Richness inputs per node, without the userData peaks (docs/架構.md §9.2). */
+  richnessInputs() {
+    return new Map([...this.crystals.records].map(([nodeId, record]) => [nodeId, record.richness]));
+  }
+
+  hasNode(nodeId: string): boolean {
+    return typeof nodeId === 'string' && this.crystals.records.has(nodeId);
+  }
+
   hasArchivedNode(nodeId: string): boolean {
     return Boolean(this.crystals.records.get(nodeId)?.archives.length);
   }

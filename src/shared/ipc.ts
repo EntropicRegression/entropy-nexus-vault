@@ -6,6 +6,7 @@ import type {
   MemoryEntryDetail,
   NodeCrystalDetail,
   NodeHit,
+  AwardWriteResult,
   RecycledEntry,
   RecycledVersion,
   VaultInfo,
@@ -27,6 +28,8 @@ export interface VaultApi {
   searchNodes(query: string): Promise<NodeHit[]>;
   listCrystals(): Promise<CrystalList>;
   readCrystal(nodeId: string): Promise<NodeCrystalDetail | null>;
+  /** Grants (award = { reason }) or withdraws (null) a rainbow; expected = CrystalList.awards.version. */
+  setAward(nodeId: string, award: { reason: string } | null, expected: FileVersion | null): Promise<AwardWriteResult>;
   setStatus(path: string, status: VaultStatusUpdate, expected: FileVersion): Promise<VaultWriteResult>;
   saveEntry(path: string, text: string, expected: FileVersion): Promise<VaultWriteResult>;
   moveToRecycle(path: string, expected: FileVersion): Promise<VaultRecycleResult>;
@@ -49,6 +52,7 @@ export const vaultChannels = {
   searchNodes: 'vault:search-nodes',
   listCrystals: 'vault:list-crystals',
   readCrystal: 'vault:read-crystal',
+  setAward: 'vault:set-award',
   setStatus: 'vault:set-status',
   saveEntry: 'vault:save-entry',
   moveToRecycle: 'vault:move-to-recycle',

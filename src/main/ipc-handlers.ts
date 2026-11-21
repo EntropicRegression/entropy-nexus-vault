@@ -12,6 +12,11 @@ import { VaultReader } from './vault';
 import { VaultWriter } from './vault/write';
 import { opaqueKey, redactForRenderer } from './vault/privacy';
 import { CrystalLayoutStore } from './vault/crystal-layout-store';
+import { readAwards, writeAward } from './vault/awards';
+import type { AwardsState } from './vault/awards';
+import { GlowPeakStore } from './vault/glow-peaks';
+import { computeRichness, glowOf } from '../shared/glow';
+import type { Richness } from '../shared/glow';
 
 type VaultHandlers = {
   [Method in keyof VaultRequests]: (
@@ -40,6 +45,7 @@ export function isVaultFrameUrl(value: string): boolean {
 export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   const settingsFile = join(app.getPath('userData'), app.isPackaged ? 'settings.json' : 'settings.dev.json');
   const crystalLayout = new CrystalLayoutStore(join(app.getPath('userData'), 'crystal-layout.json'));
+  const glowPeaks = new GlowPeakStore(join(app.getPath('userData'), 'glow-peaks.json'));
   const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
     : join(app.getAppPath(), 'fixtures', 'memory-vault');
   let activeVault: { path: string; reader: VaultReader; writer: VaultWriter } | undefined;
@@ -60,6 +66,22 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
 
   async function readVault() {
     return (await readVaultContext()).snapshot;
+  }
+
+  /** Richness with the local peaks, and the manual awards, for every node of the snapshot (DESIGN.md §6.9). */
+  async function glowState(context: Awaited<ReturnType<typeof readVaultContext>>) {
+    const inputs = context.snapshot.richnessInputs();
+    const peaks = await glowPeaks.update(opaqueKey('v', context.root),
+      new Map([...inputs].map(([id, input]) => [id, { completed: input.completedNow, rejected: input.rejectedNow }])));
+    const richness = new Map<string, Richness>();
+    for (const [id, input] of inputs) {
+      const peak = peaks.get(id) ?? { completed: input.completedNow, rejected: input.rejectedNow };
+      richness.set(id, computeRichness({ ...input, completedPeak: peak.completed, rejectedAtPeak: peak.rejected }));
+    }
+    // A file that cannot be read right now (locked by a sync client) shows no awards; setAward reads it again.
+    const awards: AwardsState = await readAwards(context.root, inputs.keys())
+      .catch(() => ({ awards: new Map(), version: null, corrupt: false }));
+    return { richness, awards };
   }
 
   const avatarCache = new WeakMap<object, Map<string, Promise<string | null>>>();
@@ -118,17 +140,30 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       const context = await readVaultContext();
       const { crystals, links } = context.snapshot.listCrystals();
       const positions = await crystalLayout.positions(opaqueKey('v', context.root), crystals.map(({ nodeId }) => nodeId));
+      const { richness, awards } = await glowState(context);
       return {
         crystals: await Promise.all(crystals.map(async (crystal) => ({
           ...crystal, position: positions.get(crystal.nodeId)!, ...await crystalImages(context, crystal.nodeId),
+          glow: glowOf(richness.get(crystal.nodeId) ?? { tier: 'white' }, awards.awards.get(crystal.nodeId)),
         }))),
         links,
+        awards: { version: awards.version, corrupt: awards.corrupt },
       };
     },
     readCrystal: async (_event, nodeId) => {
       const context = await readVaultContext();
       const detail = await context.snapshot.readCrystal(nodeId);
-      return detail ? { ...detail, ...await crystalImages(context, nodeId) } : null;
+      if (!detail) return null;
+      const { richness, awards } = await glowState(context);
+      const award = awards.awards.get(nodeId) ?? null;
+      const nodeRichness = richness.get(nodeId);
+      return { ...detail, ...await crystalImages(context, nodeId), richness: nodeRichness, award,
+        glow: glowOf(nodeRichness ?? { tier: 'white' }, award) };
+    },
+    setAward: async (_event, nodeId, award, expected) => {
+      const context = await readVaultContext();
+      if (!context.snapshot.hasNode(nodeId)) return { ok: false, reason: 'invalid' };
+      return writeAward(context.root, nodeId, award && typeof award === 'object' ? { reason: award.reason } : null, expected);
     },
     setStatus: async (_event, path, status, expected) => (await getActiveVault()).writer.setStatus(path, status, expected),
     saveEntry: writeUnavailable,
