@@ -93,6 +93,16 @@ export interface NodeCrystal {
   glow?: 'white';
 }
 
+/** A node matched by the downstairs search. matchedIn names the first field that contains the first term. */
+export interface NodeHit {
+  nodeId: string;
+  name: string;
+  role: string | null;
+  status: NodeCrystal['status'];
+  matchedIn: '名稱' | '角色' | '特長' | '側寫';
+  avatarUrl?: string | null;
+}
+
 export type CrystalLink =
   | { kind: 'lineage'; from: string; to: string }
   | { kind: 'delegate'; from: string; to: string; count: number; lastAt: string }

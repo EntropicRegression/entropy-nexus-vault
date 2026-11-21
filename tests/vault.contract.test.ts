@@ -106,6 +106,25 @@ describe('記憶庫唯讀契約', () => {
     expect(snapshot.listEntries({ kind: 'node' }).every((entry) => entry.shelf === null)).toBe(true);
   });
 
+  it('節點搜尋比對名稱、角色、特長與側寫正文,不搜回顧;依符合欄位排序', async () => {
+    const root = await copyVault();
+    await writeFile(join(root, 'nodes', '星砂.md'), [
+      '---', '種類: node', '節點ID: fixture-node-sand', '節點: 星砂', '角色: 潮汐校對', '---',
+      '# 星砂', '', '## 特長', '', '擅長比對潮位曲線。', '', '## 解決問題的流程', '', '先查鹽度計再對時。',
+      '', '## 回顧', '', '回顧專屬詞不參與搜尋。',
+    ].join('\n'));
+    const snapshot = await new VaultReader(root, now).read();
+    const ids = (query: string) => snapshot.searchNodes(query).map(({ nodeId }) => nodeId);
+    expect(snapshot.searchNodes('星砂')).toEqual([{ nodeId: 'fixture-node-sand', name: '星砂', role: '潮汐校對', status: '未知', matchedIn: '名稱' }]);
+    expect(snapshot.searchNodes('潮汐')[0]).toMatchObject({ nodeId: 'fixture-node-sand', matchedIn: '角色' });
+    expect(snapshot.searchNodes('潮位曲線')[0]).toMatchObject({ matchedIn: '特長' });
+    expect(snapshot.searchNodes('鹽度計')[0]).toMatchObject({ matchedIn: '側寫' });
+    expect(ids('星砂 鹽度計')).toEqual(['fixture-node-sand']);
+    expect(ids('回顧專屬詞')).toEqual([]);
+    expect(ids('   ')).toEqual([]);
+    expect(snapshot.searchNodes(42 as unknown as string)).toEqual([]);
+  });
+
   it('依封存時間合併同節點的兩份檔，另保留接回的新 ID 與四種連線', async () => {
     const root = await copyVault();
     await utimes(join(root, archives[1]), new Date('2030-01-01'), new Date('2030-01-01'));

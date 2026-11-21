@@ -143,7 +143,9 @@ describe('主程序 IPC 來源驗證', () => {
     expect(crystal).toMatchObject({ workflow: '參考 [本機路徑已隱藏]',
       stats: { accepted: 3, completed: 0, rejected: null, cases: null }, notRejectedRate: null });
     const fixtures = await invoke('readCrystal', 'fixture-node-moss');
-    const snapshot = [rows, found, entry, crystal, fixtures, await invoke('listCrystals'), await invoke('getVaultInfo')];
+    const nodeHits = await invoke('searchNodes', '霜');
+    expect(nodeHits.length).toBeGreaterThan(0);
+    const snapshot = [rows, found, entry, crystal, fixtures, nodeHits, await invoke('listCrystals'), await invoke('getVaultInfo')];
     expect(JSON.stringify(snapshot)).not.toMatch(/[a-z]:[\\/]|\/(?:Users|home|tmp|Volumes)\/|file:\/\/|test-server|RelativeName/i);
   });
 

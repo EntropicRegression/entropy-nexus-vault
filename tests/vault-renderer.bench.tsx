@@ -41,10 +41,11 @@ it('典藏室 500 筆合成卷宗，量測可見 DOM 更新', async () => {
   let saved: { status: VaultStatusUpdate; mtime: number } | undefined;
   const updated = <T extends MemoryEntry>(entry: T): T => entry.path === target.path && saved ? { ...entry, ...saved } : entry;
   let completeSearch: (() => void) | undefined;
-  const bridge: Pick<VaultApi, 'getVaultInfo' | 'getSettings' | 'listEntries' | 'search' | 'readEntry' | 'listCrystals' | 'setStatus'> = {
+  const bridge: Pick<VaultApi, 'getVaultInfo' | 'getSettings' | 'listEntries' | 'search' | 'searchNodes' | 'readEntry' | 'listCrystals' | 'setStatus'> = {
     getVaultInfo: async () => ({ key: 'synthetic-fixture', path: 'synthetic-fixture', exists: true, wakeAvailable: false }),
     getSettings: async () => ({ deskMode: 'A', reducedMotion: true }),
     listEntries: async (filter) => structuredClone(snapshot.listEntries(filter).map(updated)),
+    searchNodes: async (query) => snapshot.searchNodes(query),
     search: async (query, filter) => {
       const entries = snapshot.search(query, filter);
       completeSearch?.();

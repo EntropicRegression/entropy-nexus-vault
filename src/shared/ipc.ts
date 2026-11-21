@@ -5,6 +5,7 @@ import type {
   MemoryEntry,
   MemoryEntryDetail,
   NodeCrystalDetail,
+  NodeHit,
   RecycledEntry,
   RecycledVersion,
   VaultInfo,
@@ -23,6 +24,7 @@ export interface VaultApi {
   listEntries(filter: EntryFilter): Promise<MemoryEntry[]>;
   readEntry(path: string): Promise<MemoryEntryDetail | null>;
   search(query: string, filter: EntryFilter): Promise<MemoryEntry[]>;
+  searchNodes(query: string): Promise<NodeHit[]>;
   listCrystals(): Promise<CrystalList>;
   readCrystal(nodeId: string): Promise<NodeCrystalDetail | null>;
   setStatus(path: string, status: VaultStatusUpdate, expected: FileVersion): Promise<VaultWriteResult>;
@@ -44,6 +46,7 @@ export const vaultChannels = {
   listEntries: 'vault:list-entries',
   readEntry: 'vault:read-entry',
   search: 'vault:search',
+  searchNodes: 'vault:search-nodes',
   listCrystals: 'vault:list-crystals',
   readCrystal: 'vault:read-crystal',
   setStatus: 'vault:set-status',

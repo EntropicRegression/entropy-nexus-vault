@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { heatDecayAt } from '../../shared/heat';
-import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail } from '../../shared/types';
+import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit } from '../../shared/types';
 import { buildCrystals, profileHighlights } from './crystals';
 import { entryFromFile } from './entry';
 import type { ParsedEntry } from './entry';
@@ -62,6 +62,26 @@ export class VaultSnapshot {
       const text = this.searchText.get(entry.path) ?? '';
       return terms.every((term) => text.includes(term));
     }).map(({ entry }) => entry);
+  }
+
+  /** Nodes whose name, role, specialty or profile body (never 回顧) contain every term (DESIGN.md §6.6.3). */
+  searchNodes(query: string): NodeHit[] {
+    if (typeof query !== 'string') return [];
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    const hits: NodeHit[] = [];
+    for (const { crystal, profile, stats } of this.crystals.records.values()) {
+      const fields: [NodeHit['matchedIn'], string][] = [
+        ['名稱', crystal.name], ['角色', crystal.role ?? ''],
+        ['特長', profileHighlights(profile, stats).specialty], ['側寫', profile?.body ?? ''],
+      ];
+      const lowered = fields.map(([label, text]) => [label, text.toLowerCase()] as const);
+      if (!terms.every((term) => lowered.some(([, text]) => text.includes(term)))) continue;
+      const matchedIn = lowered.find(([, text]) => text.includes(terms[0]))![0];
+      hits.push({ nodeId: crystal.nodeId, name: crystal.name, role: crystal.role, status: crystal.status, matchedIn });
+    }
+    const rank = ['名稱', '角色', '特長', '側寫'];
+    return hits.sort((a, b) => rank.indexOf(a.matchedIn) - rank.indexOf(b.matchedIn) || a.name.localeCompare(b.name, 'zh-Hant'));
   }
 
   listCrystals() {

@@ -100,6 +100,11 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     listEntries: async (_event, filter) => (await readVault()).listEntries(filter),
     readEntry: async (_event, path) => (await readVault()).readEntry(path),
     search: async (_event, query, filter) => (await readVault()).search(query, filter),
+    searchNodes: async (_event, query) => {
+      const context = await readVaultContext();
+      return Promise.all(context.snapshot.searchNodes(query).slice(0, 50).map(async (hit) =>
+        ({ ...hit, avatarUrl: await avatarUrl(context, hit.nodeId) })));
+    },
     listCrystals: async () => {
       const context = await readVaultContext();
       const { crystals, links } = context.snapshot.listCrystals();
