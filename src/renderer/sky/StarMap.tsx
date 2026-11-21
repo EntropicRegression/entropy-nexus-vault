@@ -24,7 +24,8 @@ export function StarMap({ active, data, selected, visible, onToggle, onSelect, c
   const adjusted = useRef(false);
   const positions = useMemo(() => new Map(data.crystals.map(({ nodeId, position }) => [nodeId, position])), [data.crystals]);
   const connections = useMemo(() => toLinkSegments(data.links, new Set(positions.keys())), [data.links, positions]);
-  const demandFrame = useStarMapFrame({ active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock });
+  const gapped = useMemo(() => new Set(data.crystals.filter(({ glow }) => glow === 'gold').map(({ nodeId }) => nodeId)), [data.crystals]);
+  const demandFrame = useStarMapFrame({ active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock, gapped });
   const interaction = useStarMapCamera(stage, camera, demandFrame, active, adjusted);
 
   return <div ref={stage} role="region" aria-label="星圖舞台" aria-describedby="sky-map-controls" tabIndex={0} data-star-map=""

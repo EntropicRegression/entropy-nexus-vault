@@ -6,6 +6,7 @@ import { observeSize } from './canvas';
 import { createAnimator } from './frame-clock';
 import type { FrameClock } from './frame-clock';
 import { drawLinks } from './LinkCanvas';
+import type { CrystalBody } from './LinkCanvas';
 import type { LinkKind, LinkSegment } from './link-styles';
 import { autoZoom, boundingRadius, densityScale, fitViewport, placeLabels, sphereExtent } from './screen-layout';
 
@@ -23,9 +24,21 @@ interface Options {
   visible: ReadonlySet<LinkKind>;
   selected: string | null;
   clock: FrameClock;
+  /** Crystals that keep a gap between their body and lineage lines (gold tier, DESIGN.md §6.9). */
+  gapped?: ReadonlySet<string>;
 }
 
-interface Measurements { viewport: Viewport; panelWidth: number; labels: Map<string, number> }
+/**
+ * Unscaled hexagon size (Sky.module.css .crystalShape), its float range (floatCrystal moves it up to 8px) and the clear
+ * space kept around gold crystals in screen px. The float range is part of the body so the gap holds in every phase.
+ */
+const body = { width: 96, height: 136, float: 8, gap: 5 };
+
+interface Measurements {
+  viewport: Viewport; panelWidth: number; labels: Map<string, number>;
+  /** How far the hexagon's centre sits above the anchor's centre, unscaled (depends on the nameplate height). */
+  lifts: Map<string, number>;
+}
 
 /** One batch of layout reads. Badges hidden for crowding are restored first so widths stay natural. */
 export function measure(element: HTMLElement, anchors: ReadonlyMap<string, HTMLElement>): Measurements {
@@ -33,15 +46,20 @@ export function measure(element: HTMLElement, anchors: ReadonlyMap<string, HTMLE
   const viewport = { width: element.clientWidth, height: element.clientHeight };
   const panelWidth = element.parentElement?.querySelector<HTMLElement>('[data-sky-detail]')?.offsetWidth ?? 0;
   const labels = new Map<string, number>();
+  const lifts = new Map<string, number>();
   for (const [id, anchor] of anchors) {
     const width = anchor.querySelector<HTMLElement>('[data-crystal-label]')?.offsetWidth;
     if (width) labels.set(id, width);
+    const button = anchor.querySelector<HTMLElement>('[data-crystal]');
+    const shape = button?.children[1] as HTMLElement | undefined;
+    if (button && shape) lifts.set(id, anchor.offsetHeight / 2 - (button.offsetTop + shape.offsetTop + shape.offsetHeight / 2));
   }
-  return { viewport, panelWidth, labels };
+  return { viewport, panelWidth, labels, lifts };
 }
 
 export function useStarMapFrame(options: Options): () => void {
   const { active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock } = options;
+  const gapped = options.gapped;
   const radius = useMemo(() => boundingRadius(positions.values()), [positions]);
   const points = useMemo(() => [...positions.values()], [positions]);
   const density = densityScale(positions.size);
@@ -56,7 +74,7 @@ export function useStarMapFrame(options: Options): () => void {
       const element = stage.current;
       if (!active || !element || !canvas.current) return;
       measured.current ??= measure(element, nodes.current);
-      const { viewport, panelWidth, labels } = measured.current;
+      const { viewport, panelWidth, labels, lifts } = measured.current;
       if (!viewport.width || !viewport.height) {
         measured.current = null;
         return;
@@ -74,10 +92,16 @@ export function useStarMapFrame(options: Options): () => void {
       }
       const nameplates = placeLabels(layout.positions, viewport.width, layout.factor, selected, labels, density);
       element.toggleAttribute('data-dense', density < 1);
+      const bodies = new Map<string, CrystalBody>();
       for (const { id, zIndex, badgeHidden, labelOffset } of nameplates) {
         const anchor = nodes.current.get(id);
         if (!anchor) continue;
         const { left, top, scale, opacity } = crystalStyle(layout.positions.get(id)!);
+        if (gapped?.has(id)) {
+          const size = scale * layout.factor * density;
+          bodies.set(id, { cx: left, cy: top - ((lifts.get(id) ?? 0) + body.float / 2) * size,
+            width: body.width * size, height: (body.height + body.float) * size, gap: body.gap });
+        }
         anchor.style.left = left + 'px';
         anchor.style.top = top + 'px';
         anchor.style.transform = 'translate(-50%, -50%) scale(' + (scale * layout.factor * density) + ')';
@@ -87,12 +111,12 @@ export function useStarMapFrame(options: Options): () => void {
         anchor.style.setProperty('--label-offset', labelOffset + 'px');
         anchor.toggleAttribute('data-crowded-label', badgeHidden);
       }
-      drawLinks(canvas.current, viewport, layout.positions, connections, visible, selected, layout.center, nameplates.map(({ box }) => box), density < 1);
+      drawLinks(canvas.current, viewport, layout.positions, connections, visible, selected, layout.center, nameplates.map(({ box }) => box), density < 1, bodies);
     };
     measured.current = null;
     if (active) animator.request();
     else animator.cancel();
-  }, [active, stage, armillary, canvas, nodes, camera, positions, connections, visible, selected, animator]);
+  }, [active, stage, armillary, canvas, nodes, camera, positions, connections, visible, selected, animator, gapped]);
 
   useEffect(() => {
     const element = stage.current;

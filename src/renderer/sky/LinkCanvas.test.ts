@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { bundleLinks, drawLinks } from './LinkCanvas';
+import { bundleLinks, drawLinks, trimToBody } from './LinkCanvas';
 import type { LinkSegment } from './link-styles';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -90,4 +90,32 @@ it('密集模式:沒有選取時不畫連線標籤,選取後只畫相關連線�
   expect(ctx.stroke).toHaveBeenCalledTimes(2);
   drawLinks(canvas, { width: 600, height: 300 }, points, edges, visible, 'a', undefined, [], true);
   expect(fillText.mock.calls.map(([text]) => text)).toEqual(['會議同席 ×3']);
+});
+
+it('金級留空:傳承線停在六角本體外 5px;沒碰到本體或長度為 0 時不變', () => {
+  // Hexagon 96×136 centred at (100, 100): bottom tip at y = 168, right edge at x = 100 + 0.42 × 96 ≈ 140.3.
+  const body = { cx: 100, cy: 100, width: 96, height: 136, gap: 5 };
+  expect(trimToBody({ x: 100, y: 300 }, { x: 100, y: 100 }, body)).toEqual({ x: 100, y: 173 });
+  const side = trimToBody({ x: 300, y: 100 }, { x: 100, y: 100 }, body);
+  expect(side.x).toBeCloseTo(100 + 0.42 * 96 + 5);
+  expect(side.y).toBe(100);
+  expect(trimToBody({ x: 300, y: 300 }, { x: 320, y: 320 }, body)).toEqual({ x: 320, y: 320 });
+  expect(trimToBody({ x: 100, y: 100 }, { x: 100, y: 100 }, body)).toEqual({ x: 100, y: 100 });
+});
+
+it('drawLinks 只對有本體的端點裁切傳承線,其他關係不裁', () => {
+  vi.stubGlobal('window', { devicePixelRatio: 1 });
+  const calls: [string, number, number][] = [];
+  const ctx = {
+    globalAlpha: 1, strokeStyle: '', fillStyle: '', font: '', textAlign: '', lineWidth: 0, lineJoin: '',
+    setTransform() {}, clearRect() {}, beginPath() {}, setLineDash() {}, stroke() {}, fillText() {}, strokeText() {},
+    measureText: (text: string) => ({ width: 7 * text.length }),
+    moveTo: (x: number, y: number) => calls.push(['move', x, y]), lineTo: (x: number, y: number) => calls.push(['line', x, y]),
+  };
+  const canvas = { width: 0, height: 0, style: {}, getContext: () => ctx } as unknown as HTMLCanvasElement;
+  const at = (x: number, y: number) => ({ x, y, scale: 1, depth: 0 });
+  drawLinks(canvas, { width: 600, height: 600 }, new Map([['a', at(100, 500)], ['g', at(100, 100)]]),
+    [{ kind: 'lineage', from: 'a', to: 'g', label: '接回自' }], new Set(['lineage']), null, undefined, [], false,
+    new Map([['g', { cx: 100, cy: 100, width: 96, height: 136, gap: 5 }]]));
+  expect(calls).toEqual([['move', 100, 500], ['line', 100, 173]]);
 });

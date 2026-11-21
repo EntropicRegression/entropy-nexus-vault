@@ -53,6 +53,7 @@ function bridge(overrides: Partial<VaultApi> = {}, initial: Partial<ViewSettings
     setSettings: vi.fn(async (patch) => (settings = { ...settings, ...patch })),
     listEntries: vi.fn(async () => entries),
     search: vi.fn(async (term) => entries.filter(({ title }) => title.includes(term))),
+    setAward: vi.fn<VaultApi['setAward']>(async () => ({ ok: false, reason: 'io' })),
     readEntry: vi.fn(async (path) => {
       const entry = entries.find((item) => item.path === path);
       return entry ? detail(entry) : null;

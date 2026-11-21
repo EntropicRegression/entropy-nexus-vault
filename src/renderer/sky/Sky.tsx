@@ -7,6 +7,8 @@ import type { LinkKind } from './link-styles';
 import { StarMap } from './StarMap';
 import { StarField } from './StarField';
 import { DetailPanel } from './DetailPanel';
+import { AwardDialog } from './AwardDialog';
+import type { AwardFailure } from './AwardDialog';
 import { useSystemMotion } from './use-system-motion';
 import styles from './Sky.module.css';
 
@@ -35,6 +37,11 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ nodeId: string; result: NodeCrystalDetail | null }>();
   const [visible, setVisible] = useState<ReadonlySet<LinkKind>>(() => new Set(linkKinds));
+  /** Bumped after an award is written so the glow and the panel are read again. */
+  const [reload, setReload] = useState(0);
+  const [award, setAward] = useState<{ mode: 'grant' | 'withdraw'; nodeId: string; name: string; saving: boolean;
+    failure: AwardFailure | null }>();
+  const awardTrigger = useRef<HTMLButtonElement | null>(null);
   const consumedSelection = useRef(new Set<number>());
   /** A jump's target crystal receives focus once rendered (M5b review S1), also when it was already selected. */
   const [jumpFocus, setJumpFocus] = useState<{ nodeId: string; requestId: number }>();
@@ -54,7 +61,7 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
       setSelected((id) => id && next.crystals.some((node) => node.nodeId === id) ? id : null);
     }, () => { if (current) setFailed(true); });
     return () => { current = false; };
-  }, [active, vaultExists, refreshToken]);
+  }, [active, vaultExists, refreshToken, reload]);
 
   useEffect(() => {
     if (!active || !vaultExists || !selectionRequest || !data || consumedSelection.current.has(selectionRequest.requestId)) return;
@@ -77,7 +84,32 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
     const receive = (result: NodeCrystalDetail | null) => { if (current) setDetail({ nodeId: inspectedId, result }); };
     void window.vault.readCrystal(inspectedId).then(receive, () => receive(null));
     return () => { current = false; };
-  }, [active, inspectedId, refreshToken]);
+  }, [active, inspectedId, refreshToken, reload]);
+
+  function closeAward() {
+    setAward(undefined);
+    const trigger = awardTrigger.current;
+    // The panel re-renders after a write; fall back to the action button that replaced the trigger.
+    queueMicrotask(() => (trigger?.isConnected ? trigger : scene.current?.querySelector<HTMLButtonElement>('[data-award-action]'))
+      ?.focus({ preventScroll: true }));
+  }
+
+  async function confirmAward(reason: string) {
+    if (!award) return;
+    setAward({ ...award, saving: true, failure: null });
+    let result;
+    try {
+      result = await window.vault.setAward(award.nodeId, award.mode === 'grant' ? { reason } : null, data?.awards?.version ?? null);
+    } catch {
+      result = { ok: false as const, reason: 'io' as const };
+    }
+    if (result.ok) {
+      setReload((value) => value + 1);
+      closeAward();
+    } else {
+      setAward((current) => current && { ...current, saving: false, failure: result.reason });
+    }
+  }
 
   function toggle(kind: LinkKind) {
     setVisible((previous) => {
@@ -107,7 +139,16 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
       {!vaultExists ? '找不到記憶庫資料夾' : failed ? '無法讀取節點星圖。' : '尚無水晶可顯示。'}
     </p>}
     <DetailPanel node={vaultExists ? node : undefined} detail={inspected?.result ?? null} loading={Boolean(node && !inspected)}
-      error={Boolean(inspected && !inspected.result)} onDismiss={() => select(null)} onOpenEntry={onOpenEntry} />
+      error={Boolean(inspected && !inspected.result)} onDismiss={() => select(null)} onOpenEntry={onOpenEntry}
+      awardsCorrupt={data?.awards?.corrupt}
+      onAward={(mode, trigger) => {
+        if (!node) return;
+        awardTrigger.current = trigger;
+        setAward({ mode, nodeId: node.nodeId, name: node.name, saving: false, failure: null });
+      }} />
+    {award && <AwardDialog key={award.mode + award.nodeId} mode={award.mode} name={award.name} saving={award.saving}
+      failure={award.failure} onConfirm={(reason) => void confirmAward(reason)} onCancel={closeAward}
+      onReload={() => { setReload((value) => value + 1); setAward((current) => current && { ...current, failure: null }); }} />}
     <button type="button" className={styles.skylight} onClick={onReturn}>▼ 向下俯視，回到大圖書館判例卷宗室 ▼</button>
   </div>;
 }

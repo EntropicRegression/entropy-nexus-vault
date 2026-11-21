@@ -1,5 +1,6 @@
 import type { MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/types';
 import { CrystalPortrait, crystalBadge } from './Crystal';
+import { GlowBadge } from './GlowBadge';
 import styles from './Sky.module.css';
 
 const notRejectedHint = '以主控台統計的完成數與退回數計算:1 − 退回 ÷ 完成。正常完成的任務預設通過,使用者按退回才算未通過;'
@@ -18,19 +19,24 @@ function Rate({ label, rate, amber, hint }: { label: string; rate: number | null
   </div>;
 }
 
-export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEntry }: {
+export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEntry, onAward, awardsCorrupt }: {
   node?: NodeCrystal;
   detail: NodeCrystalDetail | null;
   loading: boolean;
   error: boolean;
   onDismiss: () => void;
   onOpenEntry?: (entry: MemoryEntry) => void;
+  /** Opens the grant / withdraw confirmation (DESIGN.md §6.9). */
+  onAward?: (mode: 'grant' | 'withdraw', trigger: HTMLButtonElement) => void;
+  /** .vault-awards.json is damaged: read as no awards and not writable until fixed. */
+  awardsCorrupt?: boolean;
 }) {
   const crystal = detail ?? node;
   return <aside className={styles.gameFrame + ' ' + styles.detailPanel} data-sky-detail="" data-collapsed={!crystal}
     aria-label="節點履歷" aria-hidden={!crystal} inert={!crystal}>
     {crystal && <>
       <header className={styles.panelHeader}>
+        <GlowBadge glow={detail?.glow ?? crystal.glow ?? 'white'} richness={detail?.richness} award={detail?.award} />
         <button className={styles.closePanel} type="button" onClick={onDismiss} aria-label="收起節點履歷">✕</button>
       </header>
       <div className={styles.crystalHero}>
@@ -78,6 +84,13 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
       {crystal.status === '封存' && !crystal.canWake && <p className={styles.memorial}>
         {crystal.cliRecordExists === false ? 'CLI 原始紀錄已清理，僅留存濃縮水晶履歷。' : '此封存節點無法喚醒，僅留存濃縮水晶履歷。'}
       </p>}
+      {detail && onAward && <div className={styles.panelActions}>
+        {awardsCorrupt && <p className={styles.awardWarning} role="status">頒發檔已損毀,目前視為沒有頒發;修復前無法頒發或撤回。</p>}
+        <button type="button" className={styles.awardButton} data-award-action={detail.award ? 'withdraw' : 'grant'}
+          disabled={awardsCorrupt} onClick={(event) => onAward(detail.award ? 'withdraw' : 'grant', event.currentTarget)}>
+          {detail.award ? '撤回彩虹光暈' : '頒發彩虹光暈'}
+        </button>
+      </div>}
     </>}
   </aside>;
 }

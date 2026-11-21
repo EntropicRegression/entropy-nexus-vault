@@ -26,7 +26,7 @@ export function Crystal({ node, index, selected, setAnchor, onClick }: {
 }) {
   const badge = crystalBadge(node);
   return <div ref={setAnchor} className={styles.nodeAnchor} data-crystal-anchor={node.nodeId}>
-    <button className={styles.crystal} data-crystal={node.nodeId} data-archived={node.status === '封存'}
+    <button className={styles.crystal} data-crystal={node.nodeId} data-archived={node.status === '封存'} data-glow={node.glow ?? 'white'}
       type="button" aria-pressed={selected} aria-label={node.name + ' ' + badge.text} onClick={onClick}>
       <span className={styles.crystalAura} aria-hidden="true" />
       <span className={styles.crystalShape} style={{ animationDelay: index * 0.6 + 's' }}>

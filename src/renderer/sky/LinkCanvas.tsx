@@ -11,6 +11,37 @@ export function LinkCanvas({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 }
 
 interface ScreenPoint { x: number; y: number }
+/** A crystal's hexagon on screen: centre and size after scaling, and the clear space to keep around it. */
+export interface CrystalBody { cx: number; cy: number; width: number; height: number; gap: number }
+
+/** Hexagon outline as fractions of the shape box (Sky.module.css .crystalShape clip-path). */
+const hexagon: readonly [number, number][] = [[0.5, 0], [0.92, 0.24], [0.92, 0.76], [0.5, 1], [0.08, 0.76], [0.08, 0.24]];
+
+/**
+ * Cuts the segment from `outside` towards `inside` where it meets the hexagon, then backs off by the gap, so the line
+ * stops short of the crystal (DESIGN.md §6.9: gold crystals keep about 5px clear of the gold lineage line).
+ */
+export function trimToBody(outside: ScreenPoint, inside: ScreenPoint, body: CrystalBody): ScreenPoint {
+  const dx = inside.x - outside.x, dy = inside.y - outside.y;
+  const length = Math.hypot(dx, dy);
+  if (!length) return inside;
+  const left = body.cx - body.width / 2, top = body.cy - body.height / 2;
+  const points = hexagon.map(([x, y]) => ({ x: left + x * body.width, y: top + y * body.height }));
+  let hit = Infinity;
+  for (let index = 0; index < points.length; index++) {
+    const a = points[index], b = points[(index + 1) % points.length];
+    const ex = b.x - a.x, ey = b.y - a.y;
+    const denominator = dx * ey - dy * ex;
+    if (!denominator) continue;
+    const t = ((a.x - outside.x) * ey - (a.y - outside.y) * ex) / denominator;
+    const u = ((a.x - outside.x) * dy - (a.y - outside.y) * dx) / denominator;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) hit = Math.min(hit, t);
+  }
+  if (!Number.isFinite(hit)) return inside;
+  const t = Math.max(0, hit - body.gap / length);
+  return { x: outside.x + dx * t, y: outside.y + dy * t };
+}
+
 interface LabelBounds extends ScreenPoint { half: number }
 const labelColors: Record<LinkKind, string> = {
   lineage: '#fde69f', delegate: '#b9e8ff', meeting: '#e4d5ff', project: '#a7f3d0',
@@ -53,12 +84,22 @@ export function drawLinks(
   nameplates: readonly Box[] = [],
   /** Dense maps: draw only the labels of links touching the selected crystal (none without a selection). */
   labelsForSelectionOnly = false,
+  /** Crystals whose lineage lines stop at the body edge plus a gap (gold tier). */
+  bodies: ReadonlyMap<string, CrystalBody> = new Map(),
 ) {
   const ctx = canvasSurface(canvas, viewport);
   if (!ctx) return;
-  const segments = bundleLinks(locations, links, visible).map((link) => ({
-    ...link, highlighted: link.from === selected || link.to === selected,
-  }));
+  const segments = bundleLinks(locations, links, visible).map((link) => {
+    let { start, end } = link;
+    if (link.kind === 'lineage' && bodies.size) {
+      const startId = link.from < link.to ? link.from : link.to;
+      const endId = startId === link.from ? link.to : link.from;
+      const endBody = bodies.get(endId), startBody = bodies.get(startId);
+      if (endBody) end = trimToBody(start, end, endBody);
+      if (startBody) start = trimToBody(end, start, startBody);
+    }
+    return { ...link, start, end, highlighted: link.from === selected || link.to === selected };
+  });
   for (const { kind, start, end, highlighted } of segments) {
     const { color, width, dash } = linkStyles[kind];
     ctx.globalAlpha = selected && !highlighted ? 0.42 : 1;

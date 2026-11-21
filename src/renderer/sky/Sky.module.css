@@ -75,7 +75,7 @@
   width: 96px; height: 136px; position: relative;
   clip-path: polygon(50% 0%, 92% 24%, 92% 76%, 50% 100%, 8% 76%, 8% 24%);
   background: linear-gradient(155deg, rgba(255,255,255,0.34), rgba(92,225,230,0.16) 45%, rgba(167,139,250,0.32));
-  box-shadow: inset 0 0 24px rgba(255,255,255,0.4);
+  box-shadow: var(--shape-glow);
   display: flex; align-items: center; justify-content: center;
   animation: floatCrystal 4.2s ease-in-out infinite; overflow: hidden;
 }
@@ -84,14 +84,18 @@
   filter: saturate(0.72);
 }
 .skyScene .crystal[aria-pressed='true'] .crystalShape { box-shadow: inset 0 0 32px rgba(255,255,255,0.75); }
-.skyScene .crystalAura { position: absolute; width: 124px; height: 152px; top: -6px; border-radius: 50%; filter: blur(20px); opacity: 0.4; z-index: -1; transition: opacity 0.25s; }
-.skyScene .crystal[aria-pressed='true'] .crystalAura, .skyScene .crystal:hover .crystalAura { opacity: 0.88; }
+.skyScene .crystalAura {
+  position: absolute; width: 124px; height: 152px; top: -6px; border-radius: 50%; z-index: -1; transition: opacity 0.25s;
+  background: var(--aura); filter: blur(var(--aura-blur)); opacity: var(--aura-opacity);
+}
+/* Selected or hovered: a brighter aura of the same colour; the pale gold pedestal marks the selection. */
+.skyScene .crystal[aria-pressed='true'] .crystalAura, .skyScene .crystal:hover .crystalAura { opacity: min(0.95, calc(var(--aura-opacity) + 0.24)); }
 .skyScene .crystalShape img { width: 112%; height: 112%; object-fit: cover; object-position: top center; opacity: 0.94; mix-blend-mode: screen; }
 .skyScene .crystalFacet { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(125deg, rgba(255,255,255,0.42) 0%, transparent 38%, transparent 65%, rgba(255,255,255,0.18) 100%); }
 .skyScene .crystalPedestal {
   width: 88px; height: 22px; margin-top: -8px; border-radius: 50%;
-  border: 1.5px solid rgba(92, 225, 230, 0.55);
-  box-shadow: 0 0 14px rgba(92, 225, 230, 0.35), inset 0 0 10px rgba(92, 225, 230, 0.3);
+  border: 1.5px solid var(--ring);
+  box-shadow: var(--ring-glow);
 }
 .skyScene .crystal[aria-pressed='true'] .crystalPedestal { border-color: #fde68a; box-shadow: 0 0 20px rgba(253, 230, 138, 0.65), inset 0 0 12px rgba(253, 230, 138, 0.45); }
 .skyScene .crystalLabel {
@@ -141,7 +145,54 @@
 .skyScene button:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: 2px; }
 .nodeAnchor { position: absolute; width: 144px; visibility: hidden; }
 .crystalLabel strong { display: block; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.skyScene .crystalAura { background: var(--glow-1-white); }
+/* Glow tiers (DESIGN.md §6.9). Values follow Hagemi's preview: aura blur/opacity, shape glow, pedestal ring. */
+.skyScene .crystal {
+  --aura: var(--glow-white); --aura-blur: 16px; --aura-opacity: 0.42;
+  --shape-glow: inset 0 0 22px rgba(226, 232, 240, 0.38), 0 0 14px rgba(226, 232, 240, 0.24);
+  --ring: rgba(226, 232, 240, 0.58);
+  --ring-glow: 0 0 12px rgba(226, 232, 240, 0.34), inset 0 0 8px rgba(226, 232, 240, 0.26);
+}
+.skyScene .crystal[data-glow='green'] {
+  --aura: var(--glow-green); --aura-blur: 18px; --aura-opacity: 0.5;
+  --shape-glow: inset 0 0 24px rgba(74, 222, 128, 0.4), 0 0 18px rgba(74, 222, 128, 0.32);
+  --ring: rgba(74, 222, 128, 0.65);
+  --ring-glow: 0 0 15px rgba(74, 222, 128, 0.42), inset 0 0 10px rgba(74, 222, 128, 0.32);
+}
+.skyScene .crystal[data-glow='blue'] {
+  --aura: var(--glow-blue); --aura-blur: 20px; --aura-opacity: 0.56;
+  --shape-glow: inset 0 0 26px rgba(59, 130, 246, 0.44), 0 0 22px rgba(59, 130, 246, 0.38);
+  --ring: rgba(59, 130, 246, 0.72);
+  --ring-glow: 0 0 18px rgba(59, 130, 246, 0.48), inset 0 0 11px rgba(59, 130, 246, 0.36);
+}
+.skyScene .crystal[data-glow='violet'] {
+  --aura: var(--glow-violet); --aura-blur: 22px; --aura-opacity: 0.62;
+  --shape-glow: inset 0 0 28px rgba(192, 132, 252, 0.46), 0 0 24px rgba(192, 132, 252, 0.42);
+  --ring: rgba(192, 132, 252, 0.75);
+  --ring-glow: 0 0 20px rgba(192, 132, 252, 0.52), inset 0 0 12px rgba(192, 132, 252, 0.38);
+}
+.skyScene .crystal[data-glow='gold'] {
+  --aura: var(--glow-gold); --aura-blur: 24px; --aura-opacity: 0.68;
+  --shape-glow: inset 0 0 28px rgba(245, 158, 11, 0.5), 0 0 28px rgba(245, 158, 11, 0.46);
+  --ring: rgba(245, 158, 11, 0.8);
+  --ring-glow: 0 0 22px rgba(245, 158, 11, 0.56), inset 0 0 13px rgba(245, 158, 11, 0.42);
+}
+.skyScene .crystal[data-glow='red'] {
+  --aura: var(--glow-red); --aura-blur: 26px; --aura-opacity: 0.72;
+  --shape-glow: inset 0 0 30px rgba(244, 63, 94, 0.52), 0 0 30px rgba(244, 63, 94, 0.5);
+  --ring: rgba(244, 63, 94, 0.82);
+  --ring-glow: 0 0 24px rgba(244, 63, 94, 0.58), inset 0 0 14px rgba(244, 63, 94, 0.44);
+}
+.skyScene .crystal[data-glow='rainbow'] {
+  --aura: var(--glow-rainbow); --aura-blur: 26px; --aura-opacity: 0.76;
+  --shape-glow: inset 0 0 30px rgba(255, 255, 255, 0.5), 0 0 32px rgba(192, 132, 252, 0.44);
+  --ring: rgba(253, 230, 138, 0.85);
+  --ring-glow: 0 0 22px rgba(92, 225, 230, 0.5), 0 0 34px rgba(244, 63, 94, 0.35), inset 0 0 14px rgba(253, 230, 138, 0.45);
+}
+/* The only moving tier: a slow 10s turn; still under low motion or the system reduce-motion setting. */
+.skyScene .crystal[data-glow='rainbow'] .crystalAura { animation: rainbowSpin 10s linear infinite; }
+@keyframes rainbowSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura { animation: none; }
+@media (prefers-reduced-motion: reduce) { .skyScene .crystal[data-glow='rainbow'] .crystalAura { animation: none; } }
 .skyScene .badgeDormant { background: rgba(148, 163, 184, .16); color: #b9cdbf; }
 .skyScene .badgeUnknown { background: rgba(148, 163, 184, .12); color: #a3adbb; border: 1px dashed rgba(148, 163, 184, .4); }
 .skyScene .crystalShape img[data-portrait='constellation'] { width: 64%; height: 82%; object-fit: contain; object-position: center; }
@@ -205,3 +256,64 @@
 }
 .skyScene .skylight:hover { background: rgba(245, 185, 99, 0.36); color: #fff; }
 .skyScene .skylight:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: -3px; }
+
+/* Experience badge in the detail panel header (DESIGN.md §6.6, §6.9). */
+.panelHeader { gap: 10px; }
+.glowBadgeBlock { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.glowBadge {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+  padding: 2px 8px 2px 6px; border: 1px solid rgba(255,255,255,0.14); background: rgba(6, 11, 26, 0.6);
+  color: var(--sky-text); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; cursor: help;
+}
+.glowBadge:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: 2px; }
+.glowDiamond { width: 8px; height: 8px; transform: rotate(45deg); background: var(--glow-white); box-shadow: 0 0 6px var(--glow-white); }
+.glowBadge[data-glow='green'] .glowDiamond { background: var(--glow-green); box-shadow: 0 0 6px var(--glow-green); }
+.glowBadge[data-glow='blue'] .glowDiamond { background: var(--glow-blue); box-shadow: 0 0 6px var(--glow-blue); }
+.glowBadge[data-glow='violet'] .glowDiamond { background: var(--glow-violet); box-shadow: 0 0 6px var(--glow-violet); }
+.glowBadge[data-glow='gold'] .glowDiamond { background: var(--glow-gold); box-shadow: 0 0 6px var(--glow-gold); }
+.glowBadge[data-glow='red'] .glowDiamond { background: var(--glow-red); box-shadow: 0 0 6px var(--glow-red); }
+.glowBadge[data-glow='rainbow'] .glowDiamond { background: var(--glow-rainbow); box-shadow: 0 0 6px var(--glow-violet); }
+.glowTip {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: none; width: 300px;
+  flex-direction: column; gap: 3px; padding: 9px 12px; border: 1px solid rgba(92, 225, 230, 0.35);
+  background: rgba(6, 11, 26, 0.96); box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+  color: #cbd5e1; font-size: 11.5px; font-weight: 500; letter-spacing: 0; line-height: 1.5;
+}
+.glowTip span:first-child { color: var(--sky-text); font-weight: 700; }
+.glowBadge:hover .glowTip, .glowBadge:focus .glowTip { display: flex; }
+.awardMeta { display: flex; flex-direction: column; color: var(--sky-muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.panelActions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: auto; padding-top: 6px; }
+.awardWarning { margin: 0; color: #fda4af; font-size: 12px; }
+.skyScene .awardButton {
+  padding: 6px 14px; border: 1px solid rgba(253, 230, 138, 0.45); background: rgba(253, 230, 138, 0.06);
+  color: #fde68a; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.skyScene .awardButton:hover { background: rgba(253, 230, 138, 0.16); }
+.skyScene .awardButton:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Confirmation dialog (DESIGN.md §6.7 card language). Absolute: the camera world is transformed, so fixed would not work. */
+.dialogVeil { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(0, 0, 0, 0.7); }
+.dialogCard {
+  width: 390px; max-width: calc(100% - 40px); padding: 22px 24px; display: flex; flex-direction: column; gap: 12px;
+  background: linear-gradient(180deg, rgba(16, 22, 42, 0.98), rgba(8, 12, 24, 0.98)); border: 1px solid rgba(92, 225, 230, 0.45);
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+  color: var(--sky-text); font-size: 13px;
+}
+.dialogCard h2 { margin: 0; color: var(--sky-gold); font-size: 15px; letter-spacing: 0.08em; }
+.dialogCard p { margin: 0; line-height: 1.6; }
+.reasonField { display: flex; flex-direction: column; gap: 5px; color: var(--sky-muted); font-size: 12px; }
+.reasonField input {
+  padding: 7px 9px; border: 1px solid rgba(92, 225, 230, 0.35); background: rgba(6, 11, 26, 0.85);
+  color: var(--sky-text); font: inherit; font-size: 13px;
+}
+.reasonField input:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: 1px; }
+.reasonField small { align-self: flex-end; }
+.dialogError { color: #fda4af; font-size: 12.5px; }
+.dialogActions { display: flex; justify-content: flex-end; gap: 8px; }
+.dialogActions button {
+  padding: 6px 16px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05);
+  color: #cbd5e1; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.dialogActions .dialogPrimary { border-color: rgba(253, 230, 138, 0.7); color: #fde68a; background: rgba(253, 230, 138, 0.1); }
+.dialogActions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.dialogActions button:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: 2px; }
