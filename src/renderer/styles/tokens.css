@@ -1,0 +1,34 @@
+:root {
+  --ink: #0d0b0a;
+  --surface: #161311;
+  --surface-plate: #1a1513;
+  --text: #e9e1dd;
+  --text-muted: #a89a8a;
+  --amber-bright: #f5c369;
+  --brass: #7a5b35;
+  --night: #0b0e1f;
+  --night-plate: #121731;
+  --starlight: #c9d6ff;
+  --violet: #9b8cff;
+
+  --font-serif: 'Noto Serif TC Variable', 'Noto Serif TC', serif;
+  --font-ui: 'Noto Sans TC Variable', 'Noto Sans TC', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+  --title-font: 700 22px / 30px var(--font-serif);
+  --heading-font: 700 17px / 24px var(--font-serif);
+  --ui-font: 500 13px / 18px var(--font-ui);
+  --mono-font: 500 12px / 16px var(--font-mono);
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+  --top-bar-height: 56px;
+  --details-width: 420px;
+  --control-chamfer: polygon(
+    6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px),
+    calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px
+  );
+}

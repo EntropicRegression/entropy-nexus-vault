@@ -1,0 +1,26 @@
+appId: com.entropynexus.vault
+productName: Entropy Nexus Vault
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**/*
+extraResources:
+  - from: node_modules/@fontsource-variable/noto-serif-tc/LICENSE
+    to: licenses/noto-serif-tc.txt
+  - from: node_modules/@fontsource-variable/noto-sans-tc/LICENSE
+    to: licenses/noto-sans-tc.txt
+  - from: node_modules/@fontsource-variable/jetbrains-mono/LICENSE
+    to: licenses/jetbrains-mono.txt
+win:
+  icon: assets/icon/app.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Entropy-Nexus-Vault-Setup-${version}.${ext}
+publish: null
