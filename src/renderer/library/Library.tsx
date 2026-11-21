@@ -118,7 +118,7 @@ interface CardProps {
   onOpen: (path: string, trigger?: HTMLButtonElement) => void;
   onToggleStack: (path: string) => void;
   onFocus: (path: string) => void;
-  onNode: (node: NodeCrystal) => void;
+  onNode?: (node: NodeCrystal) => void;
 }
 
 const Plaque = memo(function Plaque({ entry, active, selected, stackOpen, revision, nodes, onOpen, onToggleStack, onFocus, onNode }: CardProps) {
@@ -174,7 +174,7 @@ interface Props {
   query: string;
   deskMode: DeskMode;
   onToggleMode: () => void;
-  onNode: (node: NodeCrystal) => void;
+  onNode?: (node: NodeCrystal) => void;
   active: boolean;
   refreshToken: number;
 }

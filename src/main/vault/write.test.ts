@@ -72,7 +72,12 @@ describe('記憶庫寫入契約', () => {
     const legacyText = '# 正文\r\n保留行尾\r\n';
     await writeFile(join(root, legacy), legacyText);
     expect(await writer.setStatus(legacy, '退回', await version(join(root, legacy)))).toMatchObject({ ok: false, reason: 'legacy' });
-    expect(await writer.moveToRecycle(legacy, await version(join(root, legacy)))).toMatchObject({ ok: false, reason: 'legacy' });
+    expect(await readFile(join(root, legacy), 'utf8')).toBe(legacyText);
+    const moved = await writer.moveToRecycle(legacy, await version(join(root, legacy)));
+    if (!moved.ok) throw new Error(moved.reason);
+    expect(await readFile(join(root, moved.recycledPath), 'utf8')).toBe(legacyText);
+    await expect(stat(join(root, legacy))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await writer.restoreFromRecycle(moved.recycledPath, moved)).toMatchObject({ ok: true });
     expect(await readFile(join(root, legacy), 'utf8')).toBe(legacyText);
   });
 
@@ -278,6 +283,7 @@ describe('記憶庫寫入契約', () => {
     vi.mocked(unlink).mockRejectedValueOnce(ioError('EBUSY'));
     expect(await writer.moveToRecycle(draft, await version(target))).toMatchObject({ ok: false, reason: fallback ? 'recycle-io' : 'io' });
     expect(await readFile(target)).toEqual(bytes);
+    expect((await stat(target)).nlink).toBe(1);
     await expect(stat(join(root, recycled))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -286,7 +292,7 @@ describe('記憶庫寫入契約', () => {
     const bytes = await readFile(target);
     const fs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
     vi.mocked(link).mockRejectedValueOnce(ioError('ENOTSUP'));
-    vi.mocked(open).mockImplementationOnce(fs.open).mockImplementationOnce(fs.open).mockImplementationOnce(async (...args) => {
+    vi.mocked(open).mockImplementationOnce(fs.open).mockImplementationOnce(async (...args) => {
       const out = await fs.open(...args);
       const realWrite = out.writeFile.bind(out);
       vi.spyOn(out, 'writeFile').mockImplementationOnce(() => realWrite(Buffer.alloc(bytes.length)));
@@ -304,5 +310,19 @@ describe('記憶庫寫入契約', () => {
     expect(await writer.moveToRecycle(key, expected)).toMatchObject({ ok: false, reason: 'io' });
     expect(await writer.setStatus(key, '退回', expected)).toMatchObject({ ok: false, reason: 'io' });
     expect(await readFile(target)).toEqual(bytes);
+  });
+
+  it('未編號及 2 至 99 全部被佔用時，拒絕回收並保留來源及所有既有檔案', async () => {
+    const target = join(root, draft);
+    const prior = await readFile(target);
+    const original = await writer.moveToRecycle(draft, await version(target));
+    expect(original.ok).toBe(true);
+    await writeFile(target, prior);
+    for (let index = 2; index <= 99; index++) {
+      await writeFile(join(root, recycled.replace(/\.md$/, ' (' + index + ').md')), '已回收 ' + index);
+    }
+    expect(await writer.moveToRecycle(draft, await version(target))).toMatchObject({ ok: false, reason: 'occupied' });
+    expect(await readFile(target)).toEqual(prior);
+    expect(await readdir(dirname(join(root, recycled)))).toHaveLength(99);
   });
 });

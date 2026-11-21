@@ -7,7 +7,7 @@ import { canSetStatus } from '../../shared/vault-actions';
 import type { FileVersion, RecycledEntry, VaultRecycleResult, VaultStatusUpdate, VaultWriteFailure, VaultWriteResult } from '../../shared/types';
 import { entryFromFile } from './entry';
 import { memoryPath, sameVaultVersion } from './scan';
-import { editStatusLine, hasWritableHeader } from './status-line';
+import { editStatusLine } from './status-line';
 
 const recyclePrefix = '_回收/';
 const renameDelays = [25, 50, 100, 200];
@@ -181,9 +181,6 @@ export class VaultWriter {
       if (!key || !validExpected(expected)) return failed('io');
       const source = await prepareSource(this.root, key, expected);
       if ('ok' in source) return source;
-      const bytes = await readStable(source.path, source.stat);
-      if (!bytes) return failed('conflict');
-      if (!hasWritableHeader(bytes.toString('utf8'))) return failed('legacy');
       for (let index = 1; index <= 99; index++) {
         const recycledPath = recycledKey(key, index);
         const result = await this.move(source, recycledPath);

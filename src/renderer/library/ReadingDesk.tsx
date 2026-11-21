@@ -83,7 +83,7 @@ interface Props {
   onOpen: OpenEntry;
   onClose: () => void;
   onToggleMode: () => void;
-  onNode: (node: NodeCrystal) => void;
+  onNode?: (node: NodeCrystal) => void;
   writeState?: Feedback;
   onWrite: (request: WriteRequest) => void;
   onReload: (request: WriteRequest) => void;
@@ -102,7 +102,7 @@ export function ReadingDesk(props: Props) {
   const name = entry && projectDisplayName(entry);
   const attributes = entry?.attributes.filter(([key]) => !isProjectIdAttribute(key)) ?? [];
   const primary = entry && primaryStatus(entry);
-  const blocked = error || checking || !entry?.writable || writeState?.phase === 'pending' ||
+  const blocked = error || checking || writeState?.phase === 'pending' ||
     (writeState?.phase === 'failure' && ['conflict', 'missing', 'legacy'].includes(writeState.reason));
   for (const path of entry?.caseReferences ?? []) {
     const id = entries.get(path)?.caseId ?? /(?:^|\/)(\d{4}-\d{4})/.exec(path)?.[1];
@@ -124,7 +124,7 @@ export function ReadingDesk(props: Props) {
               {entry.nodeIds.map((id) => {
                 const node = nodes.get(id);
                 const label = (entry.nodeId === id ? '承辦：' : '參與：') + nodeName(entry, id, nodes);
-                return node
+                return node && onNode
                   ? <button key={id} type="button" className={styles.inlineLink} onClick={() => onNode(node)}>{label}</button>
                   : <span key={id}>{label}</span>;
               })}
@@ -182,12 +182,12 @@ export function ReadingDesk(props: Props) {
         </div>
         <footer className={styles.sheetFooter}>
           <div className={styles.writeControls}>
-            <button type="button" className={styles.primaryButton} aria-disabled={blocked || !primary} data-write-action={primary || undefined}
-              onClick={() => { if (!blocked && primary) onWrite({ kind: 'status', entry, status: primary }); }}>
+            <button type="button" className={styles.primaryButton} aria-disabled={blocked || !entry.writable || !primary} data-write-action={primary || undefined}
+              onClick={() => { if (!blocked && entry.writable && primary) onWrite({ kind: 'status', entry, status: primary }); }}>
               {entry.shelf === 'bookmark' ? '標為完成' : '確認'}
             </button>
-            <button type="button" className={styles.paperButton} aria-disabled={blocked || !canSetStatus(entry, '退回')} data-write-action="退回"
-              onClick={() => { if (!blocked && canSetStatus(entry, '退回')) onWrite({ kind: 'status', entry, status: '退回' }); }}>退回</button>
+            <button type="button" className={styles.paperButton} aria-disabled={blocked || !entry.writable || !canSetStatus(entry, '退回')} data-write-action="退回"
+              onClick={() => { if (!blocked && entry.writable && canSetStatus(entry, '退回')) onWrite({ kind: 'status', entry, status: '退回' }); }}>退回</button>
             <button type="button" className={styles.paperButton} aria-disabled={blocked} data-write-action="recycle"
               onClick={() => { if (!blocked) onWrite({ kind: 'recycle', entry }); }}>移入回收</button>
           </div>

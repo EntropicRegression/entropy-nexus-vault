@@ -43,9 +43,9 @@ function Seal({ id, entry, nodes, onNode }: AvatarProps & { id: string }) {
     ? <img src={source} alt="" loading="lazy" width="20" height="20" onError={() => setFailedSource(source)} />
     : initial;
   return <>
-    {node
+    {node && onNode
       ? <button type="button" className={styles.seal} tabIndex={-1} aria-label={label} onClick={() => onNode(node)}>{content}</button>
-      : <span className={styles.seal} data-unavailable="true" aria-label={label}>{content}</span>}
+      : <span className={styles.seal} data-unavailable={!node} aria-label={label}>{content}</span>}
     <span className={styles.sealTip} aria-hidden="true">{label}</span>
   </>;
 }
@@ -53,7 +53,7 @@ function Seal({ id, entry, nodes, onNode }: AvatarProps & { id: string }) {
 interface AvatarProps {
   entry: MemoryEntry;
   nodes: ReadonlyMap<string, NodeCrystal>;
-  onNode: (node: NodeCrystal) => void;
+  onNode?: (node: NodeCrystal) => void;
 }
 
 export function AvatarSeals(props: AvatarProps) {
