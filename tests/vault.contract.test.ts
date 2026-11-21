@@ -147,11 +147,11 @@ describe('記憶庫唯讀契約', () => {
     const initial = await reader.read();
     const baseline = initial.sidecars.stats;
     expect(baseline?.updatedAt).toBe('2026-11-21T08:00:00.000Z');
-    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { count: 7, level: '熾熱' } });
-    expect(await initial.readEntry(casePaths[1])).toMatchObject({ heat: { count: 0, level: '沉睡' } });
-    expect(await initial.readEntry(knowledge('確認測點代號'))).toMatchObject({ heat: { count: 1, level: '餘溫' } });
-    expect(await initial.readEntry(decisions[0])).toMatchObject({ heat: { count: 3, level: '微溫' } });
-    expect(await initial.readEntry(decisions[2])).toMatchObject({ heat: { count: 8, level: '微溫' } });
+    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: '炙熱' } });
+    expect(await initial.readEntry(casePaths[1])).toMatchObject({ heat: { count: 0, level: '餘燼' } });
+    expect(await initial.readEntry(knowledge('確認測點代號'))).toMatchObject({ heat: { count: 1, level: '微溫' } });
+    expect(await initial.readEntry(decisions[0])).toMatchObject({ heat: { count: 4, level: '溫潤' } });
+    expect(await initial.readEntry(decisions[2])).toMatchObject({ heat: { count: 6, level: '溫潤' } });
 
     await copyFile(malformedStats, join(root, statsFilename));
     await writeFile(join(root, heatFilename), JSON.stringify({
@@ -160,7 +160,7 @@ describe('記憶庫唯讀契約', () => {
     const duringFailure = await reader.read();
     expect(duringFailure.sidecars.stats).toBe(baseline);
     expect(await duringFailure.readCrystal(moss)).toMatchObject({ stats: { tasks: 4 } });
-    expect(await duringFailure.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: '餘溫' } });
+    expect(await duringFailure.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: '微溫' } });
     const noHistory = await new VaultReader(root, now).read();
     expect(noHistory.sidecars.stats).toBeNull();
     expect(await noHistory.readCrystal(moss)).toMatchObject({ stats: { tasks: 4 }, canWake: false });
@@ -173,7 +173,7 @@ describe('記憶庫唯讀契約', () => {
     const afterRepair = await reader.read();
     expect(afterRepair.sidecars.stats?.updatedAt).toBe('2026-11-21T08:10:00.000Z');
     expect(await afterRepair.readCrystal(moss)).toMatchObject({ stats: { tasks: 5 } });
-    expect(await afterRepair.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: '餘溫' } });
+    expect(await afterRepair.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: '微溫' } });
   });
 
   it('統計與熱度更新只略過不合格的單筆資料', async () => {
@@ -204,7 +204,7 @@ describe('記憶庫唯讀契約', () => {
       { kind: 'delegate', from: moss, to: heron, count: 2, lastAt: '2026-11-17T06:00:00.000Z' },
       { kind: 'meeting', nodeIds: [heron, moss], count: 1 },
     ]);
-    expect(await updated.readEntry(casePaths[0])).toMatchObject({ heat: { count: 1, level: '餘溫' } });
+    expect(await updated.readEntry(casePaths[0])).toMatchObject({ heat: { count: 1, level: '微溫' } });
     expect(updated.sidecars.heat.has(casePaths[1])).toBe(false);
     expect(updated.sidecars.heat.has(decisions[0])).toBe(false);
     await writeFile(join(root, statsFilename), JSON.stringify({ ...originalStats, 同席: null }));
@@ -242,12 +242,15 @@ describe('記憶庫唯讀契約', () => {
   });
 
   it('檔案未變也會在召回超過 30 天時更新熱度', async () => {
-    let clock = Date.parse('2026-12-21T05:30:00.000Z');
+    const edge = Date.parse('2026-12-21T05:30:00.000Z');
+    let clock = edge - 1;
     const reader = new VaultReader(fixture, () => clock);
     const initial = await reader.read();
-    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { level: '熾熱' } });
-    clock++;
-    expect(await (await reader.read()).readEntry(casePaths[0])).toMatchObject({ heat: { level: '微溫' } });
+    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: '炙熱' } });
+    clock = edge;
+    expect(await reader.read()).toBe(initial);
+    clock = edge + 1;
+    expect(await (await reader.read()).readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: '溫潤' } });
   });
 
   it('舊卷宗保留承辦名稱，節點 ID 與名稱各自篩選', async () => {

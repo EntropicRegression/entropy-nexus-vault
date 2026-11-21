@@ -1,19 +1,32 @@
-import type { HeatInfo, HeatLevel } from './types';
-
 export const defaultHeatThresholds = {
-  warm: 1,
-  warmer: 3,
-  hot: 7,
+  tepid: 1,
+  temperate: 3,
+  flaming: 5,
   decayAfterDays: 30,
 };
 
-const levels: readonly HeatLevel[] = ['沉睡', '餘溫', '微溫', '熾熱'];
+export const heatLevelNames = {
+  ember: '餘燼',
+  tepid: '微溫',
+  temperate: '溫潤',
+  flaming: '炙熱',
+} as const;
+
+export type HeatLevel = (typeof heatLevelNames)[keyof typeof heatLevelNames];
+
+export interface HeatInfo {
+  level: HeatLevel;
+  count: number;
+  lastRecalledAt: string | null;
+}
+
+const levels = Object.values(heatLevelNames);
 const dayMs = 24 * 60 * 60 * 1000;
 
 export type HeatRecall = Omit<HeatInfo, 'level'>;
 
 export function heatDecayAt(recall: HeatRecall | undefined, thresholds = defaultHeatThresholds): number {
-  if (!recall?.lastRecalledAt || recall.count < thresholds.warm) return Infinity;
+  if (!recall?.lastRecalledAt || recall.count < thresholds.tepid) return Infinity;
   const lastRecall = Date.parse(recall.lastRecalledAt);
   return Number.isFinite(lastRecall) ? lastRecall + thresholds.decayAfterDays * dayMs : Infinity;
 }
@@ -25,7 +38,10 @@ export function calculateHeat(
 ): HeatInfo {
   const count = recall?.count ?? 0;
   const lastRecalledAt = recall?.lastRecalledAt ?? null;
-  let level = count >= thresholds.hot ? 3 : count >= thresholds.warmer ? 2 : count >= thresholds.warm ? 1 : 0;
+  let level = count >= thresholds.flaming ? 3
+    : count >= thresholds.temperate ? 2
+    : count >= thresholds.tepid ? 1
+    : 0;
   if (now > heatDecayAt(recall, thresholds)) {
     level = Math.max(0, level - 1);
   }

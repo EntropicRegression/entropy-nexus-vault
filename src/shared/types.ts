@@ -1,6 +1,9 @@
+import type { HeatInfo } from './heat';
+
+export type { HeatInfo, HeatLevel } from './heat';
+
 export type MemoryKind = 'node' | 'case' | 'knowledge' | 'preference';
 export type MemoryScope = '全域' | '專案';
-export type HeatLevel = '沉睡' | '餘溫' | '微溫' | '熾熱';
 export type VaultStatusUpdate = '已確認' | '退回' | '已完成';
 export type FrontMatterValue = string | string[];
 
@@ -13,12 +16,6 @@ export interface VaultInfo {
 export interface FileVersion {
   mtime: number;
   size: number;
-}
-
-export interface HeatInfo {
-  level: HeatLevel;
-  count: number;
-  lastRecalledAt: string | null;
 }
 
 export interface EntryFilter {
