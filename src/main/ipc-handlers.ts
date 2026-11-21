@@ -76,7 +76,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     const richness = new Map<string, Richness>();
     for (const [id, input] of inputs) {
       const peak = peaks.get(id) ?? { completed: input.completedNow, rejected: input.rejectedNow };
-      richness.set(id, computeRichness({ ...input, completedPeak: peak.completed, rejectedAtPeak: peak.rejected }));
+      richness.set(id, computeRichness({ ...input, completedPeak: peak.completed, rejectedPeak: peak.rejected }));
     }
     // A file that cannot be read right now (locked by a sync client) shows no awards; setAward reads it again.
     const awards: AwardsState = await readAwards(context.root, inputs.keys())

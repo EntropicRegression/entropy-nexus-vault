@@ -189,10 +189,15 @@
   --ring-glow: 0 0 22px rgba(92, 225, 230, 0.5), 0 0 34px rgba(244, 63, 94, 0.35), inset 0 0 14px rgba(253, 230, 138, 0.45);
 }
 /* The only moving tier: a slow 10s turn; still under low motion or the system reduce-motion setting. */
-.skyScene .crystal[data-glow='rainbow'] .crystalAura { animation: rainbowSpin 10s linear infinite; }
+/* Only the colours turn: the aura keeps its oval shape and clips a larger round conic layer that rotates inside it. */
+.skyScene .crystal[data-glow='rainbow'] .crystalAura { background: none; overflow: hidden; }
+.skyScene .crystal[data-glow='rainbow'] .crystalAura::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 200px; height: 200px; margin: -100px 0 0 -100px;
+  border-radius: 50%; background: var(--glow-rainbow); animation: rainbowSpin 10s linear infinite;
+}
 @keyframes rainbowSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura { animation: none; }
-@media (prefers-reduced-motion: reduce) { .skyScene .crystal[data-glow='rainbow'] .crystalAura { animation: none; } }
+.skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; }
+@media (prefers-reduced-motion: reduce) { .skyScene .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; } }
 .skyScene .badgeDormant { background: rgba(148, 163, 184, .16); color: #b9cdbf; }
 .skyScene .badgeUnknown { background: rgba(148, 163, 184, .12); color: #a3adbb; border: 1px dashed rgba(148, 163, 184, .4); }
 .skyScene .crystalShape img[data-portrait='constellation'] { width: 64%; height: 82%; object-fit: contain; object-position: center; }
@@ -308,6 +313,7 @@
 }
 .reasonField input:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: 1px; }
 .reasonField small { align-self: flex-end; }
+.reasonField .reasonNote { align-self: flex-start; color: var(--sky-muted); font-size: 11px; }
 .dialogError { color: #fda4af; font-size: 12.5px; }
 .dialogActions { display: flex; justify-content: flex-end; gap: 8px; }
 .dialogActions button {

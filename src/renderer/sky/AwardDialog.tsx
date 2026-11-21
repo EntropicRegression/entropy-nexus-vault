@@ -60,6 +60,7 @@ export function AwardDialog({ mode, name, saving, failure, onConfirm, onCancel, 
             placeholder="例:主導記憶庫安全設計並維護至今"
             onChange={(event) => setReason(Array.from(event.target.value).slice(0, awardReasonLimit).join(''))} />
           <small aria-live="polite">還可輸入 {awardReasonLimit - length} 字</small>
+          <small className={styles.reasonNote}>看起來像金鑰、權杖或密碼的內容會自動遮罩為「[已遮罩]」。</small>
         </label>
       </> : <p>撤回〈{name}〉的彩虹光暈?等級將回到自動計算的結果。</p>}
       {failure && <p className={styles.dialogError} role="alert"><strong>未儲存</strong> · {failureText[failure]}</p>}

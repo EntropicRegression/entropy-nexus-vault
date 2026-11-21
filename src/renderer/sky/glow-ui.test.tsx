@@ -25,8 +25,8 @@ function crystals(): CrystalList {
   };
 }
 
-const capped = computeRichness({ confirmedCases: 0, participatedCases: 3, completedPeak: 200, rejectedAtPeak: 0,
-  completedNow: 40, rejectedNow: 2, projects: 6 });
+const capped = computeRichness({ confirmedCases: 0, participatedCases: 3, completedPeak: 200, rejectedPeak: 0,
+  completedNow: 40, rejectedNow: 2, projects: 6, projectScope: 'git' });
 
 function detailFor(nodeId: string, award: NodeCrystalDetail['award'] = null): NodeCrystalDetail {
   const node = crystals().crystals.find((item) => item.nodeId === nodeId)!;
@@ -60,7 +60,7 @@ describe('經歷等級光暈與彩虹頒發(介面)', () => {
     readCrystal = vi.fn(async (id: string) => detailFor(id, id === 'n-violet' ? awarded : null));
     setAward = vi.fn(async (_id: unknown, award: unknown) => {
       awarded = award ? { awardedAt: '2026-11-22T10:00:00.000Z', reason: (award as { reason: string }).reason } : null;
-      return { ok: true as const, ...version, award: awarded };
+      return { ok: true as const, ...version, award: awarded, masked: 0 };
     });
     vi.stubGlobal('vault', { listCrystals, readCrystal, setAward });
   });
@@ -101,9 +101,10 @@ describe('經歷等級光暈與彩虹頒發(介面)', () => {
       '經歷分數 47 分',
       '承辦的已確認判例 0 份 × 10 = 0',
       '參與的已確認判例 3 份 → +3(上限 10)',
-      '跨專案 6 個 → +24(最多計 6 個)',
-      '有效完成 200 件(完成峰值 200 − 退回 0)→ +20(每 10 件 1 分,上限 20)',
-      '退回率 5%(目前窗口 2 / 40)',
+      '跨專案 6 個(只算 git 專案) → +24(最多計 6 個)',
+      '有效完成 200 件(完成峰值 200 − 退回峰值 0)→ +20(每 10 件 1 分,上限 20)',
+      '退回率 5%(目前 5%=2/40、峰值 0%=0/200,取較高者)',
+      '退回數含失敗或中斷任務上的退回,退回率可能偏高',
       '沒有自己承辦的已確認判例,最高只能到藍晶',
     ]);
   });
@@ -142,6 +143,35 @@ describe('經歷等級光暈與彩虹頒發(介面)', () => {
     expect(actionButton().textContent).toBe('頒發彩虹光暈');
   });
 
+  it('B5:頒發後在清單重讀之前立刻撤回、再頒發,都帶上一次寫入回傳的版本,不誤報衝突', async () => {
+    let version = 1;
+    setAward.mockImplementation(async (_id: unknown, award: unknown) => {
+      awarded = award ? { awardedAt: '2026-11-22T10:00:00.000Z', reason: '' } : null;
+      return { ok: true as const, mtime: 1700000000000 + ++version, size: 100 + version, award: awarded, masked: 0 };
+    });
+    await render();
+    await open('n-violet');
+    // From now on the crystal list never comes back, so only the write's own result can update the version.
+    listCrystals.mockImplementation(() => new Promise(() => {}));
+    await act(async () => actionButton().click());
+    await act(async () => dialogButton('頒發').click());
+    expect(setAward).toHaveBeenLastCalledWith('n-violet', { reason: '' }, { mtime: 1700000000000, size: 120 });
+    await act(async () => actionButton().click());
+    await act(async () => dialogButton('撤回').click());
+    expect(setAward).toHaveBeenLastCalledWith('n-violet', null, { mtime: 1700000000002, size: 102 });
+    await act(async () => actionButton().click());
+    await act(async () => dialogButton('頒發').click());
+    expect(setAward).toHaveBeenLastCalledWith('n-violet', { reason: '' }, { mtime: 1700000000003, size: 103 });
+    expect(dialog()).toBeNull();
+  });
+
+  it('頒發視窗提示金鑰會被遮罩', async () => {
+    await render();
+    await open('n-violet');
+    await act(async () => actionButton().click());
+    expect(dialog()!.textContent).toContain('看起來像金鑰、權杖或密碼的內容會自動遮罩為「[已遮罩]」。');
+  });
+
   it('寫入失敗留在視窗:衝突顯示未儲存與重新載入;取消或 Esc 關閉', async () => {
     setAward.mockResolvedValueOnce({ ok: false, reason: 'conflict', current: { mtime: 1, size: 2 } });
     await render();
@@ -175,8 +205,11 @@ describe('經歷等級光暈與彩虹頒發(介面)', () => {
     expect(host.querySelector<HTMLElement>('[data-sky]')!.dataset.quiet).toBe('true');
     expect(crystal('n-rainbow').dataset.glow).toBe('rainbow');
     const css = skyCss;
-    expect(css).toContain(".skyScene .crystal[data-glow='rainbow'] .crystalAura { animation: rainbowSpin 10s linear infinite; }");
-    expect(css).toContain(".skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura { animation: none; }");
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.skyScene \.crystal\[data-glow='rainbow'\] \.crystalAura \{ animation: none; \} \}/);
+    // The oval aura itself never rotates; only its inner conic layer does (M5c review, visual item).
+    expect(css).toContain(".skyScene .crystal[data-glow='rainbow'] .crystalAura { background: none; overflow: hidden; }");
+    expect(css).toMatch(/\.crystalAura::before \{[^}]*animation: rainbowSpin 10s linear infinite;/);
+    expect(css).not.toMatch(/\.crystalAura \{[^}]*animation: rainbowSpin/);
+    expect(css).toContain(".skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; }");
+    expect(css).toContain("@media (prefers-reduced-motion: reduce) { .skyScene .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; } }");
   });
 });

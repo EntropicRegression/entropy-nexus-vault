@@ -104,6 +104,10 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
       result = { ok: false as const, reason: 'io' as const };
     }
     if (result.ok) {
+      // The next grant or withdrawal must carry the version this write produced, even if the user acts before the
+      // list is read again (M5c review B5: otherwise our own write looks like an outside change).
+      const written = { mtime: result.mtime, size: result.size };
+      setData((current) => current && { ...current, awards: { version: written, corrupt: false } });
       setReload((value) => value + 1);
       closeAward();
     } else {

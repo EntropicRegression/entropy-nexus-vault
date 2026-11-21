@@ -4,6 +4,7 @@ import { lstat, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { normaliseAwardReason } from '../../shared/glow';
+import { maskSecrets } from '../../shared/secrets';
 import type { GlowAward } from '../../shared/glow';
 import type { AwardWriteResult, FileVersion } from '../../shared/types';
 
@@ -101,8 +102,10 @@ export async function readAwards(root: string, nodeIds: Iterable<string>): Promi
 export async function writeAward(root: string, nodeId: string, award: { reason: unknown } | null, expected: unknown,
   now = () => Date.now()): Promise<AwardWriteResult> {
   if (typeof nodeId !== 'string' || !nodeId || !validExpected(expected)) return { ok: false, reason: 'invalid' };
-  const reason = award ? normaliseAwardReason(award.reason) : '';
-  if (reason === null) return { ok: false, reason: 'invalid' };
+  const normalised = award ? normaliseAwardReason(award.reason) : '';
+  if (normalised === null) return { ok: false, reason: 'invalid' };
+  // Text that looks like a key or token is masked before it reaches the file (M5c review B6).
+  const { text: reason, masked } = maskSecrets(normalised);
   const path = join(root, awardsFilename);
   let current: Awaited<ReturnType<typeof readRaw>>;
   try {
@@ -141,7 +144,7 @@ export async function writeAward(root: string, nodeId: string, award: { reason: 
     }
     const written = await statFile(path);
     if (!written) return { ok: false, reason: 'io' };
-    return { ok: true, ...versionOf(written), award: granted };
+    return { ok: true, ...versionOf(written), award: granted, masked };
   } catch {
     return { ok: false, reason: 'io' };
   } finally {

@@ -85,6 +85,17 @@ describe('.vault-awards.json(DESIGN.md §6.9、docs/架構.md §9.3)', () => {
     expect(saved.頒發.n2).toMatchObject({ 等級: '彩虹', 理由: '新' });
   });
 
+  it('B6:理由裡看起來像金鑰或權杖的字串在寫入前遮罩,回傳遮罩處數', async () => {
+    const root = await vault();
+    const result = await writeAward(root, 'n1', { reason: '金鑰 sk-ant-abcdefghijklmnop1234 與 token=hunter22 已換' }, null, now);
+    expect(result).toMatchObject({ ok: true, masked: 2, award: { reason: '金鑰 [已遮罩] 與 token=[已遮罩] 已換' } });
+    const text = await readFile(join(root, awardsFilename), 'utf8');
+    expect(text).not.toContain('sk-ant-');
+    expect(text).not.toContain('hunter22');
+    const plain = await writeAward(root, 'n2', { reason: '主導安全設計' }, await version(root), now);
+    expect(plain).toMatchObject({ ok: true, masked: 0, award: { reason: '主導安全設計' } });
+  });
+
   it('看起來像路徑的節點 ID 存成雜湊,檔案內容沒有路徑', async () => {
     const root = await vault();
     const legacy = 'legacy:nodes/C:/Users/Someone/夜苔.md';
