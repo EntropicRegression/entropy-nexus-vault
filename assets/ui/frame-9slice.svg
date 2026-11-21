@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <!-- 9-slice friendly chamfered double-border game UI frame (corner slice = 32px) -->
+  <!-- Outer dark backing border -->
+  <polygon points="24,4 232,4 252,24 252,232 232,252 24,252 4,232 4,24"
+           fill="rgba(14, 9, 7, 0.72)" stroke="#7A5B35" stroke-width="2" />
+  <!-- Inner hairline border -->
+  <polygon points="28,10 228,10 246,28 246,228 228,246 28,246 10,228 10,28"
+           fill="none" stroke="#D99B43" stroke-width="1" stroke-opacity="0.7" />
+  <!-- Corner chamfer accent plates -->
+  <path d="M24 4 L44 4 M4 24 L4 44" stroke="#F5C369" stroke-width="2" stroke-linecap="square" />
+  <path d="M232 4 L212 4 M252 24 L252 44" stroke="#F5C369" stroke-width="2" stroke-linecap="square" />
+  <path d="M24 252 L44 252 M4 232 L4 212" stroke="#F5C369" stroke-width="2" stroke-linecap="square" />
+  <path d="M232 252 L212 252 M252 232 L252 212" stroke="#F5C369" stroke-width="2" stroke-linecap="square" />
+  <!-- Four corner diamond rivets -->
+  <polygon points="15,10 20,15 15,20 10,15" fill="#F5C369" stroke="#8C3A27" stroke-width="1" />
+  <polygon points="241,10 246,15 241,20 236,15" fill="#F5C369" stroke="#8C3A27" stroke-width="1" />
+  <polygon points="15,236 20,241 15,246 10,241" fill="#F5C369" stroke="#8C3A27" stroke-width="1" />
+  <polygon points="241,236 246,241 241,246 236,241" fill="#F5C369" stroke="#8C3A27" stroke-width="1" />
+</svg>

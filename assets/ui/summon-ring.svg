@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <!-- Outer arcane rings -->
+  <circle cx="256" cy="256" r="244" stroke="#7A5B35" stroke-width="1.5" stroke-opacity="0.7"/>
+  <circle cx="256" cy="256" r="236" stroke="#D99B43" stroke-width="2" stroke-opacity="0.9"/>
+  <circle cx="256" cy="256" r="224" stroke="#7A5B35" stroke-width="1" stroke-dasharray="6 6" stroke-opacity="0.75"/>
+  <circle cx="256" cy="256" r="204" stroke="#D99B43" stroke-width="1.5" stroke-opacity="0.85"/>
+
+  <!-- 12-segment tick marks between r=204 and r=224 -->
+  <g stroke="#F5C369" stroke-width="1.5" stroke-opacity="0.85">
+    <line x1="256" y1="32" x2="256" y2="52"/>
+    <line x1="256" y1="460" x2="256" y2="480"/>
+    <line x1="32" y1="256" x2="52" y2="256"/>
+    <line x1="460" y1="256" x2="480" y2="256"/>
+    <line x1="144" y1="62" x2="154" y2="79.3"/>
+    <line x1="358" y1="432.7" x2="368" y2="450"/>
+    <line x1="62" y1="144" x2="79.3" y2="154"/>
+    <line x1="432.7" y1="358" x2="450" y2="368"/>
+    <line x1="368" y1="62" x2="358" y2="79.3"/>
+    <line x1="154" y1="432.7" x2="144" y2="450"/>
+    <line x1="450" y1="144" x2="432.7" y2="154"/>
+    <line x1="79.3" y1="358" x2="62" y2="368"/>
+  </g>
+
+  <!-- Octagram (two rotated squares) inscribed in r=204 -->
+  <rect x="111.7" y="111.7" width="288.6" height="288.6" stroke="#7A5B35" stroke-width="1.5" stroke-opacity="0.8"/>
+  <rect x="111.7" y="111.7" width="288.6" height="288.6" transform="rotate(45 256 256)" stroke="#D99B43" stroke-width="1.5" stroke-opacity="0.8"/>
+
+  <!-- Mid concentric rings -->
+  <circle cx="256" cy="256" r="144" stroke="#8C3A27" stroke-width="1.5" stroke-opacity="0.85"/>
+  <circle cx="256" cy="256" r="136" stroke="#D99B43" stroke-width="1.2" stroke-dasharray="3 5" stroke-opacity="0.8"/>
+  <circle cx="256" cy="256" r="96" stroke="#7A5B35" stroke-width="1.5" stroke-opacity="0.85"/>
+
+  <!-- Cardinal & intercardinal diamond nodes on r=236 -->
+  <g fill="#F5C369" stroke="#8C3A27" stroke-width="1.2">
+    <polygon points="256,12 263,20 256,28 249,20"/>
+    <polygon points="256,484 263,492 256,500 249,492"/>
+    <polygon points="12,256 20,249 28,256 20,263"/>
+    <polygon points="484,256 492,249 500,256 492,263"/>
+  </g>
+  <g fill="#D99B43" stroke="#7A5B35" stroke-width="1">
+    <polygon points="89.1,89.1 95.5,89.1 95.5,95.5 89.1,95.5" transform="rotate(45 92.3 92.3)"/>
+    <polygon points="416.5,89.1 422.9,89.1 422.9,95.5 416.5,95.5" transform="rotate(45 419.7 92.3)"/>
+    <polygon points="89.1,416.5 95.5,416.5 95.5,422.9 89.1,422.9" transform="rotate(45 92.3 419.7)"/>
+    <polygon points="416.5,416.5 422.9,416.5 422.9,422.9 416.5,422.9" transform="rotate(45 419.7 419.7)"/>
+  </g>
+
+  <!-- Central four-pointed arcane star -->
+  <path d="M256 168 L272 240 L344 256 L272 272 L256 344 L240 272 L168 256 L240 240 Z"
+        stroke="#F5C369" stroke-width="1.8" stroke-opacity="0.9"/>
+  <path d="M256 196 L266 246 L316 256 L266 266 L256 316 L246 266 L196 256 L246 246 Z"
+        fill="#8C3A27" fill-opacity="0.25" stroke="#D99B43" stroke-width="1.2"/>
+  <circle cx="256" cy="256" r="18" stroke="#F5C369" stroke-width="1.5"/>
+  <circle cx="256" cy="256" r="6" fill="#F5C369"/>
+</svg>

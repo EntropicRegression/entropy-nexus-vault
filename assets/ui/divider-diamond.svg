@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="24" viewBox="0 0 400 24" fill="none">
+  <defs>
+    <linearGradient id="divGradL" x1="0" y1="12" x2="180" y2="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7A5B35" stop-opacity="0" />
+      <stop offset="65%" stop-color="#7A5B35" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#D99B43" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="divGradR" x1="400" y1="12" x2="220" y2="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7A5B35" stop-opacity="0" />
+      <stop offset="65%" stop-color="#7A5B35" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#D99B43" stop-opacity="1" />
+    </linearGradient>
+  </defs>
+  <line x1="0" y1="12" x2="182" y2="12" stroke="url(#divGradL)" stroke-width="1.5" />
+  <line x1="400" y1="12" x2="218" y2="12" stroke="url(#divGradR)" stroke-width="1.5" />
+  <!-- Flanking small diamonds -->
+  <polygon points="178,12 182,9 186,12 182,15" fill="#D99B43" />
+  <polygon points="214,12 218,9 222,12 218,15" fill="#D99B43" />
+  <!-- Central faceted diamond -->
+  <polygon points="200,3 209,12 200,21 191,12" fill="#8C3A27" stroke="#D99B43" stroke-width="1.2" />
+  <polygon points="200,5 207,12 200,19 193,12" fill="#F5C369" />
+  <polygon points="200,5 207,12 200,12 193,12" fill="#F5C369" />
+  <polygon points="200,12 207,12 200,19 193,12" fill="#D99B43" />
+</svg>
