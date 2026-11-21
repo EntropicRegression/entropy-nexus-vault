@@ -4,6 +4,7 @@ import type { CrystalList, EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrys
 import { buildCrystals } from './crystals';
 import { entryFromFile } from './entry';
 import type { ParsedEntry } from './entry';
+import { field } from './frontmatter';
 import { inRecycle, VaultLinks } from './links';
 import { memoryPath, sameVaultVersion, scanVault, vaultVersion } from './scan';
 import type { VaultVersion } from './scan';
@@ -13,8 +14,9 @@ import type { SidecarSnapshot } from './sidecars';
 function matches(entry: MemoryEntry, filter: EntryFilter): boolean {
   return (filter?.includeSuperseded === true || !entry.superseded) &&
     (!filter?.kind || entry.kind === filter.kind) &&
+    (!filter?.shelf || entry.shelf === filter.shelf) &&
     (!filter?.subtype || entry.subtype === filter.subtype) &&
-    (!filter?.status || entry.status === filter.status) &&
+    (!filter?.status || (Array.isArray(filter.status) ? filter.status.includes(entry.status) : entry.status === filter.status)) &&
     (!filter?.projectId || entry.projectId === filter.projectId) &&
     (!filter?.nodeId || entry.nodeId === filter.nodeId || entry.participantNodeIds.includes(filter.nodeId)) &&
     (!filter?.nodeLabel || entry.nodeLabel === filter.nodeLabel);
@@ -24,11 +26,21 @@ export class VaultSnapshot {
   private readonly entries: Map<string, ParsedEntry>;
   private readonly links: VaultLinks;
   private readonly crystals: ReturnType<typeof buildCrystals>;
+  private readonly searchText = new Map<string, string>();
 
   constructor(private readonly root: string, parsed: ParsedEntry[], readonly sidecars: SidecarSnapshot) {
     this.entries = new Map(parsed.map((entry) => [entry.entry.path.toLowerCase(), entry]));
     this.links = new VaultLinks(parsed);
     this.crystals = buildCrystals(parsed, this.links, sidecars.stats);
+    for (const { entry, body, attributes } of parsed) {
+      entry.previousCount = this.links.supersessionChain(entry.path).length;
+      const { title, caseId, nodeLabel, nodeIds } = entry;
+      this.searchText.set(entry.path, [
+        title, caseId, body, nodeLabel, ...nodeIds,
+        ...nodeIds.map((id) => this.crystals.records.get(id)?.crystal.name),
+        field(attributes, '關鍵字', 'keywords'), field(attributes, '案由'),
+      ].join('\n').toLowerCase());
+    }
   }
 
   listEntries(filter: EntryFilter = {}): MemoryEntry[] {
@@ -44,9 +56,9 @@ export class VaultSnapshot {
   search(query: string, filter: EntryFilter = {}): MemoryEntry[] {
     if (typeof query !== 'string') return [];
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return [...this.entries.values()].filter(({ entry, body }) => {
+    return [...this.entries.values()].filter(({ entry }) => {
       if (!matches(entry, filter)) return false;
-      const text = [entry.title, entry.caseId, body].join('\n').toLowerCase();
+      const text = this.searchText.get(entry.path) ?? '';
       return terms.every((term) => text.includes(term));
     }).map(({ entry }) => entry);
   }
@@ -56,6 +68,10 @@ export class VaultSnapshot {
       crystals: [...this.crystals.records.values()].map(({ crystal }) => crystal),
       links: this.crystals.links,
     };
+  }
+
+  hasArchivedNode(nodeId: string): boolean {
+    return Boolean(this.crystals.records.get(nodeId)?.archives.length);
   }
 
   async readCrystal(nodeId: string): Promise<NodeCrystalDetail | null> {
@@ -77,7 +93,7 @@ export class VaultSnapshot {
       ...parsed.entry,
       mtime: parsed.mtime,
       size: parsed.size,
-      attributes: Object.fromEntries(parsed.attributes),
+      attributes: [...parsed.attributes],
       body: parsed.body,
       review: parsed.review,
       supersessionChain,

@@ -1,5 +1,6 @@
 import { calculateHeat } from '../../shared/heat';
 import type { HeatRecall } from '../../shared/heat';
+import { shelfOf } from '../../shared/shelves';
 import type { MemoryEntry, MemoryKind, MemoryScope } from '../../shared/types';
 import { field, parseFrontMatter } from './frontmatter';
 import type { FrontMatter } from './frontmatter';
@@ -77,6 +78,24 @@ function entryScope(value: string, kind: MemoryKind, projectId: string): MemoryS
   return kind !== 'node' && kind !== 'preference' && projectId ? '專案' : '全域';
 }
 
+function firstBodyParagraph(body: string): string {
+  const lines = body.split('\n');
+  let fence = '';
+  const paragraph: string[] = [];
+  for (const line of lines) {
+    const text = line.trim();
+    if (paragraph.length && (!text || /^#{1,6}[\t ]/.test(text) || /^(?:\x60{3,}|~{3,})/.test(text))) break;
+    const marker = /^(\x60{3,}|~{3,})(.*)$/.exec(text);
+    if (marker) {
+      if (!fence) fence = marker[1];
+      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim()) fence = '';
+      continue;
+    }
+    if (!fence && text && !/^#{1,6}[\t ]/.test(text)) paragraph.push(text);
+  }
+  return Array.from(paragraph.join(' ')).slice(0, 80).join('');
+}
+
 export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, now: number): ParsedEntry {
   const { path, text, mtime, size } = file;
   const { attributes, body: markdown } = parseFrontMatter(text);
@@ -92,7 +111,8 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
   const projectName = field(attributes, '專案', 'project', 'projectName') || folderProject;
   const projectId = field(attributes, '專案ID', '專案id', 'project-id', 'projectId') || projectName;
   const scope = entryScope(field(attributes, '範圍', 'scope'), kind, projectId);
-  const subtype = field(attributes, '子類', 'subtype');
+  const subtypeText = field(attributes, '子類', 'subtype');
+  const subtype = /^decision$/i.test(subtypeText) ? '決策' : /^bookmark$/i.test(subtypeText) ? '書籤' : subtypeText;
   const nodeId = field(attributes, '節點ID', '節點id', 'node-id', 'nodeId');
   const nodeLabel = field(attributes, '節點', '承辦節點', 'nodeLabel', 'nodeName', 'node');
   const participantNodeIds = field(attributes, '參與節點ID', 'participantNodeIds')
@@ -103,21 +123,24 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
     entry: {
       path,
       title: field(attributes, '標題', '案由', 'title', 'name') || headings.find((heading) => heading.level === 1)?.title || filename,
-      summary: /^摘要[:：][ \t]*(.+)$/m.exec(body)?.[1].trim() ?? '',
+      summary: /^摘要[:：][ \t]*(.+)$/m.exec(body)?.[1].trim() || (kind === 'case' ? '' : firstBodyParagraph(body)),
       kind,
+      shelf: shelfOf({ kind, subtype }),
       scope,
       projectId: scope === '專案' ? projectId : '',
       projectName: scope === '專案' ? projectName : '',
       nodeId,
       nodeLabel,
       participantNodeIds,
-      subtype: /^decision$/i.test(subtype) ? '決策' : /^bookmark$/i.test(subtype) ? '書籤' : subtype,
+      nodeIds: [...new Set([nodeId, ...participantNodeIds].filter(Boolean))],
+      subtype,
       status,
       caseId: kind === 'case' ? /^(\d{4}-\d{4})(?!\d)/.exec(filename)?.[1] ??
         (field(attributes, '案號', 'caseId') || null) : null,
       updatedAt: memoryTimestamp(field(attributes, '更新時間', 'updated', 'updatedAt', '封存時間')) ?? mtime,
       heat: calculateHeat(recall, now),
       superseded: false,
+      previousCount: 0,
     },
     attributes,
     markdown,

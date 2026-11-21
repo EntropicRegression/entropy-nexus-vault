@@ -1,4 +1,5 @@
 import type { HeatInfo } from './heat';
+import type { Shelf } from './shelves';
 
 export type { HeatInfo, HeatLevel } from './heat';
 
@@ -6,6 +7,12 @@ export type MemoryKind = 'node' | 'case' | 'knowledge' | 'preference';
 export type MemoryScope = '全域' | '專案';
 export type VaultStatusUpdate = '已確認' | '退回' | '已完成';
 export type FrontMatterValue = string | string[];
+export type DeskMode = 'A' | 'B';
+
+export interface ViewSettings {
+  deskMode: DeskMode;
+  reducedMotion: boolean;
+}
 
 export interface VaultInfo {
   path: string;
@@ -21,7 +28,8 @@ export interface FileVersion {
 export interface EntryFilter {
   kind?: MemoryKind;
   subtype?: string;
-  status?: string;
+  status?: string | string[];
+  shelf?: Shelf;
   projectId?: string;
   nodeId?: string;
   nodeLabel?: string;
@@ -33,6 +41,7 @@ export interface MemoryEntry {
   title: string;
   summary: string;
   kind: MemoryKind;
+  shelf: Shelf | null;
   scope: MemoryScope;
   subtype: string;
   status: string;
@@ -41,20 +50,24 @@ export interface MemoryEntry {
   nodeId: string;
   nodeLabel: string;
   participantNodeIds: string[];
+  nodeIds: string[];
   caseId: string | null;
   updatedAt: number;
   heat: HeatInfo;
   superseded: boolean;
+  previousCount: number;
 }
 
 export interface SupersessionLink {
   path: string;
   title: string | null;
+  caseId: string | null;
+  updatedAt: number | null;
   status: 'available' | 'recycled' | 'missing';
 }
 
 export interface MemoryEntryDetail extends MemoryEntry, FileVersion {
-  attributes: Record<string, FrontMatterValue>;
+  attributes: [string, FrontMatterValue][];
   body: string;
   review: string;
   supersessionChain: SupersessionLink[];
@@ -68,6 +81,7 @@ export interface NodeCrystal {
   status: '線上' | '休眠' | '封存';
   canWake: boolean;
   projectNames: string[];
+  avatarUrl?: string | null;
 }
 
 export type CrystalLink =

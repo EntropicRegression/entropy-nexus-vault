@@ -63,10 +63,11 @@ export class VaultLinks {
         if (indexed?.entry.path === path) continue;
         if (indexed) {
           indexed.entry.superseded = true;
-          links.push({ path: indexed.entry.path, title: indexed.entry.title, status: 'available' });
+          const { path, title, caseId, updatedAt } = indexed.entry;
+          links.push({ path, title, caseId, updatedAt, status: 'available' });
         } else {
           const candidate = target.includes('/') ? target : path.slice(0, path.lastIndexOf('/') + 1) + target;
-          links.push({ path: isMarkdownPath(candidate) ?? target, title: null, status: 'missing' });
+          links.push({ path: isMarkdownPath(candidate) ?? target, title: null, caseId: null, updatedAt: null, status: 'missing' });
         }
       }
       if (links.length) this.previous.set(path, links);

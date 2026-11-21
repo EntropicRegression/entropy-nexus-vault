@@ -5,14 +5,15 @@ export const defaultHeatThresholds = {
   decayAfterDays: 30,
 };
 
-export const heatLevelNames = {
+export const HEAT_LEVELS = ['ember', 'tepid', 'temperate', 'flaming'] as const;
+export type HeatLevel = (typeof HEAT_LEVELS)[number];
+
+export const HEAT_LABELS: Record<HeatLevel, string> = {
   ember: '餘燼',
   tepid: '微溫',
   temperate: '溫潤',
   flaming: '炙熱',
-} as const;
-
-export type HeatLevel = (typeof heatLevelNames)[keyof typeof heatLevelNames];
+};
 
 export interface HeatInfo {
   level: HeatLevel;
@@ -20,7 +21,6 @@ export interface HeatInfo {
   lastRecalledAt: string | null;
 }
 
-const levels = Object.values(heatLevelNames);
 const dayMs = 24 * 60 * 60 * 1000;
 
 export type HeatRecall = Omit<HeatInfo, 'level'>;
@@ -45,5 +45,5 @@ export function calculateHeat(
   if (now > heatDecayAt(recall, thresholds)) {
     level = Math.max(0, level - 1);
   }
-  return { count, lastRecalledAt, level: levels[level] };
+  return { count, lastRecalledAt, level: HEAT_LEVELS[level] };
 }

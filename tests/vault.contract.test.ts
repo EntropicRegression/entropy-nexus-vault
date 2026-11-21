@@ -53,10 +53,10 @@ describe('記憶庫唯讀契約', () => {
     const file = await stat(join(fixture, casePaths[2]));
     expect(legacy).toMatchObject({
       kind: 'case', projectId: '月汐溫室', caseId: '2026-0003', status: '退回', summary: '',
-      attributes: { 改過的檔案: ['src/gaps.ts'] }, mtime: Math.floor(file.mtimeMs), size: file.size,
+      attributes: expect.arrayContaining([['改過的檔案', ['src/gaps.ts']]]), mtime: Math.floor(file.mtimeMs), size: file.size,
     });
     expect(await snapshot.readEntry('preferences/報表時間格式.md')).toMatchObject({
-      title: '報表時間格式使用二十四小時制', kind: 'preference', scope: '全域', attributes: {},
+      title: '報表時間格式使用二十四小時制', kind: 'preference', scope: '全域', attributes: [],
     });
     expect(await snapshot.readEntry('nodes/封存/_圖像/fixture-node-moss/掃描排除測試.md')).toBeNull();
     expect(await snapshot.readEntry('knowledge/月汐溫室/待發布.md.tmp')).toBeNull();
@@ -67,8 +67,9 @@ describe('記憶庫唯讀契約', () => {
 
     expect(snapshot.listEntries({ subtype: '決策' }).map(({ path }) => path)).toEqual([decisions[0]]);
     expect(await snapshot.readEntry(decisions[0])).toMatchObject({
+      previousCount: 2,
       supersessionChain: [
-        { path: decisions[1], status: 'available' },
+        { path: decisions[1], status: 'available', updatedAt: expect.any(Number) },
         { path: decisions[2], status: 'available' },
       ],
     });
@@ -82,6 +83,27 @@ describe('記憶庫唯讀契約', () => {
     expect(snapshot.search('促成了複合唯一鍵')).toEqual([]);
     expect(snapshot.search('午夜 報表', { kind: 'case' }).map(({ path }) => path)).toEqual([casePaths[1]]);
     expect(snapshot.search('2026-0003', { kind: 'case' }).map(({ path }) => path)).toEqual([casePaths[2]]);
+  });
+
+  it('保留屬性原順序、非判例取第一段摘要，並搜尋關鍵字、案由與節點名', async () => {
+    const root = await copyVault();
+    const path = knowledge('書架契約');
+    const paragraph = '雪光'.repeat(43);
+    await writeFile(join(root, path), [
+      '---', '3000: 最先', '1000: 其次', '標題: 書架契約', '案由: 斷面水流',
+      '關鍵字: [青松閥, 細流]', '節點ID: ' + moss, '參與節點ID: [' + heron + ', ' + moss + ', ' + heron + ']',
+      '狀態: 未確認', '---',
+      '# 不是摘要', '', '~~~md', '程式碼不是摘要', '~~~', '## 記錄', '', paragraph,
+      '', '第二段不放在摘要。', '', '## 回顧', '回顧關鍵字不參與搜尋。',
+    ].join('\n'));
+    const snapshot = await new VaultReader(root, now).read();
+    const note = await snapshot.readEntry(path);
+    expect(note).toMatchObject({ summary: paragraph.slice(0, 80), shelf: 'archive', nodeIds: [moss, heron] });
+    expect(note?.attributes.slice(0, 2)).toEqual([['3000', '最先'], ['1000', '其次']]);
+    expect(snapshot.search('青松閥 斷面水流', { shelf: 'archive', status: ['未確認', '退回'] }).map((entry) => entry.path)).toEqual([path]);
+    expect(snapshot.search('紙鷺', { shelf: 'archive' }).map((entry) => entry.path)).toEqual([path]);
+    expect(snapshot.search('回顧關鍵字')).toEqual([]);
+    expect(snapshot.listEntries({ kind: 'node' }).every((entry) => entry.shelf === null)).toBe(true);
   });
 
   it('依封存時間合併同節點的兩份檔，另保留接回的新 ID 與四種連線', async () => {
@@ -147,11 +169,11 @@ describe('記憶庫唯讀契約', () => {
     const initial = await reader.read();
     const baseline = initial.sidecars.stats;
     expect(baseline?.updatedAt).toBe('2026-11-21T08:00:00.000Z');
-    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: '炙熱' } });
-    expect(await initial.readEntry(casePaths[1])).toMatchObject({ heat: { count: 0, level: '餘燼' } });
-    expect(await initial.readEntry(knowledge('確認測點代號'))).toMatchObject({ heat: { count: 1, level: '微溫' } });
-    expect(await initial.readEntry(decisions[0])).toMatchObject({ heat: { count: 4, level: '溫潤' } });
-    expect(await initial.readEntry(decisions[2])).toMatchObject({ heat: { count: 6, level: '溫潤' } });
+    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: 'flaming' } });
+    expect(await initial.readEntry(casePaths[1])).toMatchObject({ heat: { count: 0, level: 'ember' } });
+    expect(await initial.readEntry(knowledge('確認測點代號'))).toMatchObject({ heat: { count: 1, level: 'tepid' } });
+    expect(await initial.readEntry(decisions[0])).toMatchObject({ heat: { count: 4, level: 'temperate' } });
+    expect(await initial.readEntry(decisions[2])).toMatchObject({ heat: { count: 6, level: 'temperate' } });
 
     await copyFile(malformedStats, join(root, statsFilename));
     await writeFile(join(root, heatFilename), JSON.stringify({
@@ -160,7 +182,7 @@ describe('記憶庫唯讀契約', () => {
     const duringFailure = await reader.read();
     expect(duringFailure.sidecars.stats).toBe(baseline);
     expect(await duringFailure.readCrystal(moss)).toMatchObject({ stats: { tasks: 4 } });
-    expect(await duringFailure.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: '微溫' } });
+    expect(await duringFailure.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: 'tepid' } });
     const noHistory = await new VaultReader(root, now).read();
     expect(noHistory.sidecars.stats).toBeNull();
     expect(await noHistory.readCrystal(moss)).toMatchObject({ stats: { tasks: 4 }, canWake: false });
@@ -173,7 +195,7 @@ describe('記憶庫唯讀契約', () => {
     const afterRepair = await reader.read();
     expect(afterRepair.sidecars.stats?.updatedAt).toBe('2026-11-21T08:10:00.000Z');
     expect(await afterRepair.readCrystal(moss)).toMatchObject({ stats: { tasks: 5 } });
-    expect(await afterRepair.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: '微溫' } });
+    expect(await afterRepair.readEntry(casePaths[0])).toMatchObject({ heat: { count: 2, level: 'tepid' } });
   });
 
   it('統計與熱度更新只略過不合格的單筆資料', async () => {
@@ -204,7 +226,7 @@ describe('記憶庫唯讀契約', () => {
       { kind: 'delegate', from: moss, to: heron, count: 2, lastAt: '2026-11-17T06:00:00.000Z' },
       { kind: 'meeting', nodeIds: [heron, moss], count: 1 },
     ]);
-    expect(await updated.readEntry(casePaths[0])).toMatchObject({ heat: { count: 1, level: '微溫' } });
+    expect(await updated.readEntry(casePaths[0])).toMatchObject({ heat: { count: 1, level: 'tepid' } });
     expect(updated.sidecars.heat.has(casePaths[1])).toBe(false);
     expect(updated.sidecars.heat.has(decisions[0])).toBe(false);
     await writeFile(join(root, statsFilename), JSON.stringify({ ...originalStats, 同席: null }));
@@ -246,11 +268,11 @@ describe('記憶庫唯讀契約', () => {
     let clock = edge - 1;
     const reader = new VaultReader(fixture, () => clock);
     const initial = await reader.read();
-    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: '炙熱' } });
+    expect(await initial.readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: 'flaming' } });
     clock = edge;
     expect(await reader.read()).toBe(initial);
     clock = edge + 1;
-    expect(await (await reader.read()).readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: '溫潤' } });
+    expect(await (await reader.read()).readEntry(casePaths[0])).toMatchObject({ heat: { count: 5, level: 'temperate' } });
   });
 
   it('舊卷宗保留承辦名稱，節點 ID 與名稱各自篩選', async () => {
