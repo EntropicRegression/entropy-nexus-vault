@@ -97,7 +97,7 @@ describe('水晶座標持久化', () => {
     // A larger outer shell accepts the same far coordinate that the default limit (340) rejects.
     data.記憶庫 = { [firstVault]: { 'fixture-sky-far': { 座標: [400, 0, 0], 最後出現: '2026-01-01T00:00:00.000Z' } } };
     await writeFile(file, JSON.stringify(data));
-    const wide = new CrystalLayoutStore(file, () => time, { params: { radii: [220, 320, 420], minGap: [90, 70, 55], candidates: 64 } });
+    const wide = new CrystalLayoutStore(file, () => time, { params: { radii: [220, 320, 420], minGap: [90, 70, 55], minScreenGap: [0, 0, 0], candidates: 64 } });
     expect((await wide.positions(firstVault, ['fixture-sky-far'])).get('fixture-sky-far')).toEqual([400, 0, 0]);
   });
 

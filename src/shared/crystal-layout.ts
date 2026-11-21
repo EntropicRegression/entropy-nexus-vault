@@ -1,8 +1,21 @@
+import { initialCamera, project } from './projection';
 import type { Point3 } from './projection';
 
-export interface LayoutParams { radii: number[]; minGap: number[]; candidates: number }
+/**
+ * minGap: 3D distance; minScreenGap: on-screen distance (px) under the default camera, relaxed in step with minGap.
+ * Screen distances do not depend on the viewport size (only the projection centre moves), so no viewport is needed.
+ */
+export interface LayoutParams { radii: number[]; minGap: number[]; minScreenGap: number[]; candidates: number }
 
-export const defaultLayoutParams: LayoutParams = { radii: [220, 280, 340], minGap: [90, 70, 55], candidates: 512 };
+export const defaultLayoutParams: LayoutParams = {
+  radii: [220, 280, 340], minGap: [90, 70, 55], minScreenGap: [110, 90, 70], candidates: 512,
+};
+const referenceViewport = { width: 1000, height: 800 };
+
+function screenOf(point: Point3) {
+  const { x, y } = project(point, initialCamera, referenceViewport);
+  return [x, y] as const;
+}
 
 export function hashNodeId(id: string): number {
   let hash = 0x811c9dc5;
@@ -42,9 +55,24 @@ function nearestSquared([x, y, z]: Point3, placed: readonly Point3[]): number {
   return nearest;
 }
 
+function nearestScreen([x, y]: readonly [number, number], placed: readonly (readonly [number, number])[]): number {
+  let nearest = Infinity;
+  for (const [px, py] of placed) nearest = Math.min(nearest, Math.hypot(x - px, y - py));
+  return nearest;
+}
+
+/** Minimum on-screen distance between any two points under the default camera. */
+export function minimumScreenGap(points: readonly Point3[]): number {
+  const screens = points.map(screenOf);
+  let nearest = Infinity;
+  for (const [i, point] of screens.entries()) nearest = Math.min(nearest, nearestScreen(point, screens.slice(i + 1)));
+  return nearest;
+}
+
 export function placeNew(fixed: ReadonlyMap<string, Point3>, newIds: readonly string[],
   params = defaultLayoutParams): Map<string, Point3> {
   const placed = [...fixed.values()];
+  const placedScreens = placed.map(screenOf);
   const added = new Map<string, Point3>();
   const directions = fibonacciDirections(params.candidates);
   for (const id of [...new Set(newIds)].sort()) {
@@ -52,20 +80,27 @@ export function placeNew(fixed: ReadonlyMap<string, Point3>, newIds: readonly st
     const origin = directionOf(id);
     const initial = onShell(origin, params.radii[0]);
     let position = initial;
-    if (nearestSquared(initial, placed) < params.minGap[0] ** 2) {
+    if (nearestSquared(initial, placed) < params.minGap[0] ** 2 ||
+      nearestScreen(screenOf(initial), placedScreens) < params.minScreenGap[0]) {
       const ranked = directions.map((direction) => {
         const [x, y, z] = direction;
         return { direction, similarity: x * origin[0] + y * origin[1] + z * origin[2] };
       }).sort((a, b) => b.similarity - a.similarity);
       const points = params.radii.flatMap((radius) => [origin, ...ranked.map(({ direction }) => direction)]
         .map((direction) => onShell(direction, radius)));
-      const distances = points.map((point) => nearestSquared(point, placed));
-      const gap = params.minGap.map((value) => distances.findIndex((distance) => distance >= value ** 2)).find((i) => i >= 0);
-      const best = gap ?? distances.reduce((best, value, i) => value > distances[best] ? i : best, 0);
+      const distances = points.map((point) => Math.sqrt(nearestSquared(point, placed)));
+      const screens = points.map((point) => nearestScreen(screenOf(point), placedScreens));
+      // Relax both thresholds together; a candidate must satisfy the 3D gap and the screen gap of the same level.
+      const gap = params.minGap.map((value, level) => distances.findIndex((distance, i) =>
+        distance >= value && screens[i] >= params.minScreenGap[level])).find((i) => i >= 0);
+      const screenTerm = (i: number) => params.minScreenGap[0] > 0 ? screens[i] / params.minScreenGap[0] : Infinity;
+      const score = (i: number) => Math.min(distances[i] / params.minGap[0], screenTerm(i));
+      const best = gap ?? distances.reduce((best, _value, i) => score(i) > score(best) ? i : best, 0);
       position = points[best];
     }
     added.set(id, position);
     placed.push(position);
+    placedScreens.push(screenOf(position));
   }
   return added;
 }
