@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>記憶寶庫｜星圖休眠庫 × 星夜書閣（v9）</title>
+<style>
+:root {
+    --night-deep: #0E1430;
+    --wood-dark: #2C1E14;
+    --wood-mid: #4B3423;
+    --wood-warm: #6B4A2E;
+    /* Narrowed 4-step parchment luminance so the wall stays calm & contrast >= 4.5:1 */
+    --paper-0: #DDD1B8;
+    --paper-1: #E3D8C1;
+    --paper-2: #E9DFCA;
+    --paper-3: #EFE6D4;
+    --ink-paper: #2B2118;
+    --ink-paper-muted: #5A4939;
+    --gold-warm: #D9A441;
+    --amber-bright: #F5C369;
+    --ember: #8C3A27;
+    --teal-magic: #5ED9C4;
+    --text-night: #EFE6D2;
+    --text-night-muted: #B8AD99;
+    --font-serif: "Noto Serif TC", "Source Han Serif TC", "PMingLiU", "MingLiU", Georgia, serif;
+    --fade-dur: 240ms;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--night-deep);
+    color: var(--text-night);
+    font-family: var(--font-serif);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root { --fade-dur: 0ms; }
+    .wax-stamp { animation: none !important; }
+  }
+  body.low-motion { --fade-dur: 0ms; }
+  body.low-motion .wax-stamp { animation: none !important; }
+
+  .app-shell {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Backgrounds */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+
+
+  /* Top Bar */
+  .topbar {
+    position: relative;
+    z-index: 20;
+    height: 54px;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    background: linear-gradient(180deg, rgba(16, 20, 46, 0.95) 0%, rgba(28, 22, 24, 0.9) 100%);
+    border-bottom: 1px solid rgba(217, 164, 65, 0.38);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 220px;
+  }
+  .brand-title {
+    font-size: 16.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-night);
+  }
+
+  .floor-switch {
+    display: inline-flex;
+    background: rgba(14, 20, 48, 0.78);
+    border: 1px solid rgba(217, 164, 65, 0.4);
+    border-radius: 3px;
+    padding: 2px;
+    gap: 4px;
+  }
+  .floor-btn {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-night-muted);
+    font-family: var(--font-serif);
+    padding: 5px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .floor-btn:hover { color: var(--text-night); }
+  .floor-btn.active {
+    background: rgba(75, 52, 35, 0.72);
+    border-color: var(--gold-warm);
+    color: var(--amber-bright);
+  }
+  .floor-btn:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
+
+  .topbar-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .search-input {
+    width: 190px;
+    padding: 5px 4px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(217, 164, 65, 0.45);
+    color: var(--text-night);
+    font-family: var(--font-serif);
+    font-size: 13px;
+  }
+  .search-input::placeholder { color: var(--text-night-muted); }
+  .search-input:focus { outline: none; border-bottom-color: var(--amber-bright); }
+
+  .toggle-pill {
+    appearance: none;
+    background: rgba(14, 20, 48, 0.72);
+    border: 1px solid rgba(217, 164, 65, 0.36);
+    color: var(--text-night-muted);
+    font-family: var(--font-serif);
+    padding: 5px 10px;
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .toggle-pill:hover { border-color: var(--gold-warm); color: var(--text-night); }
+  .toggle-pill.active { border-color: var(--amber-bright); color: var(--amber-bright); }
+  .toggle-pill:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
+
+
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* ================= 垂直攝影機世界 ================= */
+  .camera-viewport {
+    width: 100vw; height: 100vh; overflow: hidden; perspective: 1400px;
+    position: relative;
+  }
+  .vertical-world {
+    width: 100vw; height: 200vh;
+    transform: translateY(-100vh);
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  /* ================= 樓下頂列（v8 書卷襯線頂列） ================= */
+  .downstairs-topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+    height: 54px; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    background: linear-gradient(180deg, rgba(16, 20, 46, 0.95) 0%, rgba(28, 22, 24, 0.9) 100%);
+    border-bottom: 1px solid rgba(217, 164, 65, 0.38);
+    transition: opacity 0.25s ease;
+  }
+  body.floor-upstairs .downstairs-topbar { opacity: 0; pointer-events: none; }
+  .brand-title { font-size: 16.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--text-night); }
+  .floor-switch {
+    display: inline-flex; background: rgba(14, 20, 48, 0.78);
+    border: 1px solid rgba(217, 164, 65, 0.4); border-radius: 3px; padding: 2px; gap: 4px;
+  }
+  .floor-btn {
+    appearance: none; border: 1px solid transparent; background: transparent;
+    color: var(--text-night-muted); font-family: var(--font-serif);
+    padding: 5px 14px; font-size: 13px; cursor: pointer; border-radius: 2px;
+  }
+  .floor-btn:hover { color: var(--text-night); }
+  .floor-btn.active { background: rgba(75, 52, 35, 0.72); border-color: var(--gold-warm); color: var(--amber-bright); }
+  .floor-btn:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
+  .topbar-controls { display: flex; align-items: center; gap: 10px; }
+  .search-input {
+    width: 190px; padding: 5px 4px; background: transparent; border: none;
+    border-bottom: 1px solid rgba(217, 164, 65, 0.45);
+    color: var(--text-night); font-family: var(--font-serif); font-size: 13px;
+  }
+  .search-input::placeholder { color: var(--text-night-muted); }
+  .search-input:focus { outline: none; border-bottom-color: var(--amber-bright); }
+  .toggle-pill {
+    appearance: none; background: rgba(14, 20, 48, 0.72);
+    border: 1px solid rgba(217, 164, 65, 0.36); color: var(--text-night-muted);
+    font-family: var(--font-serif); padding: 5px 10px; border-radius: 2px;
+    font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .toggle-pill:hover { border-color: var(--gold-warm); color: var(--text-night); }
+  .toggle-pill.active { border-color: var(--amber-bright); color: var(--amber-bright); }
+  .toggle-pill:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
+
+  /* ================= 樓上頂列（memory-vault-demo.html HUD） ================= */
+  .top-hud {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 32; display: flex; align-items: center; gap: 12px;
+    padding: 7px 20px;
+    background: linear-gradient(180deg, rgba(16, 22, 42, 0.92), rgba(8, 12, 24, 0.92));
+    border: 1px solid rgba(245, 185, 99, 0.38);
+    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.65);
+    backdrop-filter: blur(12px);
+    font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    transition: opacity 0.25s ease;
+    opacity: 0; pointer-events: none;
+  }
+  body.floor-upstairs .top-hud { opacity: 1; pointer-events: auto; }
+  .top-hud .brand {
+    font-size: 12px; letter-spacing: 0.18em; font-weight: 800;
+    color: #fde68a; padding-right: 12px;
+    border-right: 1px solid rgba(245, 185, 99, 0.28);
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .top-hud .diamond {
+    width: 7px; height: 7px; transform: rotate(45deg);
+    background: #5ce1e6; box-shadow: 0 0 8px #5ce1e6; display: inline-block;
+  }
+  .top-hud .mode-btn {
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03);
+    color: #94a3b8; padding: 7px 18px; cursor: pointer;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em;
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    transition: all 0.28s ease; white-space: nowrap;
+  }
+  .top-hud .mode-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+  .top-hud .mode-btn.active-sky {
+    color: #05101f; border-color: #7dd3fc;
+    background: linear-gradient(135deg, #67e8f9, #c084fc);
+    box-shadow: 0 0 20px rgba(103, 232, 249, 0.5);
+  }
+  .top-hud .hud-motion-btn {
+    border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05);
+    color: #cbd5e1; padding: 5px 10px; font-size: 11.5px; cursor: pointer;
+    border-radius: 3px; white-space: nowrap;
+  }
+  .top-hud .hud-motion-btn.active { border-color: #5ce1e6; color: #5ce1e6; }
+
+  /* ================= 樓下場景（100vh at bottom half of vertical-world） ================= */
+  .lib-floor {
+    position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    padding-top: 54px; display: flex; flex-direction: column;
+  }
+  .lib-bg {
+    position: absolute; inset: -40px 0;
+    background: url("../../../assets/bg/library-starry.png") center/cover no-repeat;
+    z-index: 0; will-change: transform;
+  }
+  .lib-scrim {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(circle at 10% 8%, rgba(245, 195, 105, 0.14) 0%, rgba(245, 195, 105, 0) 42%),
+      radial-gradient(ellipse at 50% 50%, rgba(14, 20, 48, 0.48) 0%, rgba(10, 14, 34, 0.76) 100%);
+  }
+  .lib-floor .stage { position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; }
+  .lib-floor .floor-view.downstairs { display: flex; width: 100%; height: 100%; }
+
+  /* ==================== DOWNSTAIRS ==================== */
+  .downstairs-layout {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    overflow: hidden;
+  }
+  .downstairs-main {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    overflow-y: auto;
+    padding: 16px 26px 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: rgba(14, 20, 48, 0.4); }
+  ::-webkit-scrollbar-thumb { background: rgba(107, 74, 46, 0.75); border-radius: 2px; }
+
+  /* Dark Wood Board + Thin Gold Rim (v1 structure, v4/v5 calm material) */
+  .wood-board {
+    background: linear-gradient(180deg, rgba(44, 30, 20, 0.92) 0%, rgba(28, 20, 15, 0.94) 100%);
+    border: 1px solid rgba(217, 164, 65, 0.42);
+    padding: 14px 18px 16px;
+    box-shadow: 0 8px 24px rgba(8, 10, 24, 0.5);
+  }
+  .board-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .board-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text-night);
+  }
+  .board-count {
+    font-size: 12.5px;
+    color: var(--text-night-muted);
+    margin-left: 10px;
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(185px, 1fr));
+    overflow-x: auto;
+    gap: 12px;
+  }
+
+  .pinned-note {
+    position: relative;
+    background: var(--paper-2);
+    color: var(--ink-paper);
+    border: 1px solid rgba(107, 74, 46, 0.55);
+    padding: 14px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.38);
+  }
+  .pinned-note.resolved {
+    background: var(--paper-0);
+    opacity: 0.82;
+  }
+  /* Subtle small brass pin (toned down from v1) */
+  .small-pin {
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #E6D9BE, #9C7A49 70%, #4B3423 100%);
+    border: 1px solid #2C1E14;
+  }
+  .note-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink-paper-muted);
+    font-variant-numeric: oldstyle-nums;
+  }
+  .quiet-kind {
+    font-size: 11.5px;
+    color: var(--ink-paper-muted);
+    border-bottom: 1px solid rgba(107, 74, 46, 0.35);
+  }
+  .note-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    line-height: 1.45;
+    color: var(--ink-paper);
+    cursor: pointer;
+  }
+  .note-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .note-desc {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-paper-muted);
+  }
+  .note-actions {
+    margin-top: auto;
+    padding-top: 7px;
+    border-top: 1px solid rgba(107, 74, 46, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* Low-saturation Wax Stamp (<=300ms drop on confirm, small faint mark after) */
+  .wax-stamp {
+    position: absolute;
+    right: 12px;
+    bottom: 44px;
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+    z-index: 4;
+    opacity: 0.62;
+    transform: rotate(-8deg);
+    animation: stampDrop 260ms ease-out forwards;
+  }
+  @keyframes stampDrop {
+    0% { transform: scale(1.45) rotate(-14deg); opacity: 0; }
+    100% { transform: scale(1) rotate(-8deg); opacity: 0.62; }
+  }
+
+  /* Quiet Paper Buttons */
+  .paper-btn {
+    appearance: none;
+    background: none;
+    border: 1px solid rgba(107, 74, 46, 0.5);
+    color: var(--ink-paper);
+    font-family: var(--font-serif);
+    font-size: 12.5px;
+    padding: 5px 11px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .paper-btn:hover:not(:disabled) {
+    border-color: var(--wood-dark);
+    background: rgba(107, 74, 46, 0.12);
+  }
+  .paper-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .paper-btn.primary {
+    background: var(--wood-dark);
+    border-color: var(--amber-bright);
+    color: var(--amber-bright);
+  }
+  .paper-btn.primary:hover:not(:disabled) { background: #3B281B; }
+  .paper-btn:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
+
+  /* Filter Tab Bar */
+  .shelf-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    background: rgba(14, 20, 48, 0.68);
+    border-bottom: 1px solid rgba(217, 164, 65, 0.32);
+    flex-wrap: wrap;
+  }
+  .tab-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .filter-tab {
+    appearance: none;
+    background: none;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    color: var(--text-night-muted);
+    font-family: var(--font-serif);
+    font-size: 13px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  .filter-tab:hover { color: var(--text-night); }
+  .filter-tab.active {
+    color: var(--text-night);
+    border-bottom-color: var(--gold-warm);
+  }
+  .filter-tab:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
+
+  /* Shelf Sections & 3 Physical Parchment Silhouettes (v1 shapes + v4 material) */
+  .shelf-section { margin-bottom: 24px; }
+  .shelf-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+  .shelf-rule {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(217, 164, 65, 0.45), transparent);
+  }
+  .shelf-tag {
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    color: var(--text-night);
+    padding: 3px 14px;
+    background: rgba(44, 30, 20, 0.9);
+    border: 1px solid rgba(217, 164, 65, 0.4);
+  }
+
+  .shelf-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    padding-bottom: 14px;
+    border-bottom: 4px solid var(--wood-dark);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.42);
+  }
+
+  .card-wrap {
+    position: relative;
+    cursor: pointer;
+  }
+  .card-wrap:focus { outline: none; }
+  .card-wrap:focus-visible,
+  .card-wrap.selected {
+    outline: 1.5px solid var(--amber-bright);
+    outline-offset: 2px;
+  }
+
+  .archive-card {
+    position: relative;
+    height: 100%;
+    padding: 15px 16px 13px 18px;
+    color: var(--ink-paper);
+    border: 1px solid rgba(107, 74, 46, 0.55);
+    box-shadow: 0 4px 12px rgba(8, 10, 24, 0.42);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .archive-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.04;
+    filter: url(#paperGrain);
+  }
+  .card-wrap:hover .archive-card { border-color: var(--gold-warm); }
+
+  /* Narrowed 4 Heat Levels */
+  .archive-card.heat-0 { background: var(--paper-0); }
+  .archive-card.heat-1 { background: var(--paper-1); }
+  .archive-card.heat-2 { background: var(--paper-2); }
+  .archive-card.heat-3 { background: var(--paper-3); }
+
+  /* 3 Silhouettes from v1 in Parchment/Wood tones */
+  /* 1) 判例 = 書脊 (Left Spine Band) */
+  .archive-card.type-case {
+    padding-left: 24px;
+    border-left: 3px solid var(--wood-warm);
+  }
+  .archive-card.type-case::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 11px;
+    background: repeating-linear-gradient(
+      180deg,
+      rgba(107, 74, 46, 0.25) 0px,
+      rgba(107, 74, 46, 0.25) 14px,
+      rgba(217, 164, 65, 0.42) 14px,
+      rgba(217, 164, 65, 0.42) 16px
+    );
+    border-right: 1px solid rgba(107, 74, 46, 0.35);
+  }
+
+  /* 2) 決策 = 摺頁 (Top-right Folded Corner) */
+  .archive-card.type-decision {
+    clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+  }
+
+  /* 3) 書籤 = 籤條 (Subtle Top-right Ribbon Notch) */
+  .archive-card.type-bookmark {
+    border-top: 2px solid var(--wood-warm);
+    padding-top: 17px;
+  }
+  .archive-card.type-bookmark::before {
+    content: "";
+    position: absolute;
+    top: -1px; right: 16px;
+    width: 14px; height: 20px;
+    background: var(--wood-warm);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+    opacity: 0.78;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-right: 18px;
+    font-size: 12px;
+    color: var(--ink-paper-muted);
+    font-variant-numeric: oldstyle-nums;
+  }
+  .card-title {
+    font-size: 15.5px;
+    font-weight: 700;
+    line-height: 1.48;
+    color: var(--ink-paper);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-summary {
+    font-size: 13px;
+    line-height: 1.68;
+    color: var(--ink-paper-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-footer {
+    margin-top: auto;
+    padding-top: 7px;
+    border-top: 1px solid rgba(107, 74, 46, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* Quiet Heat Crystal Slots (0-3 small muted crystals, NO glow/pulse) */
+  .heat-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    color: var(--ink-paper-muted);
+  }
+  .heat-gems { display: inline-flex; align-items: center; gap: 3px; }
+
+  /* Non-shifting Floating Popover for "前版 ×N" */
+  .stack-btn {
+    appearance: none;
+    background: rgba(107, 74, 46, 0.12);
+    border: 1px solid rgba(107, 74, 46, 0.45);
+    color: var(--ink-paper);
+    font-family: var(--font-serif);
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .stack-btn:hover { background: rgba(107, 74, 46, 0.24); border-color: var(--wood-dark); }
+  .stack-popover {
+    position: absolute;
+    left: 0; right: 0; top: calc(100% + 4px);
+    z-index: 25;
+    background: var(--paper-3);
+    color: var(--ink-paper);
+    border: 1.5px solid var(--wood-warm);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .stack-row {
+    font-size: 12px;
+    padding: 5px 6px;
+    border-bottom: 1px dotted rgba(107, 74, 46, 0.35);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .stack-row:last-child { border-bottom: none; }
+  .stack-row:hover:not(.missing) { background: rgba(107, 74, 46, 0.12); }
+  .stack-row.missing { color: var(--ink-paper-muted); cursor: default; font-style: italic; }
+
+  /* ==================== READING DESK (A: WIDE FULL-STAGE OVERLAY, B: 420px SIDEBAR) ==================== */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Mode A: True wide desk covering main stage below topbar */
+  .desk-overlay {
+    position: fixed;
+    inset: 54px 0 0 0;
+    z-index: 40;
+    background: rgba(10, 14, 34, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 48px;
+    animation: fadeIn var(--fade-dur) ease-out;
+  }
+  .desk-overlay .sheet-panel {
+    width: min(1100px, calc(100vw - 96px));
+    height: auto;
+    max-height: calc(100vh - 106px);
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.82);
+  }
+  .desk-overlay .sheet-body {
+    display: grid;
+    grid-template-columns: minmax(420px, 38em) minmax(240px, 1fr);
+    gap: 36px;
+    align-items: start;
+  }
+
+  /* Mode B: 420px Right Sidebar */
+  .desk-sidebar {
+    width: 420px;
+    flex-shrink: 0;
+    height: 100%;
+    border-left: 2px solid var(--wood-warm);
+    display: flex;
+    animation: fadeIn var(--fade-dur) ease-out;
+  }
+  .desk-sidebar .sheet-panel { width: 100%; height: 100%; }
+  .desk-sidebar .sheet-header { padding: 14px 16px 12px; gap: 8px; }
+  .desk-sidebar .sheet-header-actions { flex-shrink: 0; display: flex; gap: 6px; white-space: nowrap; }
+  .desk-sidebar .sheet-header-actions .paper-btn { padding: 4px 8px; font-size: 11.5px; white-space: nowrap; }
+  .desk-sidebar .sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Quiet Single Sheet (NO book spine, NO page nums, NO drop cap) */
+  .sheet-panel {
+    background: var(--paper-2);
+    color: var(--ink-paper);
+    border: 1.5px solid var(--wood-warm);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-header {
+    padding: 16px 28px 14px;
+    border-bottom: 1px solid rgba(107, 74, 46, 0.35);
+    background: var(--paper-3);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .sheet-meta-line {
+    font-size: 12.5px;
+    color: var(--ink-paper-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-variant-numeric: oldstyle-nums;
+  }
+  .sheet-title {
+    margin: 6px 0 0;
+    font-size: 20px;
+    line-height: 1.45;
+    color: var(--ink-paper);
+  }
+  .sheet-title:focus { outline: none; }
+  .sheet-title:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 3px; }
+
+  .sheet-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 26px 32px;
+  }
+  .sheet-col { display: flex; flex-direction: column; gap: 20px; }
+  .sheet-summary {
+    padding: 10px 14px;
+    border-left: 2px solid var(--gold-warm);
+    background: rgba(107, 74, 46, 0.08);
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--ink-paper);
+  }
+  .sheet-prose {
+    max-width: 38em;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--ink-paper);
+  }
+  .sheet-prose p { margin: 0 0 14px; }
+  .sheet-prose p:last-child { margin-bottom: 0; }
+
+  .sheet-section-head {
+    font-size: 12.5px;
+    letter-spacing: 0.14em;
+    color: var(--ink-paper-muted);
+    margin: 0 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(107, 74, 46, 0.3);
+  }
+  .evo-tree {
+    position: relative;
+    padding-left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .evo-tree::before {
+    content: "";
+    position: absolute;
+    left: 3px; top: 6px; bottom: 6px;
+    width: 1px;
+    background: rgba(107, 74, 46, 0.45);
+  }
+  .evo-node {
+    position: relative;
+    font-size: 13px;
+    color: var(--ink-paper-muted);
+    cursor: pointer;
+  }
+  .evo-node::before {
+    content: "";
+    position: absolute;
+    left: -14px; top: 6px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink-paper-muted);
+  }
+  .evo-node.active { color: var(--ink-paper); font-weight: 700; }
+  .evo-node.active::before { background: var(--wood-warm); }
+  .evo-node.missing { cursor: default; }
+  .evo-node.missing::before { background: var(--paper-2); border: 1px solid var(--ink-paper-muted); }
+
+  .rel-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .sheet-footer {
+    padding: 12px 28px;
+    border-top: 1px solid rgba(107, 74, 46, 0.35);
+    background: var(--paper-3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .save-msg { font-size: 12.5px; color: var(--ink-paper-muted); display: flex; align-items: center; gap: 8px; }
+  .save-msg.error { color: var(--ember); font-weight: 700; }
+
+
+  body.desk-b-open .wood-board { padding: 10px 14px 12px; }
+  body.desk-b-open .pinned-note { padding: 10px 12px; gap: 5px; }
+  body.desk-b-open .pinned-note .note-desc { display: none; }
+  @media (max-width: 1460px) {
+    .wood-board { padding: 10px 14px 12px; }
+    .pinned-note { padding: 10px 12px; gap: 5px; }
+    .pinned-note .note-desc { display: none; }
+  }
+
+  /* ================= 樓上場景：memory-vault-demo.html 原版 3D 星圖（作用域隔離） ================= */
+  .sky-scene {
+    --cyan: #5ce1e6;
+    --violet: #a78bfa;
+    --amber: #f5b963;
+    --gold: #fde68a;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    width: 100vw; height: 100vh; position: relative; overflow: hidden;
+    padding: 74px 28px 34px; display: flex; gap: 20px;
+    font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at 25% 22%, rgba(124, 58, 237, 0.24), transparent 46%),
+      radial-gradient(circle at 76% 32%, rgba(56, 189, 248, 0.22), transparent 44%),
+      radial-gradient(circle at 50% 96%, rgba(245, 185, 99, 0.18), transparent 36%),
+      linear-gradient(180deg, #040713 0%, #0a122a 72%, #191423 100%);
+  }
+  .sky-scene #starCanvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  .sky-scene .game-frame {
+    position: relative; z-index: 3;
+    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
+  }
+  .sky-scene .game-frame::before {
+    content: ""; position: absolute; inset: 5px; pointer-events: none; z-index: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+  }
+  .sky-scene .starmap-stage {
+    flex: 1.38; position: relative;
+    background: rgba(7, 12, 28, 0.52);
+    border: 1px solid rgba(92, 225, 230, 0.35);
+    backdrop-filter: blur(4px);
+    overflow: hidden; cursor: grab;
+  }
+  .sky-scene .starmap-stage:active { cursor: grabbing; }
+  .sky-scene .link-filter-bar { position: absolute; top: 14px; right: 18px; z-index: 6; display: flex; flex-wrap: wrap; gap: 6px; }
+  .sky-scene .link-pill {
+    font-size: 11px; font-weight: 700; padding: 4px 10px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(6, 11, 26, 0.78);
+    color: #94a3b8; transition: 0.2s;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+  .sky-scene .link-pill.on-inherit { border-color: #f59e0b; color: #fde68a; background: rgba(245,158,11,0.18); }
+  .sky-scene .link-pill.on-collab  { border-color: #38bdf8; color: #bae6fd; background: rgba(56,189,248,0.18); }
+  .sky-scene .link-pill.on-meeting { border-color: #a78bfa; color: #e9d5ff; background: rgba(167,139,250,0.20); }
+  .sky-scene .link-pill.on-project { border-color: #34d399; color: #a7f3d0; background: rgba(52,211,153,0.16); }
+
+  .sky-scene .astrolabe-3d-wrap {
+    position: absolute; left: 50%; top: 52%; width: 520px; height: 520px;
+    transform: translate(-50%, -50%); pointer-events: none; perspective: 950px; z-index: 1;
+  }
+  .sky-scene .armillary-3d { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.25s ease-out; }
+  .sky-scene .astro-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; transform-style: preserve-3d; pointer-events: none; }
+  .sky-scene .ring-outer { width: 480px; height: 480px; margin: -240px 0 0 -240px; border: 1.5px dashed rgba(125, 211, 252, 0.32); box-shadow: 0 0 24px rgba(92, 225, 230, 0.12); animation: orbit1 32s linear infinite; }
+  .sky-scene .ring-mid { width: 390px; height: 390px; margin: -195px 0 0 -195px; border: 1.5px solid rgba(192, 132, 252, 0.34); box-shadow: inset 0 0 18px rgba(167, 139, 250, 0.14); animation: orbit2 24s linear infinite; }
+  .sky-scene .ring-inner { width: 290px; height: 290px; margin: -145px 0 0 -145px; border: 1.5px dashed rgba(253, 230, 138, 0.38); animation: orbit3 18s linear infinite; }
+  .sky-scene .ring-eq { width: 430px; height: 430px; margin: -215px 0 0 -215px; border: 1px solid rgba(92, 225, 230, 0.24); animation: orbit4 28s linear infinite; }
+  .sky-scene .astro-core { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: radial-gradient(circle, rgba(186,230,253,0.7), rgba(167,139,250,0.22) 60%, transparent 72%); box-shadow: 0 0 36px rgba(92, 225, 230, 0.45); transform: translateZ(0px); }
+  @keyframes orbit1 { from { transform: rotateX(62deg) rotateY(14deg) rotateZ(0deg); } to { transform: rotateX(62deg) rotateY(14deg) rotateZ(360deg); } }
+  @keyframes orbit2 { from { transform: rotateX(28deg) rotateY(58deg) rotateZ(360deg); } to { transform: rotateX(28deg) rotateY(58deg) rotateZ(0deg); } }
+  @keyframes orbit3 { from { transform: rotateX(72deg) rotateY(-38deg) rotateZ(0deg); } to { transform: rotateX(72deg) rotateY(-38deg) rotateZ(360deg); } }
+  @keyframes orbit4 { from { transform: rotateX(18deg) rotateY(-64deg) rotateZ(360deg); } to { transform: rotateX(18deg) rotateY(-64deg) rotateZ(0deg); } }
+
+  .sky-scene .stage-caption {
+    position: absolute; top: 14px; left: 18px; z-index: 5; font-size: 11.5px; color: #bae6fd; letter-spacing: 0.06em;
+    background: rgba(6, 11, 26, 0.82); padding: 5px 14px; border: 1px solid rgba(92, 225, 230, 0.32);
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  }
+  .sky-scene .constellation-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+
+  .sky-scene .crystal-node {
+    position: absolute; transform: translate(-50%, -50%); width: 144px;
+    display: flex; flex-direction: column; align-items: center; cursor: pointer; z-index: 4; transition: transform 0.25s ease;
+  }
+  .sky-scene .crystal-node:hover { transform: translate(-50%, -54%) scale(1.06); }
+  .sky-scene .crystal-shape {
+    width: 96px; height: 136px; position: relative;
+    clip-path: polygon(50% 0%, 92% 24%, 92% 76%, 50% 100%, 8% 76%, 8% 24%);
+    background: linear-gradient(155deg, rgba(255,255,255,0.34), rgba(92,225,230,0.16) 45%, rgba(167,139,250,0.32));
+    box-shadow: inset 0 0 24px rgba(255,255,255,0.4);
+    display: flex; align-items: center; justify-content: center;
+    animation: floatCrystal 4.2s ease-in-out infinite; overflow: hidden;
+  }
+  .sky-scene .crystal-node.archived .crystal-shape {
+    background: linear-gradient(155deg, rgba(186,230,253,0.22), rgba(56,189,248,0.10) 50%, rgba(148,163,184,0.26));
+    filter: saturate(0.72);
+  }
+  .sky-scene .crystal-node.selected .crystal-shape { box-shadow: inset 0 0 32px rgba(255,255,255,0.75); }
+  .sky-scene .crystal-aura { position: absolute; width: 124px; height: 152px; top: -6px; border-radius: 50%; filter: blur(20px); opacity: 0.4; z-index: -1; transition: opacity 0.25s; }
+  .sky-scene .crystal-node.selected .crystal-aura, .sky-scene .crystal-node:hover .crystal-aura { opacity: 0.88; }
+  .sky-scene .crystal-shape img { width: 112%; height: 112%; object-fit: cover; object-position: top center; opacity: 0.94; mix-blend-mode: screen; }
+  .sky-scene .crystal-facet { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(125deg, rgba(255,255,255,0.42) 0%, transparent 38%, transparent 65%, rgba(255,255,255,0.18) 100%); }
+  .sky-scene .crystal-pedestal {
+    width: 88px; height: 22px; margin-top: -8px; border-radius: 50%;
+    border: 1.5px solid rgba(92, 225, 230, 0.55);
+    box-shadow: 0 0 14px rgba(92, 225, 230, 0.35), inset 0 0 10px rgba(92, 225, 230, 0.3);
+  }
+  .sky-scene .crystal-node.selected .crystal-pedestal { border-color: #fde68a; box-shadow: 0 0 20px rgba(253, 230, 138, 0.65), inset 0 0 12px rgba(253, 230, 138, 0.45); }
+  .sky-scene .crystal-label {
+    margin-top: 6px; text-align: center; background: rgba(6, 11, 26, 0.88); padding: 4px 12px;
+    border: 1px solid rgba(125, 211, 252, 0.25);
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); font-size: 12px;
+  }
+  .sky-scene .crystal-badge { font-size: 10px; display: inline-block; padding: 1px 6px; border-radius: 4px; margin-top: 2px; }
+  .sky-scene .badge-online { background: rgba(52, 211, 153, 0.18); color: #6ee7b7; }
+  .sky-scene .badge-wake { background: rgba(92, 225, 230, 0.22); color: #67e8f9; }
+  .sky-scene .badge-mem { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+  @keyframes floatCrystal { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+
+  .sky-scene .skylight-rim {
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    padding: 6px 36px; z-index: 8; cursor: pointer;
+    background: linear-gradient(180deg, rgba(245, 185, 99, 0.12), rgba(245, 185, 99, 0.28));
+    border: 1px solid rgba(245, 185, 99, 0.55); border-bottom: none;
+    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 100%, 0 100%);
+    font-size: 11px; letter-spacing: 0.2em; color: #fde68a; font-weight: 700;
+  }
+  .sky-scene .skylight-rim:hover { background: rgba(245, 185, 99, 0.36); color: #fff; }
+
+  .sky-scene .detail-panel {
+    width: 440px; min-width: 370px; max-width: 500px; padding: 20px 22px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 13px;
+    background: rgba(11, 18, 40, 0.86); border: 1px solid rgba(92, 225, 230, 0.35);
+    backdrop-filter: blur(14px);
+    transition: width 0.38s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.38s cubic-bezier(0.22, 1, 0.36, 1), padding 0.38s ease, opacity 0.28s ease;
+  }
+  .sky-scene .detail-panel.collapsed { width: 0 !important; min-width: 0 !important; max-width: 0 !important; padding-left: 0 !important; padding-right: 0 !important; opacity: 0; border-width: 0 !important; pointer-events: none; overflow: hidden; }
+  .sky-scene .close-panel-btn { margin-left: auto; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: #cbd5e1; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+  .sky-scene .close-panel-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+  .sky-scene .crystal-hero { display: flex; gap: 14px; align-items: center; }
+  .sky-scene .hero-portrait-box { width: 88px; height: 114px; position: relative; flex-shrink: 0; border: 1px solid rgba(125,211,252,0.5); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); background: rgba(255,255,255,0.04); overflow: hidden; }
+  .sky-scene .hero-portrait-box img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+  .sky-scene .rpg-bars { display: flex; flex-direction: column; gap: 7px; }
+  .sky-scene .rpg-bar-row { display: grid; grid-template-columns: 74px 1fr 42px; align-items: center; gap: 8px; font-size: 11.5px; }
+  .sky-scene .bar-track { height: 7px; background: rgba(255,255,255,0.08); overflow: hidden; transform: skewX(-18deg); }
+  .sky-scene .bar-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #a78bfa); box-shadow: 0 0 8px rgba(56,189,248,0.6); }
+  .sky-scene .section-box { padding: 12px 14px; background: rgba(0, 0, 0, 0.32); border-left: 3px solid #38bdf8; font-size: 12.8px; line-height: 1.65; }
+  .sky-scene .review-box { padding: 13px 15px; background: linear-gradient(135deg, rgba(245, 185, 99, 0.14), rgba(167, 139, 250, 0.08)); border: 1px solid rgba(245, 185, 99, 0.38); font-size: 12.8px; line-height: 1.65; color: #fef3c7; }
+  .sky-scene .review-title { font-size: 11px; letter-spacing: 0.12em; color: #fcd34d; margin-bottom: 5px; font-weight: 700; }
+  .sky-scene .link-card { padding: 8px 12px; cursor: pointer; background: rgba(245, 185, 99, 0.1); border: 1px solid rgba(245, 185, 99, 0.28); font-size: 12px; color: #fde68a; display: flex; justify-content: space-between; }
+  .sky-scene .link-card:hover { background: rgba(245, 185, 99, 0.22); }
+  .sky-scene .action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+  .sky-scene .btn-game { border: none; padding: 8px 16px; cursor: pointer; font-size: 12px; font-weight: 700; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); transition: 0.2s; }
+  .sky-scene .btn-cyan { background: linear-gradient(135deg, #67e8f9, #38bdf8); color: #05101f; }
+
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: center; justify-content: center; font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  .modal-mask.open { display: flex; }
+  .modal-card { width: 390px; padding: 22px; background: #0c1326; border: 1px solid rgba(92,225,230,0.45); clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px); color: #f1f5f9; }
+  .modal-card .btn-ghost { background: rgba(255,255,255,0.08); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.16); padding: 7px 14px; font-size: 12px; cursor: pointer; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+  .modal-card .btn-cyan { border: none; padding: 8px 16px; cursor: pointer; font-size: 12px; font-weight: 700; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); background: linear-gradient(135deg, #67e8f9, #38bdf8); color: #05101f; }
+  body.low-motion .sky-scene .astro-ring,
+  body.low-motion .sky-scene .crystal-shape { animation: none !important; }
+
+  /* Quiet Toast */
+  .toast-bar {
+    position: fixed;
+    bottom: 18px;
+    left: 24px;
+    z-index: 60;
+    background: rgba(20, 24, 52, 0.96);
+    border: 1px solid var(--gold-warm);
+    color: var(--text-night);
+    padding: 8px 14px;
+    font-size: 13px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+  }
+  .toast-bar.visible { display: flex; }
+
+  .center-state {
+    padding: 48px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--text-night-muted);
+    letter-spacing: 0.08em;
+  }
+
+</style>
+</head>
+<body class="floor-downstairs">
+<!-- SVG Filters: Paper Grain + Vertical Motion Blur -->
+<svg width="0" height="0" style="position:absolute;">
+  <filter id="paperGrain">
+    <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/>
+  </filter>
+  <filter id="verticalMotionBlur" x="-5%" y="-15%" width="110%" height="130%">
+    <feGaussianBlur id="vBlur" in="SourceGraphic" stdDeviation="0 0"/>
+  </filter>
+</svg>
+
+<div id="floorAnnounce" class="sr-only" aria-live="polite"></div>
+
+<!-- 樓下頂列（v8） -->
+<header class="downstairs-topbar" id="downstairsTopbar">
+  <div class="brand-title">記憶寶庫</div>
+  <nav class="floor-switch" aria-label="工作臺樓層切換">
+    <button class="floor-btn active" id="btnFloorDown" onclick="switchFloor('downstairs')">樓下｜典藏室</button>
+    <button class="floor-btn" id="btnFloorUp" onclick="switchFloor('upstairs')">樓上｜星象召喚盤</button>
+  </nav>
+  <div class="topbar-controls">
+    <input class="search-input" id="searchInput" type="search" placeholder="檢索案號、題名或節點…" oninput="onSearch(this.value)" />
+    <button class="toggle-pill" id="btnDeskMode" onclick="toggleDeskMode()">版式：A 寬幅閱讀桌</button>
+    <button class="toggle-pill" id="btnLowMotion" onclick="toggleLowMotion()">低動態：關</button>
+    <button class="toggle-pill" id="btnDevFail" onclick="toggleDevFail()">模擬失敗：關</button>
+  </div>
+</header>
+
+<!-- 樓上頂列（memory-vault-demo.html HUD） -->
+<div class="top-hud" id="skyTopHud">
+  <div class="brand"><span class="diamond"></span> ENTROPY NEXUS · ARCHIVE</div>
+  <button id="btnSkyHud" class="mode-btn active-sky" onclick="switchFloor('upstairs')">✦ 仰望星圖｜休眠庫</button>
+  <button id="btnLibHud" class="mode-btn" onclick="switchFloor('downstairs')">◈ 俯瞰圖書館｜判例室</button>
+  <button id="btnLowMotionUp" class="hud-motion-btn" onclick="toggleLowMotion()">低動態：關</button>
+</div>
+
+<!-- 垂直攝影機世界 -->
+<div class="camera-viewport">
+  <div id="world" class="vertical-world">
+
+    <!-- 上層：memory-vault-demo.html 原版 3D 星圖休眠庫 -->
+    <section class="sky-scene" aria-label="樓上星圖休眠庫">
+      <canvas id="starCanvas"></canvas>
+      <div class="starmap-stage game-frame" id="starMap">
+        <div class="astrolabe-3d-wrap">
+          <div class="armillary-3d" id="armillary3d">
+            <div class="astro-ring ring-outer"></div>
+            <div class="astro-ring ring-eq"></div>
+            <div class="astro-ring ring-mid"></div>
+            <div class="astro-ring ring-inner"></div>
+            <div class="astro-core"></div>
+          </div>
+        </div>
+        <div class="stage-caption">✦ 3D 星圖休眠庫｜拖曳旋轉視角・滾輪縮放・點擊水晶展開履歷</div>
+        <div class="link-filter-bar" id="linkFilterBar" onclick="event.stopPropagation()">
+          <button class="link-pill on-inherit" data-type="inherit" onclick="toggleLinkType('inherit', this)">━ 經驗傳承</button>
+          <button class="link-pill on-collab"  data-type="collab"  onclick="toggleLinkType('collab', this)">┄ 交辦協作</button>
+          <button class="link-pill on-meeting" data-type="meeting" onclick="toggleLinkType('meeting', this)">⋯ 會議同席</button>
+          <button class="link-pill on-project" data-type="project" onclick="toggleLinkType('project', this)">◇ 同專案</button>
+        </div>
+        <canvas class="constellation-svg" id="linkCanvas"></canvas>
+      </div>
+      <aside class="detail-panel sky-panel game-frame collapsed" id="skyDetail"></aside>
+      <div class="skylight-rim" onclick="switchFloor('downstairs')">▼ 向下俯視，回到大圖書館判例卷宗室 ▼</div>
+    </section>
+
+    <!-- 下層：v8 典藏室 -->
+    <div class="lib-floor">
+      <div class="lib-bg" id="libBg"></div>
+      <div class="lib-scrim"></div>
+      <main class="stage">
+    <!-- ==================== DOWNSTAIRS ==================== -->
+    <section class="floor-view downstairs" aria-label="樓下典藏室">
+      <div class="downstairs-layout">
+        <div class="downstairs-main" id="downstairsMain" tabindex="-1">
+          <!-- 待核閱案頭 (v1 pinned notes + v4 wood/parchment) -->
+          <section class="wood-board" aria-label="待核閱案頭">
+            <div class="board-head">
+              <div>
+                <span class="board-title">待核閱案頭</span>
+                <span class="board-count" id="boardCounts"></span>
+              </div>
+              <span style="font-size:12px;color:var(--text-night-muted);">僅於寫入成功後落印並更新計數</span>
+            </div>
+            <div class="board-grid" id="boardGrid"></div>
+          </section>
+
+          <!-- 頁籤篩選列 -->
+          <div class="shelf-toolbar">
+            <div class="tab-strip" id="tabStrip"></div>
+            <div class="tab-strip" id="projLinks"></div>
+          </div>
+
+          <!-- 藏書架 -->
+          <div id="shelfContainer"></div>
+        </div>
+
+        <!-- Mode B: 420px Right Sidebar -->
+        <aside class="desk-sidebar" id="deskSidebar" style="display:none;" aria-label="閱讀桌右側欄"></aside>
+      </div>
+    </section>
+
+
+      </main>
+    </div>
+
+  </div>
+</div>
+
+<!-- Mode A: Wide Centered Quiet Sheet Overlay -->
+<div class="desk-overlay" id="deskOverlay" style="display:none;" onclick="if(event.target===this) closeDesk()">
+  <div class="sheet-panel" id="deskOverlayPanel" role="dialog" aria-modal="true" aria-label="閱讀桌詳情"></div>
+</div>
+
+<!-- 喚醒確認彈窗 -->
+<div class="modal-mask" id="wakeModal">
+  <div class="modal-card">
+    <div style="font-size:15px;font-weight:700;color:#7dd3fc;margin-bottom:8px;">✦ 主控台喚醒確認</div>
+    <div id="wakeText" style="font-size:13px;line-height:1.6;color:#cbd5e1;margin-bottom:18px;"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button class="btn-ghost" onclick="closeWake()">取消</button>
+      <button class="btn-cyan" onclick="confirmWake()">確認接回舊 Session</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-bar" id="toastBar" aria-live="polite"></div>
+
+<script>
+// ==================== 36 DISTINCT FICTIONAL RECORDS ====================
+const PROJECTS = ['鐘樓排程', '北翼編目', '星象校準'];
+const TYPES = [
+  { key: 'case', label: '判例' },
+  { key: 'decision', label: '決策' },
+  { key: 'bookmark', label: '書籤' }
+];
+
+const SEED_ENTRIES = [
+  ['夜巡鐘樓的封存協定與回滾界線', '斷電重啟後須先核對封蠟簽章再釋放暫存鎖，避免雙重寫入。', '第七夜巡班曾在鐘樓錄得兩次並行寫入，原因在於舊鎖未釋放而新實例先行建立副本。此後凡寫入正式館藏，皆須先經原子暫存檔核驗校驗碼，再行覆寫。'],
+  ['原子暫存檔寫入前校驗碼核對準則', '所有記憶修訂皆先落於同磁碟暫存頁，確認無損方置換正本。', '若中途遭遇電源中斷，未完成之暫存頁將於下次開庫時自動清理，絕不留存半截殘卷於書架之上，確保每份卷宗皆可完整讀誦。'],
+  ['古籍修復室低溫除濕分段作業判例', '潮濕氣流來襲時忌以高熱烘烤羊皮紙，應採恆溫夾層分段除濕。', '先前直接以炭爐烘乾曾造成書頁邊緣捲曲與鐵膽墨水暈染。修訂後每兩小時翻面記錄一次透光度，待纖維恢復平順始得歸架。'],
+  ['多節點同席會議紀錄之去重歸戶原則', '同一節點識別碼於不同專案之封存，應併入單一水晶履歷。', '若依每次會議拆出獨立星點，星圖不出半月便會繁亂難讀。故決議以唯一節點識別碼為本，將歷次同席與協作悉數收歸同一座晶體名下。'],
+  ['北翼書庫第四排索引斷層清點備忘', '編號零肆一一零至零肆一二四之間尚缺三份舊案交接單。', '已逐格核對實體木架與目錄卡，初步研判該三份交接單仍封存於舊紀書記之早期履歷中，待向星象休眠庫調閱確認。'],
+  ['星象儀冬至子午線偏移複測書籤', '東側銅環刻度已量畢，西側弧線因燈影反光仍待複測一次。', '複測時須將桌上黃銅檯燈移至左後方，避免鏡面折射干擾游標讀數；補齊誤差表後即可併入年度星軌總錄。'],
+  ['回收暫存區保留期與還原版本比對', '移入回收之卷宗仍保留原位置與修改時間戳，防止誤覆既有新檔。', '還原前先比對目標路徑是否已有同名新卷，若遇衝突則並陳兩份且明示差異，不擅自蓋過使用者後來修訂之內容。'],
+  ['暖紙底稿下墨色對比度基準線', '羊皮紙面雖分四階明度，深墨字色皆須維持四點五比一以上對比。', '過於追求做舊往往令字跡模糊難辨。經實測後定案，四階紙面均以深褐墨色書寫，僅藉晶石槽與微調紙色區分召回熱度。'],
+  ['中文字距與每行三十五字閱讀邊界', '正文欄寬收斂於三十八字寬內，讓視線折返自然而不疲勞。', '寬螢幕下若放任文字橫跨整幅視窗，讀至行末常失卻下一行首字位置。故寧將多餘寬度留作書頁留白，換取沉靜閱讀節奏。'],
+  ['系統減少動態效果偏好之自動偵測', '偵測作業系統減少動態偏好後，所有淡入與落印過渡即時歸零。', '對光影變化敏感之讀者，無需每次開庫重新設定；頂列亦保留手動切換鈕，隨時可於靜止與緩慢淡入間切換。'],
+  ['長卷宗檢索與主程序讀檔分流', '全文檢索僅比對已索引摘要，避免每次鍵入皆重掃整個資料夾。', '館藏逾數百卷時，同步讀檔會令輸入卡頓。將檔案掃描置於背景佇列並保留快取，方可使書架篩選如翻頁般平順。'],
+  ['跨專案封存履歷合併顯示規範', '同一學者參與不同書閣專案之紀錄，於履歷頁按年份統編。', '按專案拆散反而難以看出該節點長年累積之專長脈絡。統編後仍附專案標籤供篩選，兼顧全貌與局部查證。'],
+  ['窄視窗下閱讀區邊距優先保底順序', '視窗縮窄時優先維持正文每行三十餘字，避免行寬過窄。', '屬性與系譜屬查考輔助，正文才是閱讀重心；因此版面壓縮順序以維持正文可讀性為第一要務。'],
+  ['待核閱與未完書籤語意分離決議', '草稿待審稱待核閱，未竟手記稱未完書籤，兩者各自計數。', '書籤本就無須經過審批流程，混稱核閱易令守夜人誤判輕重。拆開並列後，可各別執行確認或標為完成。'],
+  ['黃銅細線分隔與外框單層嵌套限制', '凡見木框之內再套紙框者，一律簡化至單層邊界。', '層層疊疊的線條正是畫面顯得繁瑣焦躁的根源。留白本身即是最佳分隔，只在必要處落下一道極細暖金或木紋界線。'],
+  ['缺失版本於演化線上保留空心佔位', '前版若已遺失或回收，仍於系譜保留空心圓點標記其曾存在。', '直接抹去中間節點會使前後因果看似突兀跳躍。保留空位並註明已自館藏移除，方合歷史考據之嚴謹。'],
+  ['夜班交接清單未補齊項目的標記法', '交接未竟之條目於行首落空心菱形，不加刺眼紅點。', '深夜書閣忌諱驚擾視線之警示色塊；空心菱形配簡短文字已足夠醒目，且能與已收錄之實心菱形明確區分。'],
+  ['館藏編目日期格式與古雅數字排印', '全頁統一採襯線舊式數字，貼合紙本編目氣息。', '科技感強烈的等寬字碼常令人誤入報表後台。改用襯線數字後，目錄與案號便自然融入紙面之中。'],
+  ['檔案鎖逾時釋放前之雙重簽章查驗', '凡逾三分鐘未動之鎖檔，釋放前須複核寫入者識別碼。', '過去曾因背景節點暫時休眠而被誤判逾時，導致另一端搶先寫入。加入雙重簽章比對後，未曾再發生覆寫事故。'],
+  ['節點休眠後統計快照更新延遲處理', '送出喚醒請求後僅靜態顯示已送出，待下次快照回傳始轉線上。', '未收到真實連線回報前絕不假裝節點已經醒來，以免使用者對空對話；狀態誠實永遠優先於即時動效。'],
+  ['靜態狀態菱形與文字標籤並陳原則', '形狀與短字同時出現，不單靠色彩傳達已收錄或退回。', '即使在低飽和或色覺輔助環境下，空心、實心與斜線菱形加上清楚短字，仍能讓讀者一眼無誤辨識狀態。'],
+  ['鍵盤方向鍵於三欄書架移動邏輯', '以方向鍵遊走於目錄卡之間，按確認鍵開卷、退出鍵歸位。', '熟練的整理者往往不願頻頻伸手摸索滑鼠。讓鍵盤焦點沿三欄自然上下左右流動，並於關閉詳情後準確落回原卡。'],
+  ['開卷收起後捲動位置與焦點復位規範', '退出閱讀桌時必須還原開啟前之捲動高度與原卡焦點。', '若每次關閉都將畫面彈回書架最頂端，翻檢幾十份卷宗後便會令人氣餒。若原卡已被篩掉，則將焦點平順交還篩選列。'],
+  ['延遲三百毫秒顯示載入提示防閃爍', '本機讀檔多於百毫秒內完成，僅逾三百毫秒始現正在翻閱字樣。', '短暫閃現的提示字反而製造視覺躁動。留出三百毫秒靜默緩衝，讀得快時悄無聲息，讀得慢時再溫和告知。'],
+  ['鐵膽墨水防暈染夾層溫控觀察書籤', '梅雨季期間北窗內側書匣需每日檢視夾層吸濕紙顏色。', '目前西側兩匣已換上新製無酸吸濕襯紙，尚餘東側三匣待明日夜巡時一併抽換並補記日期。'],
+  ['鐘樓齒輪潤滑週期與異音判讀判例', '每逢朔望之夜檢視黃銅主軸，若聞輕微乾澀聲即補點蜂蠟油。', '過度塗抹礦物油反而沾黏書庫塵絮。採少量蜂蠟油擦拭後，齒輪運轉靜謐無聲，且不再污染鄰近羊皮紙卷。'],
+  ['典藏室燭光區域與文字安全遮罩值', '星夜窗景上覆深藍暗幕，保住前排文字對比。', '窗外星雲與兩側書脊固然雅緻，卻不可喧賓奪主。適度壓暗背景亮度，正可襯出檯燈照拂下的暖紙書面。'],
+  ['非推擠式取代疊卡展開原則', '點選前版次數時以懸浮小清單展開，不推擠下方書架卡片。', '直接在格線內撐開高度會令整排卡片劇烈跳動。改以浮層列出歷代版本，既好點擊又不擾亂原本排列。'],
+  ['退回修正卷宗保留原處不自動隱藏', '標記退回後卡片仍留於書架，僅以斜線菱形與淡墨字提示。', '使用者退回某筆記憶往往是為了稍後補寫或對照，若立刻自眼前消失反而無從找起。'],
+  ['搜尋無結果與空館藏置中襯線文案', '當書架空無一物時，只於中央靜靜落下一行襯線短句。', '不繪製滑稽插圖，也不放轉圈圖示；安靜的留白與溫和文字，正符合私人圖書館的氣度。'],
+  ['星圖召喚陣僅於選中可喚醒時靜現', '召喚紋樣平時隱入夜空，僅在點選可喚醒晶體時以三成透度襯底。', '常駐旋轉的法陣太過喧囂。讓紋樣如浮水印般靜靜托住選中節點，既保留儀式感又不擾神思。'],
+  ['純紀念封存節點之唯讀查閱界線', '已退場之舊節點改為純紀念銀灰邊框，僅供翻閱過往履歷。', '明確關閉喚醒鈕並說明原因，讓來訪者知道哪些夥伴仍在星海待命、哪些已化為館史紀念。'],
+  ['晶石槽與微調紙色區分熱度原則', '熱度主要藉安靜的晶石槽呈現，四階紙色僅微調以保牆面和諧。', '過度拉開紙面明度反令整牆跳動刺眼；縮小四階紙色差距並配無閃爍晶石，既清楚又沉靜。'],
+  ['書籤標為完成後自動移出未完計數', '點選標為完成並寫入成功後，案頭未完書籤計數即時減一。', '計數變動與書籤狀態切換永遠同步於寫入成功之後，絕不先改數字再補寫檔案。'],
+  ['北翼高架梯安全插銷定期點檢書籤', '第三座滑軌木梯左側黃銅插銷略有鬆動，暫繫麻繩標記。', '已通知鍛書匠於本週末攜帶替換銅栓前來修繕，完成修繕後即可將此條書籤標為完成。'],
+  ['館藏匯出純文字備份檔之編碼約定', '所有離線備份皆採無位元組序記號之萬國碼儲存，便於跨平台閱讀。', '確保即使數年後以最簡樸的文字編輯器開啟，仍能完整讀出每段標題、案號與附註，不致出現亂碼。']
+];
+
+const RECORDS = SEED_ENTRIES.map(([title, summary, bodyExtra], idx) => {
+  const typeObj = TYPES[idx % 3];
+  const project = PROJECTS[idx % 3];
+  const heat = idx % 4;
+  let status = 'confirmed';
+  if (idx === 0 || idx === 3) status = 'draft';
+  else if (idx === 5 || idx === 24) status = 'draft';
+  else if (idx % 9 === 0) status = 'returned';
+  else if (typeObj.key === 'bookmark' && idx % 2 === 1) status = 'completed';
+
+  const prefix = typeObj.key === 'case' ? '判' : (typeObj.key === 'decision' ? '決' : '籤');
+  const id = `${prefix}・${String(420 - idx).padStart(3, '0')}`;
+  const date = `2026-11-${String(21 - (idx % 20)).padStart(2, '0')}`;
+
+  let evolution = [{ id, date, note: '現行定本', state: 'active' }];
+  if (idx === 0) {
+    evolution = [
+      { id, date, note: '加入雙簽章鎖檔驗證', state: 'active' },
+      { id: '判・389', date: '2026-10-14', note: '初訂僅查時間戳', state: 'archived' },
+      { id: '判・311', date: '2026-08-03', note: '早期稿已自館藏移除', state: 'missing' }
+    ];
+  } else if (idx === 1 || idx === 6) {
+    evolution = [
+      { id, date, note: '現行修訂本', state: 'active' },
+      { id: `${prefix}・290`, date: '2026-09-02', note: '草擬初稿', state: 'archived' }
+    ];
+  }
+
+  return {
+    id, type: typeObj.key, typeLabel: typeObj.label, project, heat, status, date,
+    isBoardItem: idx === 0 || idx === 3 || idx === 5 || idx === 24,
+    boardKind: typeObj.key === 'bookmark' ? '未完書籤' : '待核閱判例',
+    title, summary,
+    body: [bodyExtra, `本卷歸屬於「${project}」書架，經守夜人依紙墨典藏體例校對無誤後編入目錄，供日後翻檢與跨案參照。`],
+    relatedIds: idx > 0 ? [idx - 1] : [],
+    evolution
+  };
+});
+
+
+
+// ==================== STATE ====================
+const state = {
+  floor: 'downstairs',
+  deskMode: 'A',
+  search: '',
+  filterTab: 'all',
+  filterProject: 'all',
+  lowMotion: false,
+  devFail: false,
+  focusedId: null,
+  openId: null,
+  openStackId: null,
+  savedScrollTop: 0,
+  loading: false,
+  showLoadingText: false,
+  saveMsg: '',
+  saveError: false,
+  lastFailedAction: null,
+  boardStamp: {}
+};
+
+let loadingTimer = null;
+let loadSeq = 0;
+
+// ==================== HELPERS ====================
+function diamondSvg(status) {
+  const stroke = status === 'returned' ? '#5A4939' : '#2B2118';
+  if (status === 'draft') {
+    return `<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><polygon points="5,1 9,5 5,9 1,5" fill="none" stroke="${stroke}" stroke-width="1.2"/></svg>`;
+  }
+  if (status === 'returned') {
+    return `<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><polygon points="5,1 9,5 5,9 1,5" fill="none" stroke="${stroke}" stroke-width="1.1"/><line x1="1.5" y1="8.5" x2="8.5" y2="1.5" stroke="${stroke}" stroke-width="1.1"/></svg>`;
+  }
+  return `<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><polygon points="5,1 9,5 5,9 1,5" fill="${stroke}"/></svg>`;
+}
+
+function quietGemSvg(on) {
+  if (on) {
+    return `<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true">
+      <polygon points="8,1 14,8 8,15 2,8" fill="#8C6232" stroke="#4B3423" stroke-width="1.2"/>
+    </svg>`;
+  }
+  return `<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true">
+    <polygon points="8,2 13,8 8,14 3,8" fill="none" stroke="#8A7965" stroke-width="1.1"/>
+  </svg>`;
+}
+
+function heatWidgetHtml(heat) {
+  const names = ['沉睡', '餘溫', '微溫', '熾熱'];
+  let gems = '';
+  for (let i = 0; i < 3; i++) gems += quietGemSvg(i < heat);
+  return `<span class="heat-widget" title="召回熱度：${names[heat]}"><span class="heat-gems">${gems}</span><span>${names[heat]}</span></span>`;
+}
+
+function waxStampSvg(kind) {
+  const label = kind === 'completed' ? '完成' : '收錄';
+  const fill = kind === 'completed' ? '#4D6A62' : '#7D4234';
+  return `<svg class="wax-stamp" viewBox="0 0 48 48" aria-hidden="true">
+    <circle cx="24" cy="24" r="20" fill="${fill}" stroke="#DDD1B8" stroke-width="1.5"/>
+    <circle cx="24" cy="24" r="15" fill="none" stroke="#DDD1B8" stroke-width="0.9" stroke-dasharray="2 2"/>
+    <text x="24" y="28" text-anchor="middle" fill="#EFE6D2" font-size="11" font-family="serif">${label}</text>
+  </svg>`;
+}
+
+function statusText(rec) {
+  return {
+    draft: rec.type === 'bookmark' ? '未完書籤' : '待核閱',
+    confirmed: '已收錄',
+    completed: '已完成',
+    returned: '已退回',
+    recycled: '已回收'
+  }[rec.status] || '待核閱';
+}
+
+function showToast(msg, undoFn) {
+  const bar = document.getElementById('toastBar');
+  bar.innerHTML = `<span>${msg}</span>`;
+  if (undoFn) {
+    const b = document.createElement('button');
+    b.className = 'toggle-pill active';
+    b.textContent = '撤銷';
+    b.onclick = () => { undoFn(); bar.classList.remove('visible'); };
+    bar.appendChild(b);
+  }
+  bar.classList.add('visible');
+  clearTimeout(bar._t);
+  bar._t = setTimeout(() => bar.classList.remove('visible'), 3600);
+}
+
+// ==================== RENDER DOWNSTAIRS ====================
+function renderBoard() {
+  const items = RECORDS.filter(r => r.isBoardItem);
+  const revPending = items.filter(r => r.status === 'draft' && r.type !== 'bookmark').length;
+  const bmkPending = items.filter(r => r.status === 'draft' && r.type === 'bookmark').length;
+  document.getElementById('boardCounts').textContent = `待核閱 ${revPending} · 未完書籤 ${bmkPending}`;
+
+  document.getElementById('boardGrid').innerHTML = items.map(rec => {
+    const isDraft = rec.status === 'draft';
+    const actLabel = rec.type === 'bookmark' ? '標為完成' : '確認';
+    const actKey = rec.type === 'bookmark' ? 'complete' : 'confirm';
+    const stamp = state.boardStamp[rec.id] ? waxStampSvg(state.boardStamp[rec.id]) : '';
+    return `
+      <article class="pinned-note ${isDraft ? '' : 'resolved'}">
+        <div class="small-pin"></div>
+        ${stamp}
+        <div class="note-meta">
+          <span class="quiet-kind">${rec.boardKind}</span>
+          <span>${rec.id}</span>
+        </div>
+        <div class="note-title" onclick="openDesk('${rec.id}')">${rec.title}</div>
+        <div class="note-desc">${rec.summary}</div>
+        <div class="note-actions">
+          <button class="paper-btn" onclick="openDesk('${rec.id}')">看詳情</button>
+          <button class="paper-btn primary" ${isDraft ? '' : 'disabled'} onclick="mutateRecord('${rec.id}','${actKey}')">${isDraft ? actLabel : statusText(rec)}</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function getFilteredRecords() {
+  return RECORDS.filter(r => {
+    if (state.filterTab === 'pending') {
+      if (r.status !== 'draft' && r.status !== 'returned') return false;
+    } else if (state.filterTab !== 'all') {
+      if (r.type !== state.filterTab) return false;
+    }
+    if (state.filterProject !== 'all' && r.project !== state.filterProject) return false;
+    if (state.search) {
+      const q = state.search.toLowerCase();
+      if (!(r.id.toLowerCase().includes(q) || r.title.toLowerCase().includes(q) || r.summary.toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
+}
+
+function renderShelfBar(count) {
+  const tabs = [['all', '全部'], ['case', '判例'], ['decision', '決策'], ['bookmark', '書籤'], ['pending', '待處理']];
+  document.getElementById('tabStrip').innerHTML = tabs.map(([k, label]) => `
+    <button class="filter-tab ${state.filterTab === k ? 'active' : ''}" onclick="setFilterTab('${k}')">${label}</button>
+  `).join('');
+
+  const projs = ['all', ...PROJECTS];
+  document.getElementById('projLinks').innerHTML =
+    `<span style="color:var(--text-night-muted);font-size:12.5px;">書閣：</span>` +
+    projs.map(p => `<button class="filter-tab ${state.filterProject === p ? 'active' : ''}" onclick="setFilterProject('${p}')">${p === 'all' ? '全部' : p}</button>`).join('') +
+    `<span style="margin-left:8px;color:var(--text-night-muted);font-size:12.5px;">凡 ${count} 卷</span>`;
+}
+
+function renderShelf() {
+  const list = getFilteredRecords();
+  renderShelfBar(list.length);
+  const container = document.getElementById('shelfContainer');
+
+  if (!list.length) {
+    container.innerHTML = `<div class="center-state">書架上暫無符合條件之卷宗。</div>`;
+    return;
+  }
+
+  let html = '';
+  for (const t of TYPES) {
+    const group = list.filter(r => r.type === t.key);
+    if (!group.length) continue;
+    html += `
+      <section class="shelf-section">
+        <div class="shelf-header">
+          <div class="shelf-rule"></div>
+          <div class="shelf-tag">${t.label}書架</div>
+          <div class="shelf-rule"></div>
+        </div>
+        <div class="shelf-grid">
+          ${group.map(rec => {
+            const prevCount = rec.evolution.length - 1;
+            const showPop = state.openStackId === rec.id;
+            return `
+              <div class="card-wrap ${state.focusedId === rec.id ? 'selected' : ''}"
+                   tabindex="0" data-id="${rec.id}"
+                   onclick="openDesk('${rec.id}')"
+                   onfocus="state.focusedId='${rec.id}'">
+                <div class="archive-card type-${rec.type} heat-${rec.heat}">
+                  <div class="card-meta">
+                    <span>${rec.id} · ${diamondSvg(rec.status)} ${statusText(rec)}</span>
+                    <span>${rec.date}</span>
+                  </div>
+                  <div class="card-title">${rec.title}</div>
+                  <div class="card-summary">${rec.summary}</div>
+                  <div class="card-footer">
+                    ${heatWidgetHtml(rec.heat)}
+                    ${prevCount > 0 ? `<button class="stack-btn" onclick="toggleStack('${rec.id}', event)">前版 ×${prevCount}</button>` : ''}
+                  </div>
+                </div>
+                ${showPop ? `
+                  <div class="stack-popover" onclick="event.stopPropagation()">
+                    ${rec.evolution.slice(1).map(v => v.state === 'missing'
+                      ? `<div class="stack-row missing"><span>${v.id} · ${v.note}</span><span>缺失</span></div>`
+                      : `<div class="stack-row" onclick="openDesk('${rec.id}')"><span>${v.id} · ${v.note}</span><span>${v.date}</span></div>`
+                    ).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </section>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+// ==================== RENDER READING DESK (A: WIDE SINGLE-SHEET / B: 420px SIDEBAR) ====================
+function renderDesk() {
+  const overlay = document.getElementById('deskOverlay');
+  const overlayPanel = document.getElementById('deskOverlayPanel');
+  const sidebar = document.getElementById('deskSidebar');
+
+  if (!state.openId) {
+    overlay.style.display = 'none';
+    sidebar.style.display = 'none';
+    return;
+  }
+
+  let innerHtml = '';
+  if (state.loading) {
+    innerHtml = state.showLoadingText
+      ? `<div class="center-state" style="color:var(--ink-paper-muted);">正在翻閱…</div>`
+      : `<div class="center-state"></div>`;
+  } else {
+    const rec = RECORDS.find(r => r.id === state.openId);
+    if (!rec) return;
+    const confirmLabel = rec.type === 'bookmark' ? '標為完成' : '確認';
+    const confirmAction = rec.type === 'bookmark' ? 'complete' : 'confirm';
+
+    const mainColHtml = `
+      <div class="sheet-col">
+        <div class="sheet-summary"><strong>結論摘要：</strong>${rec.summary}</div>
+        <div class="sheet-prose">${rec.body.map(p => `<p>${p}</p>`).join('')}</div>
+      </div>
+    `;
+    const sideColHtml = `
+      <div class="sheet-col">
+        <div>
+          <h3 class="sheet-section-head">取代演化線</h3>
+          <div class="evo-tree">
+            ${rec.evolution.map(v => `
+              <div class="evo-node ${v.state}" onclick="${v.state === 'missing' ? '' : `showToast('檢視演化節點：${v.id}（${v.date}）')`}">
+                ${v.id} · ${v.date} — ${v.note}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div>
+          <h3 class="sheet-section-head">關聯卷宗</h3>
+          <div class="rel-chips">
+            ${rec.relatedIds.length
+              ? rec.relatedIds.map(i => `<button class="paper-btn" onclick="openDesk('${RECORDS[i].id}')">${RECORDS[i].id} · ${RECORDS[i].title}</button>`).join('')
+              : `<span style="font-size:13px;color:var(--ink-paper-muted);">無關聯卷宗</span>`}
+          </div>
+        </div>
+      </div>
+    `;
+
+    innerHtml = `
+      <div class="sheet-header">
+        <div>
+          <div class="sheet-meta-line">
+            <span>${rec.id}</span>
+            <span>·</span>
+            <span>${rec.typeLabel}</span>
+            <span>·</span>
+            <span>${rec.project}</span>
+            <span>·</span>
+            <span>${diamondSvg(rec.status)} ${statusText(rec)}</span>
+            <span>·</span>
+            ${heatWidgetHtml(rec.heat)}
+            <span>·</span>
+            <span>${rec.date}</span>
+          </div>
+          <h2 class="sheet-title" id="sheetTitle" tabindex="-1">${rec.title}</h2>
+        </div>
+        <div class="sheet-header-actions" style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+          <button class="paper-btn" title="切換閱讀桌版式" aria-label="切換閱讀桌版式" onclick="toggleDeskMode()">${state.deskMode === 'B' ? '版式 B' : '切換版式（目前 A）'}</button>
+          <button class="paper-btn" title="返回書架 (Esc)" aria-label="返回書架" onclick="closeDesk()">${state.deskMode === 'B' ? '返回' : '返回書架（Esc）'}</button>
+        </div>
+      </div>
+
+      <div class="sheet-body">
+        ${mainColHtml}
+        ${sideColHtml}
+      </div>
+
+      <div class="sheet-footer">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="paper-btn primary" onclick="mutateRecord('${rec.id}','${confirmAction}')">${confirmLabel}</button>
+          <button class="paper-btn" onclick="mutateRecord('${rec.id}','return')">退回</button>
+          <button class="paper-btn" onclick="mutateRecord('${rec.id}','recycle')">移入回收</button>
+        </div>
+        <div class="save-msg ${state.saveError ? 'error' : ''}">
+          <span>${state.saveMsg}</span>
+          ${state.saveError && state.lastFailedAction ? `<button class="paper-btn" onclick="mutateRecord('${rec.id}','${state.lastFailedAction}')">重試</button>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  document.body.classList.toggle('desk-b-open', state.deskMode === 'B');
+  if (state.deskMode === 'A') {
+    sidebar.style.display = 'none';
+    overlayPanel.innerHTML = innerHtml;
+    overlay.style.display = 'flex';
+  } else {
+    overlay.style.display = 'none';
+    sidebar.innerHTML = `<div class="sheet-panel">${innerHtml}</div>`;
+    sidebar.style.display = 'flex';
+  }
+}
+
+
+
+// ==================== CAMERA PAN + VERTICAL MOTION BLUR ====================
+let panRaf = null;
+let starWarp = 1;
+
+function finalizeFloor(floor) {
+  if (panRaf) { cancelAnimationFrame(panRaf); panRaf = null; }
+  const world = document.getElementById('world');
+  const vBlur = document.getElementById('vBlur');
+  const libBg = document.getElementById('libBg');
+  world.style.filter = 'none';
+  world.style.transition = '';
+  vBlur.setAttribute('stdDeviation', '0 0');
+  world.style.transform = floor === 'upstairs' ? 'translateY(0vh) rotateX(0deg)' : 'translateY(-100vh) rotateX(0deg)';
+  if (libBg) libBg.style.transform = 'translateY(0px)';
+  starWarp = 1;
+
+  state.floor = floor;
+  document.body.classList.toggle('floor-downstairs', floor === 'downstairs');
+  document.body.classList.toggle('floor-upstairs', floor === 'upstairs');
+  document.getElementById('btnFloorDown').classList.toggle('active', floor === 'downstairs');
+  document.getElementById('btnFloorUp').classList.toggle('active', floor === 'upstairs');
+
+  if (floor === 'upstairs') {
+    const first = document.querySelector('#linkFilterBar button') || document.getElementById('btnLibHud');
+    if (first) first.focus();
+  } else {
+    const first = document.querySelector('#downstairsMain .paper-btn') || document.getElementById('btnFloorDown');
+    if (first) first.focus();
+  }
+}
+
+function switchFloor(floor) {
+  if (panRaf) {
+    finalizeFloor(floor);
+    document.getElementById('floorAnnounce').textContent = floor === 'upstairs' ? '前往樓上星象台' : '回到樓下典藏室';
+    return;
+  }
+  if (state.floor === floor) return;
+  if (state.openId) closeDesk();
+
+  document.getElementById('floorAnnounce').textContent = floor === 'upstairs' ? '前往樓上星象台' : '回到樓下典藏室';
+
+  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (state.lowMotion || prefersReduced) {
+    const world = document.getElementById('world');
+    world.style.opacity = '0.25';
+    world.style.transition = 'opacity 120ms ease';
+    setTimeout(() => {
+      world.style.opacity = '1';
+      finalizeFloor(floor);
+    }, 120);
+    return;
+  }
+
+  const world = document.getElementById('world');
+  const vBlur = document.getElementById('vBlur');
+  const libBg = document.getElementById('libBg');
+  const startY = state.floor === 'upstairs' ? 0 : -100;
+  const endY = floor === 'upstairs' ? 0 : -100;
+  const duration = 980;
+  const startTime = performance.now();
+  let topbarSwapped = false;
+  starWarp = 6;
+  world.style.filter = 'url(#verticalMotionBlur)';
+
+  function step(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const curY = startY + (endY - startY) * ease;
+    const velCurve = Math.sin(Math.PI * t); // 0 -> 1 -> 0
+    const tilt = (floor === 'upstairs' ? 2.4 : -2.4) * velCurve;
+    const blurY = (14 * velCurve).toFixed(1);
+
+    world.style.transform = `translateY(${curY}vh) rotateX(${tilt.toFixed(2)}deg)`;
+    vBlur.setAttribute('stdDeviation', `0 ${blurY}`);
+    if (libBg) libBg.style.transform = `translateY(${((curY + 100) * 0.35).toFixed(1)}px)`;
+
+    if (!topbarSwapped && t >= 0.45) {
+      topbarSwapped = true;
+      document.body.classList.toggle('floor-downstairs', floor === 'downstairs');
+      document.body.classList.toggle('floor-upstairs', floor === 'upstairs');
+    }
+
+    if (t < 1) {
+      panRaf = requestAnimationFrame(step);
+    } else {
+      finalizeFloor(floor);
+    }
+  }
+  panRaf = requestAnimationFrame(step);
+}
+
+function toggleDeskMode() {
+  state.deskMode = state.deskMode === 'A' ? 'B' : 'A';
+  document.getElementById('btnDeskMode').textContent = state.deskMode === 'A' ? '版式：A 寬幅閱讀桌' : '版式：B 右側 420px 欄';
+  renderDesk();
+}
+
+function toggleLowMotion() {
+  state.lowMotion = !state.lowMotion;
+  document.body.classList.toggle('low-motion', state.lowMotion);
+  const b = document.getElementById('btnLowMotion');
+  b.classList.toggle('active', state.lowMotion);
+  b.textContent = `低動態：${state.lowMotion ? '開' : '關'}`;
+  const bUp = document.getElementById('btnLowMotionUp');
+  if (bUp) { bUp.classList.toggle('active', state.lowMotion); bUp.textContent = b.textContent; }
+}
+
+function toggleDevFail() {
+  state.devFail = !state.devFail;
+  const b = document.getElementById('btnDevFail');
+  b.classList.toggle('active', state.devFail);
+  b.textContent = `模擬失敗：${state.devFail ? '開' : '關'}`;
+}
+
+function setFilterTab(k) { state.filterTab = k; state.openStackId = null; renderShelf(); }
+function setFilterProject(p) { state.filterProject = p; state.openStackId = null; renderShelf(); }
+function onSearch(v) {
+  state.search = v.trim();
+  const s1 = document.getElementById('searchInput'); const s2 = document.getElementById('searchInputUp');
+  if (s1 && s1.value !== v) s1.value = v;
+  if (s2 && s2.value !== v) s2.value = v;
+  renderShelf(); 
+}
+
+function toggleStack(id, e) {
+  e.stopPropagation();
+  state.openStackId = state.openStackId === id ? null : id;
+  renderShelf();
+}
+
+function openDesk(id) {
+  const main = document.getElementById('downstairsMain');
+  if (!state.openId) state.savedScrollTop = main.scrollTop;
+  state.focusedId = id;
+  state.openId = id;
+  state.openStackId = null;
+  state.saveMsg = '';
+  state.saveError = false;
+  state.lastFailedAction = null;
+
+  clearTimeout(loadingTimer);
+  const seq = ++loadSeq;
+  const delayMs = state.devFail ? 650 : 120;
+  state.loading = true;
+  state.showLoadingText = false;
+  renderShelf();
+  renderDesk();
+
+  loadingTimer = setTimeout(() => {
+    if (seq === loadSeq && state.loading && state.openId === id) {
+      state.showLoadingText = true;
+      renderDesk();
+    }
+  }, 300);
+
+  setTimeout(() => {
+    if (seq !== loadSeq || state.openId !== id) return;
+    clearTimeout(loadingTimer);
+    state.loading = false;
+    state.showLoadingText = false;
+    renderDesk();
+    const t = document.getElementById('sheetTitle');
+    if (t) t.focus();
+  }, delayMs);
+}
+
+function closeDesk() {
+  clearTimeout(loadingTimer);
+  loadSeq++;
+  const prevId = state.openId;
+  state.loading = false;
+  state.openId = null;
+  renderDesk();
+  renderShelf();
+
+  const main = document.getElementById('downstairsMain');
+  main.scrollTop = state.savedScrollTop;
+  const target = prevId ? main.querySelector(`.card-wrap[data-id="${prevId}"]`) : null;
+  if (target) target.focus();
+  else document.querySelector('#tabStrip .filter-tab')?.focus();
+}
+
+function mutateRecord(id, action) {
+  const rec = RECORDS.find(r => r.id === id);
+  if (!rec) return;
+  const prevStatus = rec.status;
+  if (state.openId === id) {
+    state.saveMsg = '正在寫入…';
+    state.saveError = false;
+    renderDesk();
+  }
+
+  setTimeout(() => {
+    if (state.devFail) {
+      if (state.openId === id) {
+        state.saveMsg = '未儲存';
+        state.saveError = true;
+        state.lastFailedAction = action;
+        renderDesk();
+      }
+      showToast(`寫入失敗：${rec.id} 尚未儲存，狀態維持不變。`);
+      return;
+    }
+
+    if (action === 'confirm') { rec.status = 'confirmed'; state.boardStamp[id] = 'confirmed'; }
+    else if (action === 'complete') { rec.status = 'completed'; state.boardStamp[id] = 'completed'; }
+    else if (action === 'return') rec.status = 'returned';
+    else if (action === 'recycle') rec.status = 'recycled';
+
+    renderBoard();
+    renderShelf();
+    if (state.openId === id) {
+      state.saveMsg = `已儲存：${statusText(rec)}`;
+      state.saveError = false;
+      state.lastFailedAction = null;
+      renderDesk();
+    }
+
+    if (action === 'recycle') {
+      showToast(`已移入回收：${rec.id}（去向：回收暫存區）`, () => {
+        rec.status = prevStatus;
+        renderBoard();
+        renderShelf();
+        if (state.openId === id) renderDesk();
+      });
+    } else {
+      showToast(`已儲存：${rec.id}（${statusText(rec)}）`);
+    }
+  }, 200);
+}
+
+
+
+function onSearch(v) {
+  state.search = v.trim();
+  renderShelf();
+}
+
+document.addEventListener('click', () => {
+  if (state.openStackId) { state.openStackId = null; renderShelf(); }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (state.floor !== 'downstairs') return;
+  if (e.key === 'Escape' && state.openId) { e.preventDefault(); closeDesk(); return; }
+  if (state.openId && state.deskMode === 'A') return;
+
+  const active = document.activeElement;
+  if (!active || !active.classList.contains('card-wrap')) return;
+  const cards = Array.from(document.querySelectorAll('#shelfContainer .card-wrap'));
+  const idx = cards.indexOf(active);
+  if (idx === -1) return;
+
+  let nextIdx = idx;
+  if (e.key === 'ArrowRight') nextIdx = Math.min(cards.length - 1, idx + 1);
+  else if (e.key === 'ArrowLeft') nextIdx = Math.max(0, idx - 1);
+  else if (e.key === 'ArrowDown') nextIdx = Math.min(cards.length - 1, idx + 3);
+  else if (e.key === 'ArrowUp') nextIdx = Math.max(0, idx - 3);
+  else if (e.key === 'Enter') { e.preventDefault(); openDesk(active.dataset.id); return; }
+  else return;
+
+  if (nextIdx !== idx) { e.preventDefault(); cards[nextIdx].focus(); }
+});
+
+
+
+// ==================== UPSTAIRS: memory-vault-demo.html 3D STAR MAP ====================
+const skyNodes = [
+  {
+    id: "claudia-v2", name: "claudia jr", title: "Chief Systems Architect", role: "主工程師 · Claude Code", status: "線上",
+    pos3d: [-130, -55, 85], color: "#f59e0b", portrait: "../../ref/claude/busy.png", avatar: "../../ref/claude/chibi_avatar.png",
+    specialty: "負責 Electron 主行程、SQLite 索引與記憶庫安全機制設計。",
+    stats: { tasks: 42, donePct: 95, acceptPct: 92, cases: 6 },
+    workflow: "先讀取既有架構並寫入單元測試，透過 feat/memory-phase1 分支逐步驗證 CI 後才合併。",
+    review: "「記憶庫會議抓出 memory_read 與 .nexus-heat.json 的邊界時特別順暢，有 Hagemi 一起補齊溫度設計很安心。」",
+    inheritedFrom: "claudia-v1", relatedDocs: ["判・420", "決・419"],
+    session: { backend: "Claude Code", sessionId: "sess-claudia-882a", wakeable: true }
+  },
+  {
+    id: "claudia-v1", name: "claudia (一代)", title: "Founding Scribe", role: "架構奠基者 · 已封存", status: "封存",
+    pos3d: [-210, 105, -75], color: "#fb923c", portrait: "../../ref/claude/neutral.webp", avatar: "../../ref/claude/chibi_avatar.png",
+    specialty: "完成 Entropy Nexus 遠端權限分級與三家 CLI 轉接器早期原型。",
+    stats: { tasks: 28, donePct: 93, acceptPct: 89, cases: 4 },
+    workflow: "採用工作區快照差異檢視與白名單權限驗證，確保跨家 CLI 操作不互相覆寫。",
+    review: "「封存前把交接清單留給下一代節點了，希望圖書館裡的判例以後都能幫上忙。」",
+    inheritedFrom: null, relatedDocs: ["判・420"],
+    session: { backend: "Claude Code", sessionId: "sess-claudia-019f", wakeable: true }
+  },
+  {
+    id: "hagemi-01", name: "Hagemi", title: "Astral Visualist", role: "視覺與跨界調研 · Antigravity", status: "線上",
+    pos3d: [155, -70, 50], color: "#a78bfa", portrait: "../../ref/gemini/busy.png", avatar: "../../ref/gemini/chibi_avatar.png",
+    specialty: "擅長空間桌布設計、模型技術調研、與記憶寶庫溫度體驗規劃。",
+    stats: { tasks: 31, donePct: 97, acceptPct: 94, cases: 3 },
+    workflow: "先做官方來源交叉查證與多方案比較，再配合視覺原型快速收斂設計方向。",
+    review: "「跟使用者一路從塔羅、工作室 Q 版桌布聊到這個有溫度的星圖休眠庫，過程超有成就感！」",
+    inheritedFrom: null, relatedDocs: ["判・417", "決・416"],
+    session: { backend: "Antigravity", sessionId: "sess-hagemi-2516", wakeable: true }
+  },
+  {
+    id: "gpt-01", name: "gpt", title: "Boundary Sentinel", role: "系統驗收 · Codex", status: "封存",
+    pos3d: [95, 110, -120], color: "#38bdf8", portrait: "../../ref/gpt/busy.png", avatar: "../../ref/gpt/chibi_avatar.png",
+    specialty: "協助邊界測試、嚴格型別檢查與外部 API 規格對齊。",
+    stats: { tasks: 19, donePct: 90, acceptPct: 88, cases: 2 },
+    workflow: "針對邊界條件與錯誤恢復路徑做壓力驗證，確認無回歸問題才放行。",
+    review: "「CLI 歷史已歸檔，只保留濃縮後的經驗水晶留存於星圖中。」",
+    inheritedFrom: null, relatedDocs: ["籤・415"],
+    session: { backend: "Codex", sessionId: "sess-gpt-004c", wakeable: false }
+  }
+];
+
+const skyConnections = [
+  { from: "claudia-v1", to: "claudia-v2", type: "inherit", label: "接回自" },
+  { from: "claudia-v2", to: "hagemi-01",  type: "collab",  label: "交辦 ×6" },
+  { from: "hagemi-01",  to: "claudia-v2", type: "meeting", label: "會議同席 ×3" },
+  { from: "claudia-v2", to: "gpt-01",     type: "collab",  label: "驗收 ×4" },
+  { from: "hagemi-01",  to: "gpt-01",     type: "project", label: "Entropy Nexus" },
+  { from: "claudia-v1", to: "gpt-01",     type: "project", label: "Entropy Nexus" }
+];
+const activeLinkTypes = new Set(["inherit", "collab", "meeting", "project"]);
+let selectedSkyNodeId = null;
+let wakeTargetNode = null;
+let camYaw = 0.25, camPitch = 0.14, camZoom = 1.0;
+let isDragging3D = false, dragMoved = false, lastDragX = 0, lastDragY = 0;
+
+function toggleLinkType(type, btn) {
+  if (activeLinkTypes.has(type)) { activeLinkTypes.delete(type); btn.className = "link-pill"; }
+  else { activeLinkTypes.add(type); btn.className = `link-pill on-${type}`; }
+}
+
+function project3D(pos, w, h) {
+  const [x0, y0, z0] = pos;
+  const cy = Math.cos(camYaw), sy = Math.sin(camYaw);
+  const cp = Math.cos(camPitch), sp = Math.sin(camPitch);
+  const x1 = x0 * cy - z0 * sy;
+  const z1 = x0 * sy + z0 * cy;
+  const y2 = y0 * cp - z1 * sp;
+  const z2 = y0 * sp + z1 * cp;
+  const fov = 620 * camZoom;
+  const dist = 560;
+  const scale = fov / Math.max(140, dist + z2);
+  return { sx: w * 0.5 + x1 * scale, sy: h * 0.52 + y2 * scale, scale, z: z2 };
+}
+
+function renderStarMap() {
+  const stage = document.getElementById("starMap");
+  stage.querySelectorAll(".crystal-node").forEach(el => el.remove());
+  skyNodes.forEach((n, idx) => {
+    const el = document.createElement("div");
+    el.id = `node-${n.id}`;
+    el.className = `crystal-node ${n.status === "封存" ? "archived" : ""} ${n.id === selectedSkyNodeId ? "selected" : ""}`;
+    el.onclick = (e) => {
+      e.stopPropagation();
+      if (dragMoved) return;
+      selectedSkyNodeId = (selectedSkyNodeId === n.id) ? null : n.id;
+      renderStarMap(); renderSkyDetail();
+    };
+    const badgeClass = n.status === "線上" ? "badge-online" : (n.session.wakeable ? "badge-wake" : "badge-mem");
+    const badgeText = n.status === "線上" ? "● 現役" : (n.session.wakeable ? "✦ 封存 · 可喚醒" : "◇ 封存 · 純紀念");
+    el.innerHTML = `
+      <div class="crystal-aura" style="background:${n.color};"></div>
+      <div class="crystal-shape" style="animation-delay:${idx * 0.6}s;">
+        <img src="${n.portrait}" alt="${n.name}" />
+        <div class="crystal-facet"></div>
+      </div>
+      <div class="crystal-pedestal"></div>
+      <div class="crystal-label">
+        <div style="font-weight:700;color:#fff;">${n.name}</div>
+        <span class="crystal-badge ${badgeClass}">${badgeText}</span>
+      </div>
+    `;
+    stage.appendChild(el);
+  });
+}
+
+function update3DStarMap() {
+  const stage = document.getElementById("starMap");
+  const canvas = document.getElementById("linkCanvas");
+  if (stage && canvas) {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    if (w > 0 && h > 0) {
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      const arm = document.getElementById("armillary3d");
+      if (arm) arm.style.transform = `scale(${camZoom}) rotateX(${-camPitch * 57.3}deg) rotateY(${camYaw * 57.3}deg)`;
+
+      const projected = {};
+      skyNodes.forEach(n => {
+        const p = project3D(n.pos3d, w, h);
+        projected[n.id] = p;
+        const el = document.getElementById(`node-${n.id}`);
+        if (el) {
+          el.style.left = `${p.sx}px`; el.style.top = `${p.sy}px`;
+          const s = Math.max(0.62, Math.min(1.28, p.scale * 0.92));
+          el.style.transform = `translate(-50%, -50%) scale(${s})`;
+          el.style.zIndex = Math.round(500 - p.z);
+          el.style.opacity = Math.max(0.45, Math.min(1, 1.05 - (p.z + 180) / 720));
+        }
+      });
+
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, w, h);
+      const styleMap = {
+        inherit: { color: "rgba(245, 185, 99, 0.85)", width: 2.5, dash: [] },
+        collab:  { color: "rgba(56, 189, 248, 0.65)", width: 1.8, dash: [7, 5] },
+        meeting: { color: "rgba(167, 139, 250, 0.68)", width: 1.8, dash: [3, 5] },
+        project: { color: "rgba(52, 211, 153, 0.48)", width: 1.4, dash: [10, 8] }
+      };
+      skyConnections.forEach(c => {
+        if (!activeLinkTypes.has(c.type)) return;
+        const a = projected[c.from], b = projected[c.to];
+        if (!a || !b) return;
+        const st = styleMap[c.type];
+        ctx.save();
+        ctx.strokeStyle = st.color; ctx.lineWidth = st.width; ctx.setLineDash(st.dash);
+        ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+        const mx = (a.sx + b.sx) * 0.5, my = (a.sy + b.sy) * 0.5;
+        ctx.setLineDash([]); ctx.font = "600 10.5px Segoe UI, Noto Sans TC, sans-serif";
+        ctx.fillStyle = st.color; ctx.textAlign = "center"; ctx.fillText(c.label, mx, my - 5);
+        ctx.restore();
+      });
+    }
+  }
+  requestAnimationFrame(update3DStarMap);
+}
+
+function jumpToDocFromSky(docId) {
+  const target = RECORDS.find(r => r.id === docId) || RECORDS[0];
+  switchFloor('downstairs');
+  setTimeout(() => { if (target) openDesk(target.id); }, state.lowMotion ? 160 : 1020);
+}
+
+function renderSkyDetail() {
+  const panel = document.getElementById("skyDetail");
+  if (!selectedSkyNodeId) { panel.classList.add("collapsed"); return; }
+  const n = skyNodes.find(x => x.id === selectedSkyNodeId);
+  if (!n) { panel.classList.add("collapsed"); return; }
+  panel.classList.remove("collapsed");
+  const docLinks = n.relatedDocs.map(did => {
+    const d = RECORDS.find(x => x.id === did) || RECORDS[0];
+    return d ? `<div class="link-card" onclick="jumpToDocFromSky('${d.id}')"><span>${d.id} · ${d.title}</span><span>前往圖書館 →</span></div>` : "";
+  }).join("");
+  const wakeBtn = n.session.wakeable
+    ? `<button class="btn-game btn-cyan" onclick="openWake('${n.id}')">⚡ 在主控台喚醒舊 Session</button>`
+    : `<span style="font-size:12px;color:#94a3b8;">（CLI 原始紀錄已清理，僅留存濃縮水晶履歷）</span>`;
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:10.5px;letter-spacing:0.14em;color:#fde68a;font-weight:700;">${n.title.toUpperCase()}</span>
+      <button class="close-panel-btn" title="收起介紹" onclick="selectedSkyNodeId=null;renderStarMap();renderSkyDetail();">✕</button>
+    </div>
+    <div class="crystal-hero">
+      <div class="hero-portrait-box"><img src="${n.portrait}" alt="${n.name}" /></div>
+      <div>
+        <div style="font-size:19px;font-weight:800;color:#fff;">${n.name}</div>
+        <div style="font-size:12px;color:#7dd3fc;margin:2px 0 6px;">${n.role} · ${n.status}</div>
+        <div style="font-size:12.5px;line-height:1.5;color:#cbd5e1;">${n.specialty}</div>
+      </div>
+    </div>
+    <div class="rpg-bars">
+      <div class="rpg-bar-row">
+        <span style="color:#cbd5e1;">任務完成率</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${n.stats.donePct}%"></div></div>
+        <span style="color:#7dd3fc;font-weight:700;text-align:right;">${n.stats.donePct}%</span>
+      </div>
+      <div class="rpg-bar-row">
+        <span style="color:#cbd5e1;">一次驗收率</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${n.stats.acceptPct}%;background:linear-gradient(90deg,#fbbf24,#f59e0b);"></div></div>
+        <span style="color:#fde68a;font-weight:700;text-align:right;">${n.stats.acceptPct}%</span>
+      </div>
+      <div style="font-size:11.5px;color:#94a3b8;">累計完成任務：<strong style="color:#fff;">${n.stats.tasks}</strong> ｜ 經手判例：<strong style="color:#fde68a;">${n.stats.cases}</strong></div>
+    </div>
+    <div class="section-box"><div style="font-size:11px;color:#7dd3fc;font-weight:700;margin-bottom:4px;">濃縮解題流程</div>${n.workflow}</div>
+    <div class="review-box"><div class="review-title">## 節點回顧</div>${n.review}</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="font-size:12px;font-weight:700;color:#fde68a;">關聯卷宗（點擊俯衝回圖書館）</div>
+      ${docLinks}
+    </div>
+    <div class="action-row">${wakeBtn}</div>
+  `;
+}
+
+const starMapEl = document.getElementById("starMap");
+starMapEl.addEventListener("pointerdown", (e) => {
+  if (e.target.closest(".link-filter-bar")) return;
+  isDragging3D = true; dragMoved = false; lastDragX = e.clientX; lastDragY = e.clientY;
+});
+window.addEventListener("pointermove", (e) => {
+  if (!isDragging3D) return;
+  const dx = e.clientX - lastDragX, dy = e.clientY - lastDragY;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+  camYaw += dx * 0.007;
+  camPitch = Math.max(-0.95, Math.min(0.95, camPitch + dy * 0.007));
+  lastDragX = e.clientX; lastDragY = e.clientY;
+});
+window.addEventListener("pointerup", () => { setTimeout(() => { isDragging3D = false; }, 0); });
+starMapEl.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  camZoom = Math.max(0.65, Math.min(1.65, camZoom - e.deltaY * 0.0008));
+}, { passive: false });
+starMapEl.addEventListener("click", (e) => {
+  if (dragMoved) { dragMoved = false; return; }
+  if (!e.target.closest(".crystal-node") && !e.target.closest(".link-filter-bar")) {
+    selectedSkyNodeId = null; renderStarMap(); renderSkyDetail();
+  }
+});
+
+function openWake(nodeId) {
+  wakeTargetNode = skyNodes.find(n => n.id === nodeId);
+  document.getElementById("wakeText").innerHTML =
+    `即將透過 <code>entropy-nexus://wake?node=${wakeTargetNode.id}</code> 喚醒主控台：<br><br>「確定要接回 <strong>${wakeTargetNode.name}</strong>（${wakeTargetNode.session.backend}）的舊對話嗎？」`;
+  document.getElementById("wakeModal").classList.add("open");
+}
+function closeWake() { document.getElementById("wakeModal").classList.remove("open"); }
+function confirmWake() {
+  closeWake();
+  showToast(`已模擬送出 entropy-nexus://wake?node=${wakeTargetNode.id}（${wakeTargetNode.session.sessionId}）`);
+}
+
+function initStars() {
+  const canvas = document.getElementById("starCanvas");
+  const ctx = canvas.getContext("2d");
+  const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+  resize();
+  window.addEventListener("resize", resize);
+  const stars = Array.from({ length: 130 }, () => ({
+    x: Math.random(), y: Math.random(), r: Math.random() * 1.6 + 0.4,
+    phase: Math.random() * Math.PI * 2, speed: Math.random() * 0.02 + 0.008
+  }));
+  function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of stars) {
+      s.phase += s.speed;
+      if (starWarp > 1) { s.y = (s.y + 0.006 * starWarp) % 1; }
+      const alpha = 0.25 + 0.6 * (0.5 + 0.5 * Math.sin(s.phase));
+      ctx.fillStyle = `rgba(196, 225, 255, ${alpha})`;
+      ctx.beginPath();
+      if (starWarp > 1.5) ctx.rect(s.x * canvas.width, s.y * canvas.height, s.r, s.r * 9);
+      else ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// ==================== INIT ====================
+renderBoard();
+renderShelf();
+initStars();
+renderStarMap();
+update3DStarMap();
+renderSkyDetail();
+</script>
+</body>
+</html>
