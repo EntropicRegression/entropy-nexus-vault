@@ -344,13 +344,47 @@ describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
     expect(JSON.stringify(snapshot.listCrystals())).not.toMatch(/synthetic|[a-z]:\//i);
   });
 
-  it('經歷計分的輸入:完成/退回取統計(驗收數不用),跨專案以 專案ID 代號去重,舊版退回用名稱', async () => {
+  it('經歷計分的輸入:完成/退回取統計(驗收數不用);有專案表時跨專案只算 git(M5c 審查 B4)', async () => {
     const snapshot = await new VaultReader(consoleStats, now).read();
     const inputs = snapshot.richnessInputs();
-    // Two projects named "app" with different IDs count as two.
-    expect(inputs.get(id(1))).toEqual({ confirmedCases: 0, participatedCases: 0, completedNow: 10, rejectedNow: 1, projects: 2 });
-    expect(inputs.get(id(4))).toMatchObject({ completedNow: 2, rejectedNow: 0, projects: 1 });
-    expect(inputs.get(id(3))).toMatchObject({ completedNow: 0, projects: 1 });
+    // 合成甲: app (git) + 共用庫 (非 git 資料夾) → 1.
+    expect(inputs.get(id(1))).toEqual({ confirmedCases: 0, participatedCases: 0, completedNow: 10, rejectedNow: 1, projects: 1, projectScope: 'git' });
+    expect(inputs.get(id(2))).toMatchObject({ projects: 1, projectScope: 'git' });
+    // Only the shared folder: no project points, and no fallback to case projects.
+    expect(inputs.get(id(3))).toMatchObject({ completedNow: 0, projects: 0 });
+    // Old nodes without 專案ID cannot be checked against the table, so they count none.
+    expect(inputs.get(id(4))).toMatchObject({ completedNow: 2, rejectedNow: 0, projects: 0 });
+  });
+
+  it('沒有專案表的舊統計檔:跨專案照舊以代號去重(同名不同 ID 算兩個),並標示為近似', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'entropy-vault-contract-'));
+    scratchDirs.push(root);
+    await cp(consoleStats, root, { recursive: true });
+    const stats = JSON.parse(await readFile(join(root, statsFilename), 'utf8'));
+    delete stats.專案表;
+    for (const node of Object.values(stats.節點) as Record<string, unknown>[]) delete node.總管;
+    await writeFile(join(root, statsFilename), JSON.stringify(stats));
+    const inputs = (await new VaultReader(root, now).read()).richnessInputs();
+    expect(inputs.get(id(1))).toMatchObject({ projects: 2, projectScope: 'all' });
+    expect(inputs.get(id(4))).toMatchObject({ projects: 1, projectScope: 'all' });
+  });
+
+  it('總管不拿參與判例分;一般參與者照算(M5c 審查 B3)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'entropy-vault-contract-'));
+    scratchDirs.push(root);
+    await cp(consoleStats, root, { recursive: true });
+    await mkdir(join(root, 'cases', '合成'), { recursive: true });
+    for (const n of [1, 2]) {
+      await writeFile(join(root, 'cases', '合成', '2026-000' + n + '-合成.md'), ['---', '種類: case', '案號: 2026-000' + n,
+        '專案: app', '專案ID: d:/synthetic/work/app', '節點ID: ' + id(3), '參與節點ID: [' + id(3) + ', ' + id(1) + ', ' + id(2) + ']',
+        '狀態: 已確認', '---', '摘要: 合成', ''].join('\n'));
+    }
+    const inputs = (await new VaultReader(root, now).read()).richnessInputs();
+    expect(inputs.get(id(1))).toMatchObject({ participatedCases: 0 });
+    expect(inputs.get(id(2))).toMatchObject({ participatedCases: 2 });
+    expect(inputs.get(id(3))).toMatchObject({ confirmedCases: 2, participatedCases: 0 });
+    // The archived 合成丙 had only a non-git folder in the stats; it does not fall back to its case project.
+    expect(inputs.get(id(3))).toMatchObject({ projects: 0 });
   });
 
   it('封存節點沒有統計專案時,跨專案改用其已確認判例的專案;判例數由寶庫自己計', async () => {

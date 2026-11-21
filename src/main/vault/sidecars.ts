@@ -24,13 +24,19 @@ export interface VaultStatsNode {
   sessionId: string | null;
   canWake: boolean;
   cliRecordExists?: boolean;
+  /** 總管 (console 2026-11-22): the current chief; absent in older files. */
+  chief: boolean;
 }
+
+export type ProjectType = 'git' | '資料夾';
 
 export interface VaultStatsSnapshot {
   updatedAt: string;
   portraitsDir: string;
   nodes: ReadonlyMap<string, VaultStatsNode>;
   activity: ActivityLink[];
+  /** 專案表 by opaque project key (console 2026-11-22); null for older files without it. */
+  projectTypes: ReadonlyMap<string, ProjectType> | null;
 }
 
 export interface SidecarSnapshot {
@@ -100,6 +106,7 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
     backend: stringValue(value.session.後台),
     sessionId: stringValue(value.session.sessionId),
     canWake: status === '封存' && value.session.可接回 === true,
+    chief: value.總管 === true,
     ...(typeof value.session.CLI有紀錄 === 'boolean' ? { cliRecordExists: value.session.CLI有紀錄 } : {}),
   };
 }
@@ -129,7 +136,15 @@ function decodeStats(value: unknown): VaultStatsSnapshot | undefined {
     if (id.trim() && node) nodes.set(id, node);
   }
   const activity = decodeActivity(value.協作, value.同席);
-  return { updatedAt: value.更新時間, portraitsDir: value.圖像目錄, nodes, activity };
+  let projectTypes: Map<string, ProjectType> | null = null;
+  if (isRecord(value.專案表)) {
+    projectTypes = new Map();
+    for (const [id, project] of Object.entries(value.專案表)) {
+      if (!id.trim() || !isRecord(project) || (project.類型 !== 'git' && project.類型 !== '資料夾')) continue;
+      projectTypes.set(opaqueKey('p', id), project.類型);
+    }
+  }
+  return { updatedAt: value.更新時間, portraitsDir: value.圖像目錄, nodes, activity, projectTypes };
 }
 
 async function readSidecar<T>(path: string, decode: (value: unknown) => T | undefined, previous: T) {

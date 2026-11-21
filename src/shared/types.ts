@@ -159,7 +159,8 @@ export type VaultWriteFailure = {
 export type VaultWriteResult = ({ ok: true } & FileVersion) | VaultWriteFailure;
 /** setAward: corrupt = .vault-awards.json is damaged and is left untouched; invalid = bad node, version or reason. */
 export type AwardWriteResult =
-  | ({ ok: true; award: GlowAward | null } & FileVersion)
+  /** masked: how many key- or token-like strings in the reason were replaced with [已遮罩] before writing. */
+  | ({ ok: true; award: GlowAward | null; masked: number } & FileVersion)
   | { ok: false; reason: 'conflict' | 'corrupt' | 'invalid' | 'io'; current?: FileVersion | null };
 export interface RecycledVersion extends FileVersion { originalPath: string }
 export type VaultRecycleResult = ({ ok: true; recycledPath: string } & RecycledVersion) | VaultWriteFailure;

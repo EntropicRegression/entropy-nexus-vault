@@ -21,7 +21,7 @@ interface NodeFiles {
 export interface CrystalRecord {
   crystal: NodeCrystal;
   /** Richness inputs known from the vault and the stats; the peaks come from userData (docs/架構.md §9.2). */
-  richness: Omit<RichnessInput, 'completedPeak' | 'rejectedAtPeak'>;
+  richness: Omit<RichnessInput, 'completedPeak' | 'rejectedPeak'>;
   profile: ParsedEntry | undefined;
   stats: CrystalStats | null;
   archives: Array<{ path: string; archivedAt: string }>;
@@ -149,18 +149,24 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
     const confirmed = relatedEntries.filter((entry) => entry.kind === 'case' && entry.status === '已確認');
     const handled = confirmed.filter((entry) => entry.nodeId === nodeId);
     // Projects from the stats (專案ID keys, or names for old data); archived nodes without them fall back to the
-    // projects of their confirmed cases (DESIGN.md §6.9).
-    const statsProjects = new Set((statsNode?.projects ?? []).map(({ key }) => key).filter(Boolean));
-    const projectCount = statsProjects.size ||
-      new Set(confirmed.map((entry) => entry.projectId).filter(Boolean)).size;
+    // projects of their confirmed cases (DESIGN.md §6.9). With a 專案表, only git repos count (M5c review B4): shared
+    // non-git folders cannot be used to collect project points.
+    const types = snapshot?.projectTypes ?? null;
+    const counts = (key: string) => Boolean(key) && (!types || types.get(key) === 'git');
+    const statsProjects = new Set((statsNode?.projects ?? []).map(({ key }) => key).filter(counts));
+    const projectCount = statsProjects.size || (statsNode?.projects.length && types ? 0 :
+      new Set(confirmed.map((entry) => entry.projectId).filter(counts)).size);
     records.set(nodeId, {
       crystal,
       richness: {
         confirmedCases: handled.length,
-        participatedCases: confirmed.length - handled.length,
+        // The console lists the delegator (and, for meeting delegations, everyone in the meeting) as participants, so
+        // the chief would collect participation steadily; the chief gets none (M5c review B3).
+        participatedCases: statsNode?.chief ? 0 : confirmed.length - handled.length,
         completedNow: stats?.completed ?? 0,
         rejectedNow: stats?.rejected ?? 0,
         projects: projectCount,
+        projectScope: types ? 'git' : 'all',
       },
       profile,
       stats,
