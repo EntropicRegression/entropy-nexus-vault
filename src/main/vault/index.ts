@@ -10,6 +10,7 @@ import { memoryPath, sameVaultVersion, scanVault, vaultVersion } from './scan';
 import type { VaultVersion } from './scan';
 import { heatFilename, readSidecars, statsFilename } from './sidecars';
 import type { SidecarSnapshot } from './sidecars';
+import { publicAttributes } from './privacy';
 
 function matches(entry: MemoryEntry, filter: EntryFilter): boolean {
   return (filter?.includeSuperseded === true || !entry.superseded) &&
@@ -93,7 +94,7 @@ export class VaultSnapshot {
       ...parsed.entry,
       mtime: parsed.mtime,
       size: parsed.size,
-      attributes: [...parsed.attributes],
+      attributes: publicAttributes(parsed.attributes),
       body: parsed.body,
       review: parsed.review,
       supersessionChain,

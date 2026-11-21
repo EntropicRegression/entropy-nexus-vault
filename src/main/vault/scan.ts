@@ -72,7 +72,7 @@ async function readMemoryFile(absPath: string, path: string): Promise<{ file: Va
       }
       // 原子改名可能換掉路徑指向的檔案，但舊 handle 上的版本仍然相同。
       if (sameVaultVersion(after, await vaultVersion(absPath))) {
-        return { file: { path, text, mtime: Math.floor(after.mtimeMs), size: after.size }, version: after };
+        return { file: { path, text, mtime: after.mtimeMs, size: after.size }, version: after };
       }
     }
     return null;

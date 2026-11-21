@@ -5,6 +5,24 @@ export interface FrontMatter {
   body: string;
 }
 
+/** YAML comments start after whitespace outside a quoted scalar. */
+export function beforeYamlComment(value: string): string {
+  let quote = '';
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    if (quote) {
+      if (quote === '"' && char === '\\') i++;
+      else if (char === quote && quote === "'" && value[i + 1] === "'") i++;
+      else if (char === quote) quote = '';
+    } else if ((char === '"' || char === "'") && !value.slice(0, i).trim()) {
+      quote = char;
+    } else if (char === '#' && (i === 0 || /\s/.test(value[i - 1]))) {
+      return value.slice(0, i);
+    }
+  }
+  return value;
+}
+
 function unquote(input: string): string {
   const value = input.trim();
   if (value.length < 2) return value;
@@ -58,7 +76,7 @@ export function parseFrontMatter(text: string): FrontMatter {
     const property = /^([^:：]+)[:：]\s*(.*)$/.exec(line);
     const key = property?.[1].trim();
     if (!property || !key) continue;
-    const value = property[2].trim();
+    const value = (key === '狀態' || key === 'status' ? beforeYamlComment(property[2]) : property[2]).trim();
     if (!value) {
       list = [];
       attributes.set(key, list);

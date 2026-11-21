@@ -6,6 +6,8 @@ import { field, parseFrontMatter } from './frontmatter';
 import type { FrontMatter } from './frontmatter';
 import { vaultFolders } from './scan';
 import type { VaultFile } from './scan';
+import { opaqueKey } from './privacy';
+import { hasWritableHeader } from './status-line';
 
 const kinds = new Map<string, MemoryKind>([
   ['node', 'node'], ['節點側寫', 'node'], ['節點', 'node'],
@@ -122,12 +124,15 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
   return {
     entry: {
       path,
+      mtime,
+      size,
+      writable: hasWritableHeader(text),
       title: field(attributes, '標題', '案由', 'title', 'name') || headings.find((heading) => heading.level === 1)?.title || filename,
       summary: /^摘要[:：][ \t]*(.+)$/m.exec(body)?.[1].trim() || (kind === 'case' ? '' : firstBodyParagraph(body)),
       kind,
       shelf: shelfOf({ kind, subtype }),
       scope,
-      projectId: scope === '專案' ? projectId : '',
+      projectId: scope === '專案' ? opaqueKey('p', projectId) : '',
       projectName: scope === '專案' ? projectName : '',
       nodeId,
       nodeLabel,
