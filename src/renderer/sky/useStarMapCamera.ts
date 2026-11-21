@@ -12,6 +12,7 @@ const rotationKeys = new Map([
 
 export function useStarMapCamera(
   stage: RefObject<HTMLDivElement | null>, camera: RefObject<Camera>, demandFrame: () => void, active: boolean,
+  adjusted: RefObject<boolean> = { current: false },
 ) {
   const drag = useRef<Drag | null>(null);
   const suppressClick = useRef(false);
@@ -24,6 +25,7 @@ export function useStarMapCamera(
       event.preventDefault();
       const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element!.clientHeight : 1);
       camera.current = zoomCamera(camera.current, pixels);
+      adjusted.current = true;
       demandFrame();
     }
     element.addEventListener('wheel', onWheel, { passive: false });
@@ -53,6 +55,8 @@ export function useStarMapCamera(
         else if (event.key === '-' || event.key === '−') camera.current = zoomCamera(camera.current, 125);
         else if (event.key === '0') camera.current = { ...initialCamera };
         else return;
+        // "0" returns to the default view, which re-enables auto-fit; any other key is a manual adjustment.
+        adjusted.current = event.key !== '0';
         event.preventDefault();
         demandFrame();
       },
@@ -73,6 +77,7 @@ export function useStarMapCamera(
           event.currentTarget.setPointerCapture?.(event.pointerId);
         }
         camera.current = rotateCamera(camera.current, x - start.x, y - start.y);
+        adjusted.current = true;
         start.x = x;
         start.y = y;
         demandFrame();

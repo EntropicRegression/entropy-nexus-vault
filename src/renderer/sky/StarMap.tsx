@@ -21,10 +21,11 @@ export function StarMap({ active, data, selected, visible, onToggle, onSelect, c
   const canvas = useRef<HTMLCanvasElement>(null);
   const nodes = useRef(new Map<string, HTMLDivElement>());
   const camera = useRef({ ...initialCamera });
+  const adjusted = useRef(false);
   const positions = useMemo(() => new Map(data.crystals.map(({ nodeId, position }) => [nodeId, position])), [data.crystals]);
   const connections = useMemo(() => toLinkSegments(data.links, new Set(positions.keys())), [data.links, positions]);
-  const demandFrame = useStarMapFrame({ active, stage, armillary, canvas, nodes, camera, positions, connections, visible, selected, clock });
-  const interaction = useStarMapCamera(stage, camera, demandFrame, active);
+  const demandFrame = useStarMapFrame({ active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock });
+  const interaction = useStarMapCamera(stage, camera, demandFrame, active, adjusted);
 
   return <div ref={stage} role="region" aria-label="星圖舞台" aria-describedby="sky-map-controls" tabIndex={0} data-star-map=""
     className={styles.gameFrame + ' ' + styles.mapStage} {...interaction.handlers}

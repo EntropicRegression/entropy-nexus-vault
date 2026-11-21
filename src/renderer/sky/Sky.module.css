@@ -102,6 +102,10 @@
 }
 .skyScene .crystalBadge { font-size: 10px; display: inline-block; padding: 1px 6px; border-radius: 4px; margin-top: 2px; }
 .nodeAnchor[data-crowded-label] .crystalBadge { visibility: hidden; }
+/* Many crystals: nameplates show the name only; the badge returns on hover, focus or selection. */
+[data-dense] .nodeAnchor .crystalBadge { display: none; }
+[data-dense] .nodeAnchor:hover .crystalBadge, [data-dense] .nodeAnchor:focus-within .crystalBadge,
+[data-dense] .nodeAnchor:has([aria-pressed='true']) .crystalBadge { display: inline-block; }
 .skyScene .badgeOnline { background: rgba(52, 211, 153, 0.18); color: #6ee7b7; }
 .skyScene .badgeWake { background: rgba(92, 225, 230, 0.22); color: #67e8f9; }
 .skyScene .badgeMemorial { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
@@ -136,6 +140,7 @@
 .crystalLabel strong { display: block; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skyScene .crystalAura { background: var(--glow-1-white); }
 .skyScene .badgeDormant { background: rgba(148, 163, 184, .16); color: #b9cdbf; }
+.skyScene .badgeUnknown { background: rgba(148, 163, 184, .12); color: #a3adbb; border: 1px dashed rgba(148, 163, 184, .4); }
 .skyScene .crystalShape img[data-portrait='constellation'] { width: 64%; height: 82%; object-fit: contain; object-position: center; }
 .skyScene .heroPortrait img[data-portrait='constellation'] { object-fit: contain; padding: 10px; filter: invert(1); }
 .panelHeader { display: flex; align-items: center; color: var(--sky-muted); font-size: 12px; }

@@ -37,3 +37,57 @@ it('同端點三種關係相距 5px，即使方向相反仍分束，標籤也不
     }
   }
 });
+
+it('連線標籤避開水晶銘牌:預設位置被銘牌佔住時改放別處,絕不畫在銘牌框內', () => {
+  vi.stubGlobal('window', { devicePixelRatio: 1 });
+  const edges: LinkSegment[] = [{ kind: 'meeting', from: 'a', to: 'b', label: '會議同席 ×3' }];
+  const points = new Map([
+    ['a', { x: 60, y: 120, scale: 1, depth: 0 }],
+    ['b', { x: 540, y: 120, scale: 1, depth: 0 }],
+  ]);
+  const fillText = vi.fn();
+  const ctx = {
+    setTransform: vi.fn(), clearRect: vi.fn(), setLineDash: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(),
+    lineTo: vi.fn(), stroke: vi.fn(), strokeText: vi.fn(), fillText, measureText: (text: string) => ({ width: text.length * 7 }),
+  };
+  const canvas = { width: 600, height: 300, getContext: () => ctx } as unknown as HTMLCanvasElement;
+  const visible = new Set(['meeting' as const]);
+  const core = { x: 300, y: 260 };
+  drawLinks(canvas, { width: 600, height: 300 }, points, edges, visible, null, core);
+  const [, freeX, freeY] = fillText.mock.calls[0] as [string, number, number];
+  expect([freeX, freeY]).toEqual([300, 113]);
+
+  fillText.mockClear();
+  const plate = { x: 300, y: 112, width: 120, height: 48 };
+  drawLinks(canvas, { width: 600, height: 300 }, points, edges, visible, null, core, [plate]);
+  expect(fillText).toHaveBeenCalledTimes(1);
+  const [text, x, y] = fillText.mock.calls[0] as [string, number, number];
+  const half = text.length * 3.5 + 4;
+  const overlaps = Math.abs(plate.x - x) < plate.width / 2 + half && Math.abs(plate.y - (y - 4)) < plate.height / 2 + 6;
+  expect(overlaps).toBe(false);
+});
+
+it('密集模式:沒有選取時不畫連線標籤,選取後只畫相關連線的標籤', () => {
+  vi.stubGlobal('window', { devicePixelRatio: 1 });
+  const edges: LinkSegment[] = [
+    { kind: 'meeting', from: 'a', to: 'b', label: '會議同席 ×3' },
+    { kind: 'delegate', from: 'b', to: 'c', label: '交辦 ×1' },
+  ];
+  const points = new Map([
+    ['a', { x: 60, y: 60, scale: 1, depth: 0 }],
+    ['b', { x: 300, y: 200, scale: 1, depth: 0 }],
+    ['c', { x: 540, y: 60, scale: 1, depth: 0 }],
+  ]);
+  const fillText = vi.fn();
+  const ctx = {
+    setTransform: vi.fn(), clearRect: vi.fn(), setLineDash: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(),
+    lineTo: vi.fn(), stroke: vi.fn(), strokeText: vi.fn(), fillText, measureText: (text: string) => ({ width: text.length * 7 }),
+  };
+  const canvas = { width: 600, height: 300, getContext: () => ctx } as unknown as HTMLCanvasElement;
+  const visible = new Set(['meeting', 'delegate'] as const);
+  drawLinks(canvas, { width: 600, height: 300 }, points, edges, visible, null, undefined, [], true);
+  expect(fillText).not.toHaveBeenCalled();
+  expect(ctx.stroke).toHaveBeenCalledTimes(2);
+  drawLinks(canvas, { width: 600, height: 300 }, points, edges, visible, 'a', undefined, [], true);
+  expect(fillText.mock.calls.map(([text]) => text)).toEqual(['會議同席 ×3']);
+});

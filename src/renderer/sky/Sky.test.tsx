@@ -19,7 +19,7 @@ const data: CrystalList = {
     { kind: 'lineage', from: 'iris', to: 'quill' },
     { kind: 'delegate', from: 'flint', to: 'dawn', count: 2, lastAt: '2026-11-22' },
     { kind: 'meeting', nodeIds: ['iris', 'quill', 'flint'], count: 3 },
-    { kind: 'project', nodeIds: ['iris', 'quill'], projectName: '合成站' },
+    { kind: 'project', nodeIds: ['iris', 'quill'], projectKey: 'p_fixture', projectName: '合成站' },
   ],
 };
 
@@ -30,7 +30,7 @@ const detail: NodeCrystalDetail = {
     summary: '', writable: false, scope: '專案', status: '已確認', subtype: '', projectName: '合成站', projectId: 'p_fixture',
     nodeId: 'iris', nodeLabel: '稜鏡', participantNodeIds: [], nodeIds: ['iris'], updatedAt: 0, mtime: 0, size: 0,
     heat: { level: 'ember', count: 0, lastRecalledAt: null }, previousCount: 0, superseded: false }],
-  specialty: '核對合成脈衝。', workflow: '比對時間序列。', review: '對齊測試基準。', acceptanceRate: 0.75, consoleAppendixCount: 2,
+  specialty: '核對合成脈衝。', workflow: '比對時間序列。', review: '對齊測試基準。', notRejectedRate: 0.75, consoleAppendixCount: 2,
   confirmedCaseCount: 1,
   stats: { tasks: 10, completed: 8, completionRate: 0.8, accepted: 6, rejected: 2, cases: 99 },
 };
@@ -90,7 +90,7 @@ describe('星象召喚盤', () => {
       return (this.hasAttribute('data-star-field') ? stars.ctx : links.ctx) as unknown as CanvasRenderingContext2D;
     });
     readCrystal = vi.fn(async (id: string) => id === 'iris' ? detail : { ...detail, ...data.crystals.find((node) => node.nodeId === id),
-      stats: null, specialty: '', workflow: '', review: '', acceptanceRate: null, consoleAppendixCount: 0, archives: [],
+      stats: null, specialty: '', workflow: '', review: '', notRejectedRate: null, consoleAppendixCount: 0, archives: [],
       relatedEntries: [], confirmedCaseCount: 0 });
     vi.stubGlobal('vault', { listCrystals: async () => data, readCrystal });
   });
@@ -156,7 +156,7 @@ describe('星象召喚盤', () => {
     await act(async () => crystal('iris').click());
     expect(readCrystal).toHaveBeenCalledWith('iris');
     expect(panel().querySelector('[aria-label="任務完成率"]')?.getAttribute('aria-valuenow')).toBe('80');
-    expect(panel().querySelector('[aria-label="一次驗收率"]')?.getAttribute('aria-valuenow')).toBe('75');
+    expect(panel().querySelector('[aria-label="未退回率"]')?.getAttribute('aria-valuenow')).toBe('75');
     expect(panel().textContent).toContain('核對合成脈衝。');
     expect(panel().textContent).toContain('比對時間序列。');
     expect(panel().textContent).toContain('對齊測試基準。');
@@ -275,6 +275,32 @@ describe('星象召喚盤', () => {
     expect(manual.count()).toBe(1);
   });
 
+  it('預設視角依水晶分布自動拉遠;使用者縮放後不再被自動覆蓋,按 0 恢復自動適配', async () => {
+    const spread = Array.from({ length: 30 }, (_, i) => ({
+      nodeId: 'n' + i, name: '合成' + i, role: null, status: '線上' as const, canWake: false, projectNames: [],
+      position: [320 * Math.cos(i * 2.4), 150 * Math.sin(i * 1.3), 320 * Math.sin(i * 2.4)] as [number, number, number],
+    }));
+    vi.stubGlobal('vault', { listCrystals: async () => ({ crystals: spread, links: [] }), readCrystal });
+    vi.mocked(Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')!.get!).mockReturnValue(620);
+    vi.mocked(Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')!.get!).mockReturnValue(480);
+    await render(true, true);
+    act(() => manual.tick(100));
+    const stage = host.querySelector<HTMLElement>('[data-star-map]')!;
+    const armillary = host.querySelector<HTMLElement>('[data-armillary]')!;
+    const zoomOf = () => Number(/scale\(([\d.]+)\)/.exec(armillary.style.transform)![1]);
+    const auto = zoomOf();
+    expect(auto).toBeLessThan(1);
+    expect(stage.hasAttribute('data-dense')).toBe(true);
+    act(() => { stage.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -300 })); manual.tick(120); });
+    const manualZoom = zoomOf();
+    expect(manualZoom).toBeGreaterThan(auto);
+    act(() => { window.dispatchEvent(new Event('resize')); manual.tick(140); });
+    expect(zoomOf()).toBe(manualZoom);
+    stage.focus();
+    act(() => { stage.dispatchEvent(new KeyboardEvent('keydown', { key: '0', bubbles: true, cancelable: true })); manual.tick(160); });
+    expect(zoomOf()).toBeCloseTo(auto, 6);
+  });
+
   it('舞台使用方向鍵、加減與 0 操作視角，卸載後不再攔截滾輪', async () => {
     await render(true, true);
     const stage = host.querySelector<HTMLElement>('[data-star-map]')!;
@@ -331,7 +357,7 @@ describe('星象召喚盤', () => {
   it('立繪失敗後更換節點，履歷欄會重新嘗試載入新立繪', async () => {
     const nextPortrait = 'vault-image://node/quill/portrait';
     readCrystal.mockImplementation(async (id: string) => id === 'iris' ? detail : {
-      ...detail, ...data.crystals[1], portraitUrl: nextPortrait, acceptanceRate: null,
+      ...detail, ...data.crystals[1], portraitUrl: nextPortrait, notRejectedRate: null,
     });
     await render(true, true);
     await act(async () => crystal('iris').click());
@@ -340,7 +366,7 @@ describe('星象召喚盤', () => {
     expect(portrait().dataset.portrait).toBe('constellation');
     await act(async () => crystal('quill').click());
     expect(portrait().src).toBe(nextPortrait);
-    expect(panel().textContent).toContain('一次驗收率—');
+    expect(panel().textContent).toContain('未退回率—');
     await act(async () => crystal('iris').click());
     expect(portrait().src).toBe('vault-image://node/iris/portrait');
   });

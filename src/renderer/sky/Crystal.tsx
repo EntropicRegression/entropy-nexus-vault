@@ -15,6 +15,7 @@ export function CrystalPortrait({ src }: { src?: string | null }) {
 export function crystalBadge(node: Pick<NodeCrystal, 'status' | 'canWake'>) {
   if (node.status === '線上') return { text: '● 現役', style: styles.badgeOnline };
   if (node.status === '休眠') return { text: '● 休眠', style: styles.badgeDormant };
+  if (node.status === '未知') return { text: '◌ 狀態未知', style: styles.badgeUnknown };
   return node.canWake ? { text: '✦ 封存 · 可喚醒', style: styles.badgeWake } :
     { text: '◇ 封存 · 純紀念', style: styles.badgeMemorial };
 }

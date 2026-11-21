@@ -3,6 +3,7 @@ import type { Projection, Viewport } from '../../shared/projection';
 import { canvasSurface } from './canvas';
 import { linkStyles } from './link-styles';
 import type { LinkKind, LinkSegment } from './link-styles';
+import type { Box } from './screen-layout';
 import styles from './Sky.module.css';
 
 export function LinkCanvas({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }) {
@@ -49,6 +50,9 @@ export function drawLinks(
   canvas: HTMLCanvasElement, viewport: Viewport, locations: ReadonlyMap<string, Projection>,
   links: readonly LinkSegment[], visible: ReadonlySet<LinkKind>, selected: string | null,
   core: ScreenPoint = { x: viewport.width / 2, y: viewport.height * 0.52 },
+  nameplates: readonly Box[] = [],
+  /** Dense maps: draw only the labels of links touching the selected crystal (none without a selection). */
+  labelsForSelectionOnly = false,
 ) {
   const ctx = canvasSurface(canvas, viewport);
   if (!ctx) return;
@@ -74,7 +78,8 @@ export function drawLinks(
   ctx.lineJoin = 'round';
   ctx.strokeStyle = '#080e22';
   const placed: LabelBounds[] = [];
-  for (const { kind, label, start, end, labelAt } of segments.sort((a, b) => Number(b.highlighted) - Number(a.highlighted))) {
+  for (const { kind, label, start, end, labelAt, highlighted } of segments.sort((a, b) => Number(b.highlighted) - Number(a.highlighted))) {
+    if (labelsForSelectionOnly && !highlighted) continue;
     const half = ctx.measureText(label).width / 2 + 4;
     const dx = end.x - start.x, dy = end.y - start.y;
     for (const t of [labelAt, 0.2, 0.8, 0.35, 0.65]) {
@@ -84,7 +89,10 @@ export function drawLinks(
       const offset = labelOffsets.find((offset) => {
         const y = baseline + offset;
         return y >= 12 && y < viewport.height && (Math.abs(x - core.x) > 34 + half || Math.abs(y - core.y) > 34) &&
-          !placed.some((other) => Math.abs(other.y - y) < 14 && Math.abs(other.x - x) < other.half + half);
+          !placed.some((other) => Math.abs(other.y - y) < 14 && Math.abs(other.x - x) < other.half + half) &&
+          // Keep link labels off crystal nameplates (text box is ~12px tall, baseline at y).
+          !nameplates.some((plate) => Math.abs(plate.x - x) < plate.width / 2 + half + 2 &&
+            Math.abs(plate.y - (y - 4)) < plate.height / 2 + 9);
       });
       if (offset === undefined) continue;
       const y = baseline + offset;

@@ -7,7 +7,7 @@ import { createAnimator } from './frame-clock';
 import type { FrameClock } from './frame-clock';
 import { drawLinks } from './LinkCanvas';
 import type { LinkKind, LinkSegment } from './link-styles';
-import { fitViewport, placeLabels } from './screen-layout';
+import { autoZoom, boundingRadius, densityScale, fitViewport, placeLabels, sphereExtent } from './screen-layout';
 
 interface Options {
   active: boolean;
@@ -16,6 +16,8 @@ interface Options {
   canvas: RefObject<HTMLCanvasElement | null>;
   nodes: RefObject<Map<string, HTMLDivElement>>;
   camera: RefObject<Camera>;
+  /** True once the user has rotated or zoomed; auto-fit then stops overriding the camera until a reset. */
+  adjusted: RefObject<boolean>;
   positions: ReadonlyMap<string, Point3>;
   connections: LinkSegment[];
   visible: ReadonlySet<LinkKind>;
@@ -39,7 +41,10 @@ export function measure(element: HTMLElement, anchors: ReadonlyMap<string, HTMLE
 }
 
 export function useStarMapFrame(options: Options): () => void {
-  const { active, stage, armillary, canvas, nodes, camera, positions, connections, visible, selected, clock } = options;
+  const { active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock } = options;
+  const radius = useMemo(() => boundingRadius(positions.values()), [positions]);
+  const points = useMemo(() => [...positions.values()], [positions]);
+  const density = densityScale(positions.size);
   const draw = useRef(() => {});
   const animator = useMemo(() => createAnimator(clock, () => draw.current()), [clock]);
   // Layout reads (sizes, label widths) are cached and refreshed only when data, selection or size change,
@@ -56,29 +61,33 @@ export function useStarMapFrame(options: Options): () => void {
         measured.current = null;
         return;
       }
+      // Default view: fit the bounding sphere into the stage (zoom out only) until the user takes over.
+      if (!adjusted.current) camera.current = { ...camera.current, zoom: autoZoom(points, viewport, density) };
       const view = camera.current;
       const projected = new Map<string, Projection>();
       for (const [id, point] of positions) projected.set(id, project(point, view, viewport));
-      const layout = fitViewport(projected, viewport, selected !== null || panelWidth > 0);
+      const layout = fitViewport(projected, viewport, selected !== null || panelWidth > 0, sphereExtent(radius, view.zoom, density));
       if (armillary.current) {
         armillary.current.style.transform = 'translate(' + layout.dx + 'px, ' + layout.dy + 'px) scale(' +
           (view.zoom * layout.factor) + ') rotateX(' + (-view.pitch * 57.3) +
           'deg) rotateY(' + (view.yaw * 57.3) + 'deg)';
       }
-      for (const { id, zIndex, badgeHidden, labelOffset } of placeLabels(layout.positions, viewport.width, layout.factor, selected, labels)) {
+      const nameplates = placeLabels(layout.positions, viewport.width, layout.factor, selected, labels, density);
+      element.toggleAttribute('data-dense', density < 1);
+      for (const { id, zIndex, badgeHidden, labelOffset } of nameplates) {
         const anchor = nodes.current.get(id);
         if (!anchor) continue;
         const { left, top, scale, opacity } = crystalStyle(layout.positions.get(id)!);
         anchor.style.left = left + 'px';
         anchor.style.top = top + 'px';
-        anchor.style.transform = 'translate(-50%, -50%) scale(' + (scale * layout.factor) + ')';
+        anchor.style.transform = 'translate(-50%, -50%) scale(' + (scale * layout.factor * density) + ')';
         anchor.style.zIndex = String(zIndex);
         anchor.style.opacity = String(opacity);
         anchor.style.visibility = 'visible';
         anchor.style.setProperty('--label-offset', labelOffset + 'px');
         anchor.toggleAttribute('data-crowded-label', badgeHidden);
       }
-      drawLinks(canvas.current, viewport, layout.positions, connections, visible, selected, layout.center);
+      drawLinks(canvas.current, viewport, layout.positions, connections, visible, selected, layout.center, nameplates.map(({ box }) => box), density < 1);
     };
     measured.current = null;
     if (active) animator.request();

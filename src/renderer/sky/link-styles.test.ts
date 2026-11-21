@@ -9,7 +9,8 @@ describe('星圖關係的線段轉換', () => {
       { kind: 'delegate', from: 'a', to: 'a', count: 7, lastAt: '2026-11-22' },
       { kind: 'meeting', nodeIds: ['c', 'b', 'a', 'c', 'missing'], count: 3 },
       { kind: 'meeting', nodeIds: ['b', 'c'], count: 2 },
-      { kind: 'project', nodeIds: ['c', 'a'], projectName: '合成觀測站' },
+      { kind: 'project', nodeIds: ['c', 'a'], projectKey: 'p_one', projectName: '合成觀測站' },
+      { kind: 'project', nodeIds: ['a', 'c'], projectKey: 'p_two', projectName: '合成觀測站' },
     ], new Set(['a', 'b', 'c']));
     expect(segments).toEqual([
       { kind: 'lineage', from: 'b', to: 'a', label: '接回自' },
@@ -17,6 +18,8 @@ describe('星圖關係的線段轉換', () => {
       { kind: 'meeting', from: 'a', to: 'b', label: '會議同席 ×3' },
       { kind: 'meeting', from: 'a', to: 'c', label: '會議同席 ×3' },
       { kind: 'meeting', from: 'b', to: 'c', label: '會議同席 ×5' },
+      { kind: 'project', from: 'a', to: 'c', label: '合成觀測站' },
+      // A different project with the same name stays a separate link.
       { kind: 'project', from: 'a', to: 'c', label: '合成觀測站' },
     ]);
     expect(Object.values(linkStyles).map(({ dash }) => dash)).toEqual([[], [7, 5], [3, 5], [10, 8]]);

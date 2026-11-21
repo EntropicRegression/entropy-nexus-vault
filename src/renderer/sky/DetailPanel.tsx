@@ -2,12 +2,15 @@ import type { MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/t
 import { CrystalPortrait, crystalBadge } from './Crystal';
 import styles from './Sky.module.css';
 
-function Rate({ label, rate, amber }: { label: string; rate: number | null; amber?: boolean }) {
-  if (rate === null) return <div className={styles.barRow}>
+const notRejectedHint = '正常完成的任務預設通過,使用者按退回才算未通過;數值為 1 − 退回 ÷ 完成。';
+
+function Rate({ label, rate, amber, hint }: { label: string; rate: number | null; amber?: boolean; hint?: string }) {
+  if (rate === null) return <div className={styles.barRow} title={hint}>
     <span>{label}</span><span className={styles.barTrack} aria-hidden="true" /><span title="無資料">—</span>
   </div>;
   const value = Math.round(rate * 100);
-  return <div className={styles.barRow} role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value}>
+  return <div className={styles.barRow} role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value}
+    title={hint} aria-description={hint}>
     <span>{label}</span>
     <span className={styles.barTrack}><span className={styles.barFill} data-amber={Boolean(amber)} style={{ width: value + '%' }} /></span>
     <strong data-amber={Boolean(amber)}>{value}%</strong>
@@ -44,7 +47,7 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
       {detail && <>
         {detail.stats ? <div className={styles.statsBars}>
           <Rate label="任務完成率" rate={detail.stats.completionRate} />
-          <Rate label="一次驗收率" rate={detail.acceptanceRate} amber />
+          <Rate label="未退回率" rate={detail.notRejectedRate} amber hint={notRejectedHint} />
         </div> : <p className={styles.statsTotal}>統計：無資料</p>}
         <p className={styles.statsTotal}>
           {detail.stats?.completed != null && <>累計完成任務 <strong>{detail.stats.completed}</strong>｜</>}
