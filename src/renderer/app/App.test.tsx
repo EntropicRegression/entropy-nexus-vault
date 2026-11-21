@@ -5,8 +5,10 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VaultApi } from '../../shared/ipc';
-import type { CrystalList, MemoryEntry, MemoryEntryDetail, VaultInfo, ViewSettings } from '../../shared/types';
+import type { CrystalList, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit, VaultInfo, ViewSettings } from '../../shared/types';
+import { manualClock } from '../test-support/manual-clock';
 import { App } from './App';
+import { floorTiming } from './floor-camera';
 
 const vaultInfo: VaultInfo = { key: 'fixture-vault', path: 'fixtures/memory-vault', exists: true, wakeAvailable: false };
 const baseEntry: MemoryEntry = {
@@ -37,8 +39,13 @@ function detail(entry: MemoryEntry): MemoryEntryDetail {
   };
 }
 
-function bridge(overrides: Partial<VaultApi> = {}): VaultApi {
-  let settings: ViewSettings = { deskMode: 'A', reducedMotion: false };
+const crystalDetail: NodeCrystalDetail = {
+  ...crystal, profile: null, stats: null, archives: [], relatedEntries: [baseEntry], confirmedCaseCount: 0,
+  specialty: '', workflow: '', review: '', notRejectedRate: null, consoleAppendixCount: 0,
+};
+
+function bridge(overrides: Partial<VaultApi> = {}, initial: Partial<ViewSettings> = {}): VaultApi {
+  let settings: ViewSettings = { deskMode: 'A', reducedMotion: false, ...initial };
   return {
     getVaultInfo: vi.fn(async () => vaultInfo),
     chooseVault: vi.fn(async () => null),
@@ -50,6 +57,8 @@ function bridge(overrides: Partial<VaultApi> = {}): VaultApi {
       const entry = entries.find((item) => item.path === path);
       return entry ? detail(entry) : null;
     }),
+    searchNodes: vi.fn(async (term) => term && crystal.name.includes(term)
+      ? [{ nodeId: crystal.nodeId, name: crystal.name, role: null, status: crystal.status, matchedIn: '名稱' as const }] : []),
     listCrystals: vi.fn(async () => ({ crystals: [crystal], links: [] })),
     readCrystal: vi.fn(async () => null),
     setStatus: vi.fn<VaultApi['setStatus']>(async () => ({ ok: false, reason: 'io' })),
@@ -66,8 +75,10 @@ function bridge(overrides: Partial<VaultApi> = {}): VaultApi {
 describe('典藏室', () => {
   let container: HTMLDivElement;
   let root: Root;
+  let manual: ReturnType<typeof manualClock>;
 
   beforeEach(() => {
+    manual = manualClock();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     container = document.createElement('div');
     document.body.append(container);
@@ -78,11 +89,12 @@ describe('典藏室', () => {
     act(() => root.unmount());
     container.remove();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   async function renderApp(vault = bridge()) {
     vi.stubGlobal('vault', vault);
-    await act(async () => { root.render(<App />); });
+    await act(async () => { root.render(<App clock={manual.clock} />); });
     return vault;
   }
 
@@ -108,23 +120,210 @@ describe('典藏室', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  it('可用兩層頂列往返；頭像章仍可見，跳轉留待 M5b', async () => {
-    const vault = await renderApp();
-    const library = button('樓下｜典藏室');
-    const sky = button('樓上｜星象召喚盤');
+  const world = () => container.querySelector<HTMLElement>('[data-floor-world]')!;
+  const shell = () => container.firstElementChild as HTMLElement;
+  const layer = (name: '樓上星象召喚盤' | '樓下典藏室') => container.querySelector<HTMLElement>('section[aria-label="' + name + '"]')!;
+  const announcement = () => container.querySelector('[data-floor-announcement]')!.textContent;
+  const sealOf = (entry: MemoryEntry) => card(entry).querySelector<HTMLElement>('[aria-label="承辦：霧苔"]')!;
+
+  /** Advances the camera to progress t of a transition that started at `start`. */
+  async function frame(start: number, t: number) {
+    await act(async () => manual.tick(start + t * floorTiming.duration));
+  }
+
+  async function travel() {
+    const start = manual.now();
+    await frame(start, 0);
+    await frame(start, 1);
+  }
+
+  it('上下樓:鏡頭平移、Y 軸模糊、45% 換頂列、結束移除濾鏡並移焦點與播報', async () => {
+    await renderApp();
     expect(container.querySelector('h1')?.textContent).toBe('記憶寶庫');
-    expect(library.getAttribute('aria-pressed')).toBe('true');
-    const seal = card(baseEntry).querySelector<HTMLElement>('[aria-label="承辦：霧苔"]')!;
-    expect(seal.textContent).toBe('霧');
-    expect(seal.tabIndex).toBe(-1);
-    act(() => seal.click());
-    expect(container.querySelector('[data-sky]')?.hasAttribute('hidden')).toBe(true);
-    await act(async () => sky.click());
-    expect(container.querySelector('[data-sky]')?.hasAttribute('hidden')).toBe(false);
-    expect(container.querySelector('[data-crystal="node-test"]')?.textContent).toContain('霧苔');
-    expect(vault.readEntry).not.toHaveBeenCalled();
-    act(() => button('俯瞰圖書館').click());
-    expect(button('樓下｜典藏室').getAttribute('aria-pressed')).toBe('true');
+    expect(shell().dataset.topbar).toBe('library');
+    expect(world().style.transform).toBe('translateY(-50%)');
+    expect(layer('樓上星象召喚盤').dataset.shown).toBe('false');
+    await act(async () => button('樓上｜星象召喚盤').click());
+    expect(announcement()).toBe('前往樓上星象台');
+    expect(button('樓上｜星象召喚盤').getAttribute('aria-pressed')).toBe('true');
+    expect(shell().dataset.moving).toBe('true');
+    expect(layer('樓上星象召喚盤').dataset.shown).toBe('true');
+    expect(layer('樓下典藏室').dataset.shown).toBe('true');
+    expect(layer('樓下典藏室').hasAttribute('inert')).toBe(true);
+    const start = manual.now();
+    await frame(start, 0);
+    await frame(start, 0.25);
+    expect(world().style.transform).toMatch(/^translateY\(-46\.875%\) rotateX\(1\.697deg\)$/);
+    expect(world().style.filter).toContain('#verticalMotionBlur');
+    expect(container.querySelector('feGaussianBlur')!.getAttribute('stdDeviation')).toBe('0 9.90');
+    expect(shell().dataset.topbar).toBe('library');
+    await frame(start, 0.45);
+    expect(shell().dataset.topbar).toBe('sky');
+    expect(container.querySelector('[data-library-bar]')!.hasAttribute('inert')).toBe(true);
+    expect(container.querySelector('[data-sky-hud]')!.hasAttribute('inert')).toBe(false);
+    await frame(start, 0.5);
+    expect(container.querySelector('feGaussianBlur')!.getAttribute('stdDeviation')).toBe('0 14.00');
+    await frame(start, 0.75);
+    expect(world().style.transform).toContain('rotateX');
+    await frame(start, 1);
+    expect(world().style.transform).toBe('translateY(0%)');
+    expect(world().style.filter).toBe('');
+    expect(shell().dataset.moving).toBe('false');
+    expect(layer('樓下典藏室').dataset.shown).toBe('false');
+    expect(document.activeElement?.matches('button[data-kind]')).toBe(true);
+    expect(manual.count()).toBe(0);
+
+    await act(async () => button('俯瞰圖書館').click());
+    expect(announcement()).toBe('回到樓下典藏室');
+    await travel();
+    expect(world().style.transform).toBe('translateY(-50%)');
+    expect(shell().dataset.topbar).toBe('library');
+    expect(document.activeElement?.closest('[aria-labelledby="draft-board"]')).not.toBeNull();
+    expect(document.activeElement?.tagName).toBe('BUTTON');
+  });
+
+  it('連點:動畫中再按直接到終態,沒有半途的濾鏡、傾斜或頂列', async () => {
+    await renderApp();
+    await act(async () => button('樓上｜星象召喚盤').click());
+    const start = manual.now();
+    await frame(start, 0);
+    await frame(start, 0.3);
+    expect(world().style.filter).not.toBe('');
+    await act(async () => button('樓下｜典藏室').click());
+    expect(world().style.transform).toBe('translateY(-50%)');
+    expect(world().style.filter).toBe('');
+    expect(shell().dataset.topbar).toBe('library');
+    expect(shell().dataset.moving).toBe('false');
+    expect(layer('樓上星象召喚盤').dataset.shown).toBe('false');
+    expect(manual.count()).toBe(0);
+    for (let index = 0; index < 5; index++) await act(async () => button('樓上｜星象召喚盤').click());
+    expect(world().style.transform).toBe('translateY(0%)');
+    expect(world().style.filter).toBe('');
+    expect(shell().dataset.topbar).toBe('sky');
+    expect(manual.count()).toBe(0);
+  });
+
+  it('切換前先關閉閱讀桌;回到樓下時搜尋字仍在', async () => {
+    vi.useFakeTimers();
+    await renderApp();
+    act(() => typeSearch('採樣'));
+    await act(async () => vi.advanceTimersByTimeAsync(120));
+    await act(async () => button('整理採樣記錄', card(baseEntry)).click());
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    await act(async () => button('樓上｜星象召喚盤').click());
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await travel();
+    await act(async () => button('俯瞰圖書館').click());
+    await travel();
+    expect(container.querySelector<HTMLInputElement>('input[type=search]')!.value).toBe('採樣');
+    expect(container.querySelectorAll('[data-entry]')).toHaveLength(1);
+  });
+
+  it('低動態:不平移不模糊不排程,改為 120ms 淡入', async () => {
+    await renderApp(bridge({}, { reducedMotion: true }));
+    await act(async () => button('樓上｜星象召喚盤').click());
+    expect(manual.count()).toBe(0);
+    expect(world().style.transform).toBe('translateY(0%)');
+    expect(world().style.filter).toBe('');
+    expect(shell().dataset.quietFade).toBe('a');
+    expect(shell().dataset.topbar).toBe('sky');
+    expect(announcement()).toBe('前往樓上星象台');
+    expect(document.activeElement?.matches('button[data-kind]')).toBe(true);
+    await act(async () => button('俯瞰圖書館').click());
+    expect(shell().dataset.quietFade).toBe('b');
+    expect(world().style.transform).toBe('translateY(-50%)');
+  });
+
+  it('系統減少動態也走淡換', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduce'), addEventListener() {}, removeEventListener() {} }));
+    await renderApp();
+    await act(async () => button('樓上｜星象召喚盤').click());
+    expect(manual.count()).toBe(0);
+    expect(world().style.filter).toBe('');
+    expect(shell().dataset.quietFade).toBe('a');
+  });
+
+  it('跳轉一:點頭像章,動畫結束後才選中水晶並開履歷', async () => {
+    const vault = await renderApp(bridge({ readCrystal: vi.fn(async () => crystalDetail) }));
+    expect(sealOf(baseEntry).textContent).toBe('霧');
+    expect(sealOf(baseEntry).tabIndex).toBe(-1);
+    await act(async () => sealOf(baseEntry).click());
+    const start = manual.now();
+    await frame(start, 0);
+    await frame(start, 0.75);
+    expect(vault.readCrystal).not.toHaveBeenCalled();
+    await frame(start, 1);
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(vault.readCrystal).toHaveBeenCalledWith('node-test');
+    expect(container.querySelector('[aria-label="節點履歷"]')?.getAttribute('aria-hidden')).toBe('false');
+  });
+
+  it('跳轉一(鍵盤):閱讀紙的節點名稱連結也上樓選中', async () => {
+    const vault = await renderApp(bridge({ readCrystal: vi.fn(async () => crystalDetail) }));
+    await act(async () => button('整理採樣記錄', card(baseEntry)).click());
+    const desk = container.querySelector<HTMLElement>('[role="dialog"]')!;
+    await act(async () => button('霧苔', desk).click());
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await travel();
+    expect(vault.readCrystal).toHaveBeenCalledWith('node-test');
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('跳轉二:搜尋出「相符的節點」小籤,最多 6 枚加 +N,點擊上樓選中;無相符時不顯示', async () => {
+    vi.useFakeTimers();
+    const many: NodeHit[] = Array.from({ length: 8 }, (_, index) => ({
+      nodeId: index ? 'n' + index : 'node-test', name: index ? '霧' + index : '霧苔', role: null, status: '休眠', matchedIn: '名稱' }));
+    const vault = await renderApp(bridge({ searchNodes: vi.fn(async (term: string) => term === '霧' ? many : []),
+      readCrystal: vi.fn(async () => crystalDetail) }));
+    expect(container.querySelector('[aria-label="相符的節點"]')).toBeNull();
+    act(() => typeSearch('霧'));
+    await act(async () => vi.advanceTimersByTimeAsync(120));
+    expect(vault.searchNodes).toHaveBeenCalledWith('霧');
+    const row = container.querySelector<HTMLElement>('[aria-label="相符的節點"]')!;
+    expect(row.textContent).toContain('相符的節點（8）');
+    expect(row.querySelectorAll('[data-node-hit]')).toHaveLength(6);
+    expect(row.querySelector('[data-node-hit]')!.textContent).toBe('霧霧苔休眠');
+    act(() => button('+2', row).click());
+    expect(row.querySelectorAll('[data-node-hit]')).toHaveLength(8);
+    await act(async () => row.querySelector<HTMLButtonElement>('[data-node-hit="node-test"]')!.click());
+    await travel();
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => button('俯瞰圖書館').click());
+    await travel();
+    act(() => typeSearch('沒有'));
+    await act(async () => vi.advanceTimersByTimeAsync(120));
+    expect(container.querySelector('[aria-label="相符的節點"]')).toBeNull();
+  });
+
+  it('跳轉三:履歷欄的關聯卷宗「前往圖書館 →」回到樓下並開啟該卷', async () => {
+    const vault = await renderApp(bridge({ readCrystal: vi.fn(async () => crystalDetail) }));
+    await act(async () => sealOf(baseEntry).click());
+    await travel();
+    const related = container.querySelector<HTMLButtonElement>('[data-related-entry]')!;
+    expect(related.textContent).toBe('2026-0001 · 整理採樣記錄前往圖書館 →');
+    await act(async () => related.click());
+    expect(announcement()).toBe('回到樓下典藏室');
+    const start = manual.now();
+    await frame(start, 0);
+    await frame(start, 0.75);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await frame(start, 1);
+    expect(vault.readEntry).toHaveBeenCalledWith(baseEntry.path);
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('整理採樣記錄');
+  });
+
+  it('跳轉四:樓上底部天窗回到樓下;選取請求只消耗一次', async () => {
+    await renderApp(bridge({ readCrystal: vi.fn(async () => crystalDetail) }));
+    await act(async () => sealOf(baseEntry).click());
+    await travel();
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="收起節點履歷"]')!.click());
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => button('向下俯視，回到大圖書館判例卷宗室').click());
+    await travel();
+    expect(world().style.transform).toBe('translateY(-50%)');
+    await act(async () => button('樓上｜星象召喚盤').click());
+    await travel();
+    expect(container.querySelector('[data-crystal="node-test"]')?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('記憶庫不存在時可選擇其他資料夾；空藏書架有說明', async () => {

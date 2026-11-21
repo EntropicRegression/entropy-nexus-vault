@@ -65,7 +65,8 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
         <ul>{detail!.relatedEntries.map((entry) => {
           const label = [entry.caseId, entry.title].filter(Boolean).join(' · ');
           return <li key={entry.path}>{onOpenEntry
-            ? <button type="button" className={styles.linkCard} onClick={() => onOpenEntry(entry)}>{label}</button>
+            ? <button type="button" className={styles.linkCard} data-related-entry="" onClick={() => onOpenEntry(entry)}>
+              <span>{label}</span><span className={styles.toLibrary}>前往圖書館 →</span></button>
             : <span className={styles.linkCard}>{label}</span>}
           </li>;
         })}</ul>

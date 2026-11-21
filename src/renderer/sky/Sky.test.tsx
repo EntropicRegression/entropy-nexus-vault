@@ -74,7 +74,6 @@ describe('星象召喚盤', () => {
   let links: ReturnType<typeof canvasStub>;
   let readCrystal: ReturnType<typeof vi.fn>;
   const back = () => {};
-  const motion = () => {};
 
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -102,7 +101,7 @@ describe('星象召喚盤', () => {
 
   async function render(active = true, reduced = false, selectionRequest?: { nodeId: string; requestId: number }, refreshToken = 0) {
     await act(async () => root.render(<Sky active={active} reducedMotion={reduced} vaultExists refreshToken={refreshToken} selectionRequest={selectionRequest}
-      clock={manual.clock} onReturn={back} onToggleMotion={motion} />));
+      clock={manual.clock} onReturn={back} />));
   }
 
   const crystal = (id: string) => host.querySelector<HTMLButtonElement>('[data-crystal="' + id + '"]')!;

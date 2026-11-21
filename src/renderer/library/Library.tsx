@@ -2,10 +2,11 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { KeyboardEvent } from 'react';
 import { shelves } from '../../shared/shelves';
 import type { Shelf } from '../../shared/shelves';
-import type { DeskMode, FileVersion, MemoryEntry, MemoryEntryDetail, NodeCrystal } from '../../shared/types';
+import type { DeskMode, FileVersion, MemoryEntry, MemoryEntryDetail, NodeCrystal, NodeHit } from '../../shared/types';
 import { primaryStatus } from '../../shared/vault-actions';
 import { dateLabel, deskNoteLabel, entryIdentifier, isOpenBookmark, isPending, projectDisplayName, shelfNames, tabNames, tabs } from './catalog';
 import type { CatalogTab } from './catalog';
+import { NodeMatches } from './NodeMatches';
 import { AvatarSeals, HeatSlot, PreviousVersion, StatusMark } from './Paper';
 import { ReadingDesk } from './ReadingDesk';
 import { useDelayed } from './use-delayed';
@@ -174,17 +175,22 @@ interface Props {
   query: string;
   deskMode: DeskMode;
   onToggleMode: () => void;
-  onNode?: (node: NodeCrystal) => void;
+  /** Goes upstairs to this node (avatar seals, reading-desk name links, matched-node chips). */
+  onNode?: (nodeId: string) => void;
+  /** Issued after arriving downstairs; each requestId opens its entry at most once. */
+  openRequest?: { path: string; requestId: number };
   active: boolean;
   refreshToken: number;
 }
 
-export function Library({ query, deskMode, onToggleMode, onNode, active, refreshToken }: Props) {
+export function Library({ query, deskMode, onToggleMode, onNode, openRequest, active, refreshToken }: Props) {
   const [allEntries, setAllEntries] = useState<MemoryEntry[] | null>(null);
   const [nodes, setNodes] = useState<ReadonlyMap<string, NodeCrystal>>(new Map());
   const [loadError, setLoadError] = useState(false);
   const [reload, setReload] = useState(0);
   const [search, setSearch] = useState<{ query: string; entries: MemoryEntry[] | null }>();
+  const [nodeHits, setNodeHits] = useState<{ query: string; hits: NodeHit[] }>();
+  const consumedOpen = useRef(new Set<number>());
   const [tab, setTab] = useState<CatalogTab>('all');
   const [project, setProject] = useState('');
   const [limits, setLimits] = useState<Partial<Record<Shelf, number>>>({});
@@ -273,6 +279,8 @@ export function Library({ query, deskMode, onToggleMode, onNode, active, refresh
         if (current) setSearch({ query: trimmed, entries });
       };
       void window.vault.search(trimmed, entryFilter).then(receive, () => receive(null));
+      const receiveNodes = (hits: NodeHit[]) => { if (current) setNodeHits({ query: trimmed, hits }); };
+      void window.vault.searchNodes(trimmed).then(receiveNodes, () => receiveNodes([]));
     }, 120);
     return () => { current = false; window.clearTimeout(timer); };
   }, [trimmed, revision]);
@@ -316,6 +324,23 @@ export function Library({ query, deskMode, onToggleMode, onNode, active, refresh
     setSelected(path);
   }, []);
   const toggleStack = useCallback((path: string) => setStack((current) => current === path ? null : path), []);
+  const goToNode = useCallback((node: NodeCrystal) => onNode?.(node.nodeId), [onNode]);
+  const nodeLink = onNode ? goToNode : undefined;
+
+  // Leaving the floor closes the reading desk and any open stack; focus is handed to the other floor.
+  useEffect(() => {
+    if (active) return;
+    restore.current = false;
+    savedPosition.current = null;
+    setSelected(null);
+    setStack(null);
+  }, [active]);
+
+  useEffect(() => {
+    if (!active || !openRequest || !allEntries || consumedOpen.current.has(openRequest.requestId)) return;
+    consumedOpen.current.add(openRequest.requestId);
+    if (allEntries.some((entry) => entry.path === openRequest.path)) openEntry(openRequest.path);
+  }, [active, openRequest, allEntries, openEntry]);
 
   function closeEntry() {
     restore.current = true;
@@ -409,6 +434,8 @@ export function Library({ query, deskMode, onToggleMode, onNode, active, refresh
           <span aria-live="polite">凡 {total} 卷</span>
         </div>
       </div>
+      {trimmed && nodeHits?.query === trimmed && onNode &&
+        <NodeMatches key={trimmed} hits={nodeHits.hits} onNode={onNode} />}
       <div className={styles.shelves} aria-busy={(!allEntries && !loadError) || searching}>
         {showLoading && <p className={styles.message} role="status">正在翻閱…</p>}
         {(loadError || searchFailed) && <div className={styles.message} role="alert">
@@ -426,7 +453,7 @@ export function Library({ query, deskMode, onToggleMode, onNode, active, refresh
             {entries.slice(0, limits[shelf] ?? batchSize).map((entry) => <Plaque key={entry.path} entry={entry}
               active={entry.path === activeCard} selected={entry.path === selected} stackOpen={entry.path === stack}
               revision={entry.path === stack ? revision : 0} nodes={nodes} onOpen={openEntry} onToggleStack={toggleStack}
-              onFocus={setCursor} onNode={onNode} />)}
+              onFocus={setCursor} onNode={nodeLink} />)}
           </div>
           {entries.length > (limits[shelf] ?? batchSize) &&
             <MoreEntries shown={limits[shelf] ?? batchSize} size={entries.length} onMore={() => more(shelf)} />}
@@ -434,7 +461,7 @@ export function Library({ query, deskMode, onToggleMode, onNode, active, refresh
       </div>
     </div>
     {selected && <ReadingDesk deskMode={deskMode} selectedPath={selected} entries={entryMap} nodes={nodes}
-      onOpen={openEntry} onClose={closeEntry} onToggleMode={onToggleMode} onNode={onNode}
+      onOpen={openEntry} onClose={closeEntry} onToggleMode={onToggleMode} onNode={nodeLink}
       writeState={writes.feedback.get(selected)} onWrite={writes.run} onReload={reloadFromFailure} {...detail} />}
     </div>
     <WriteNotices notices={writes.notices} feedback={writes.feedback} onRun={writes.run} onReload={reloadFromFailure} dismiss={writes.dismiss} />

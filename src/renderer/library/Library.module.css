@@ -140,6 +140,35 @@
   border: 1px solid rgba(217,164,65,.38);
   font: inherit;
 }
+.nodeMatches {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  background: rgba(14,20,48,.52);
+  border-bottom: 1px solid rgba(217,164,65,.22);
+}
+.nodeMatches h2 { flex: none; margin: 0; color: var(--text-night-muted); font-size: 12px; font-weight: 500; }
+.nodeChips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.nodeChip, .nodeMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 22ch;
+  padding: 2px 9px 2px 3px;
+  color: var(--text-night);
+  background: rgba(14,20,48,.72);
+  border: 1px solid rgba(217,164,65,.36);
+  border-radius: 12px;
+  font-size: 12px;
+}
+.nodeChip:hover, .nodeMore:hover { border-color: var(--gold-warm); }
+.nodeChip .seal { flex: none; }
+.nodeChipName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nodeChipStatus { flex: none; color: var(--text-night-muted); font-size: 11px; }
+.nodeMore { padding: 2px 9px; }
+.nodeChip:focus-visible, .nodeMore:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
 .shelves { flex: none; padding: 0 4px 12px; }
 .shelf { position: relative; margin-bottom: 20px; }
 .shelf h2 {
