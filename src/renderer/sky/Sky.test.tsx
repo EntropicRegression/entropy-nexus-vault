@@ -206,6 +206,36 @@ describe('星象召喚盤', () => {
     expect(panel().dataset.collapsed).toBe('true');
   });
 
+  it('拖曳中的每一幀不再讀取版面尺寸；選取或尺寸改變時才重新量測', async () => {
+    const offsetWidth = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(120);
+    const clientWidth = vi.mocked(Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')!.get!);
+    await render(true, true);
+    act(() => manual.tick(100));
+    const stage = host.querySelector<HTMLElement>('[data-star-map]')!;
+    const anchor = host.querySelector<HTMLElement>('[data-crystal-anchor="iris"]')!;
+    const reads = () => offsetWidth.mock.calls.length + clientWidth.mock.calls.length;
+    const settled = reads();
+    const positions: string[] = [];
+    act(() => pointer(stage, 'pointerdown', 100));
+    for (let frame = 1; frame <= 5; frame++) {
+      act(() => {
+        pointer(stage, 'pointermove', 100 + frame * 12);
+        manual.tick(100 + frame * 16);
+      });
+      positions.push(anchor.style.left);
+    }
+    act(() => pointer(stage, 'pointerup', 160));
+    expect(new Set(positions).size).toBe(5);
+    expect(reads()).toBe(settled);
+
+    await act(async () => crystal('quill').click());
+    act(() => manual.tick(300));
+    expect(reads()).toBeGreaterThan(settled);
+    const afterSelect = reads();
+    act(() => { window.dispatchEvent(new Event('resize')); manual.tick(320); });
+    expect(reads()).toBeGreaterThan(afterSelect);
+  });
+
   it('一般模式可連續推進星點，低動態只繪一幀，離開樓上取消所有排程', async () => {
     await render(true, false);
     act(() => manual.tick(10));

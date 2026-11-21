@@ -71,6 +71,78 @@ describe('水晶座標持久化', () => {
     expect(Object.keys(data.記憶庫[firstVault])).toEqual([iris]);
   });
 
+  it('過期清理只作用在目前的記憶庫；久未開啟的另一個記憶庫重開後座標不變', async () => {
+    const second = await store().positions(secondVault, [dawn, iris]);
+    await store().positions(firstVault, [iris]);
+    time += 400 * 86_400_000;
+    await store().positions(firstVault, [iris]);
+    const data = JSON.parse(await readFile(file, 'utf8'));
+    expect(Object.keys(data.記憶庫[secondVault]).sort()).toEqual([dawn, iris].sort());
+    expect(await store().positions(secondVault, [dawn, iris])).toEqual(second);
+  });
+
+  it('單筆壞資料只略過該筆並修正檔案，其餘座標保留；上限依最大半徑推得', async () => {
+    const kept = await store().positions(firstVault, [iris]);
+    const data = JSON.parse(await readFile(file, 'utf8'));
+    data.記憶庫[firstVault][dawn] = { 座標: [0, 0, 'x'], 最後出現: '2026-01-01T00:00:00.000Z' };
+    data.記憶庫[firstVault]['fixture-sky-far'] = { 座標: [400, 0, 0], 最後出現: '2026-01-01T00:00:00.000Z' };
+    data.記憶庫[firstVault]['fixture-sky-time'] = { 座標: [1, 2, 3], 最後出現: 'not a date' };
+    data.記憶庫['not-a-vault'] = { [iris]: { 座標: [1, 1, 1], 最後出現: '2026-01-01T00:00:00.000Z' } };
+    await writeFile(file, JSON.stringify(data));
+    expect((await store().positions(firstVault, [iris])).get(iris)).toEqual(kept.get(iris));
+    const repaired = JSON.parse(await readFile(file, 'utf8'));
+    expect(Object.keys(repaired.記憶庫)).toEqual([firstVault]);
+    expect(Object.keys(repaired.記憶庫[firstVault])).toEqual([iris]);
+
+    // A larger outer shell accepts the same far coordinate that the default limit (340) rejects.
+    data.記憶庫 = { [firstVault]: { 'fixture-sky-far': { 座標: [400, 0, 0], 最後出現: '2026-01-01T00:00:00.000Z' } } };
+    await writeFile(file, JSON.stringify(data));
+    const wide = new CrystalLayoutStore(file, () => time, { params: { radii: [220, 320, 420], minGap: [90, 70, 55], candidates: 64 } });
+    expect((await wide.positions(firstVault, ['fixture-sky-far'])).get('fixture-sky-far')).toEqual([400, 0, 0]);
+  });
+
+  it('暫時鎖檔會遞增間隔重試，成功後沿用既有座標', async () => {
+    const saved = await store().positions(firstVault, [iris]);
+    const waits: number[] = [];
+    let attempts = 0;
+    const read = async (path: string) => {
+      if (++attempts < 3) throw Object.assign(new Error('locked'), { code: 'EBUSY' });
+      return readFile(path, 'utf8');
+    };
+    const retrying = new CrystalLayoutStore(file, () => time, { read, sleep: async (ms) => { waits.push(ms); } });
+    expect(await retrying.positions(firstVault, [iris])).toEqual(saved);
+    expect(waits).toEqual([50, 100]);
+  });
+
+  it('重試後仍鎖住：本次照算但不覆寫檔案，也不把暫算結果記成正式座標', async () => {
+    await store().positions(firstVault, [iris]);
+    const before = await readFile(file, 'utf8');
+    let locked = true;
+    const read = async (path: string) => {
+      if (locked) throw Object.assign(new Error('locked'), { code: 'EPERM' });
+      return readFile(path, 'utf8');
+    };
+    const waits: number[] = [];
+    const layout = new CrystalLayoutStore(file, () => time, { read, sleep: async (ms) => { waits.push(ms); } });
+    const temporary = await layout.positions(firstVault, [dawn, iris]);
+    expect(temporary.size).toBe(2);
+    expect(waits).toEqual([50, 100, 200]);
+    expect(await readFile(file, 'utf8')).toBe(before);
+
+    locked = false;
+    const recovered = await layout.positions(firstVault, [dawn, iris]);
+    expect(recovered.get(iris)).toEqual((await store().positions(firstVault, [iris])).get(iris));
+    expect(JSON.parse(await readFile(file, 'utf8')).記憶庫[firstVault][dawn].座標).toEqual(recovered.get(dawn));
+  });
+
+  it('同一天內重讀不重寫檔案', async () => {
+    await store().positions(firstVault, [iris]);
+    const first = await readFile(file, 'utf8');
+    time += 60_000;
+    await store().positions(firstVault, [iris]);
+    expect(await readFile(file, 'utf8')).toBe(first);
+  });
+
   it('寫檔暫時失敗時先提供記憶體座標，下一次可補寫', async () => {
     const dir = join(root, 'not-yet-created');
     file = join(dir, 'crystal-layout.json');
