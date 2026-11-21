@@ -1,7 +1,8 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
-import type { NodeCrystal, VaultInfo, ViewSettings } from '../../shared/types';
+﻿import { useEffect, useState } from 'react';
+import type { VaultInfo, ViewSettings } from '../../shared/types';
 import { Library } from '../library/Library';
 import { useDelayed } from '../library/use-delayed';
+import { Sky } from '../sky/Sky';
 import styles from './App.module.css';
 
 type Floor = 'library' | 'sky';
@@ -9,7 +10,6 @@ const defaults: ViewSettings = { deskMode: 'A', reducedMotion: false };
 
 export function App() {
   const [floor, setFloor] = useState<Floor>('library');
-  const [node, setNode] = useState<NodeCrystal | null>(null);
   const [vaultInfo, setVaultInfo] = useState<VaultInfo | null>(null);
   const [vaultError, setVaultError] = useState('');
   const [settingsError, setSettingsError] = useState('');
@@ -19,7 +19,6 @@ export function App() {
   const [saving, setSaving] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const up = useRef<HTMLButtonElement>(null);
   const showLoading = useDelayed(!vaultInfo && !vaultError ? 'vault' : null);
 
   useEffect(() => {
@@ -82,42 +81,31 @@ export function App() {
     void updateSettings({ deskMode: settings.deskMode === 'A' ? 'B' : 'A' });
   }
 
-  const openNode = useCallback((selected: NodeCrystal) => {
-    setNode(selected);
-    setFloor('sky');
-    up.current?.focus();
-  }, []);
-
   return <div className={styles.shell} data-floor={floor} data-reduced-motion={settings.reducedMotion}>
-    <header className={styles.topBar}>
+    {floor === 'library' && <header className={styles.topBar}>
       <h1>記憶寶庫</h1>
       <div role="group" aria-label="樓層切換" className={styles.modeSwitch}>
         <button type="button" aria-pressed={floor === 'library'} onClick={() => setFloor('library')}>樓下｜典藏室</button>
-        <button type="button" aria-pressed={floor === 'sky'} ref={up}
-          onClick={() => { setNode(null); setFloor('sky'); }}>樓上｜星象召喚盤</button>
+        <button type="button" aria-pressed="false" onClick={() => setFloor('sky')}>樓上｜星象召喚盤</button>
       </div>
       <div className={styles.tools}>
-        {floor === 'library' && <>
-          <input type="search" aria-label="搜尋卷宗" placeholder="檢索案號、題名或節點…" value={query}
-            onChange={(event) => setQuery(event.target.value)} disabled={!vaultInfo?.exists} />
-          <button type="button" disabled={!settingsReady || saving} onClick={toggleDesk}>
-            版式：{settings.deskMode === 'A' ? 'A 寬幅閱讀桌' : 'B 右側 420px 欄'}
-          </button>
-          <button type="button" onClick={() => setAttempt((value) => value + 1)}>重新整理</button>
-        </>}
+        <input type="search" aria-label="搜尋卷宗" placeholder="檢索案號、題名或節點…" value={query}
+          onChange={(event) => setQuery(event.target.value)} disabled={!vaultInfo?.exists} />
+        <button type="button" disabled={!settingsReady || saving} onClick={toggleDesk}>
+          版式：{settings.deskMode === 'A' ? 'A 寬幅閱讀桌' : 'B 右側 420px 欄'}
+        </button>
+        <button type="button" onClick={() => setAttempt((value) => value + 1)}>重新整理</button>
         <button type="button" aria-pressed={settings.reducedMotion} disabled={!settingsReady || saving}
           onClick={() => void updateSettings({ reducedMotion: !settings.reducedMotion })}>低動態：{settings.reducedMotion ? '開' : '關'}</button>
         <button type="button" disabled={choosing} onClick={() => void chooseVault()} title={vaultInfo?.path}>記憶庫位置</button>
       </div>
-    </header>
+    </header>}
     <main className={styles.stage}>
       {(settingsError || (vaultInfo?.exists && vaultError)) &&
         <p className={styles.settingError} role="alert">{settingsError || vaultError}</p>}
-      {floor === 'sky' && <section className={styles.center}>
-        <h2>星象召喚盤</h2>
-        {node && <p>{node.name}</p>}
-        <p>節點星圖將於 M5 開放。</p>
-      </section>}
+      <Sky key={vaultInfo?.key} active={floor === 'sky'} reducedMotion={settings.reducedMotion}
+        settingsDisabled={!settingsReady || saving} refreshToken={attempt} vaultExists={vaultInfo?.exists ?? false}
+        onReturn={() => setFloor('library')} onToggleMotion={() => void updateSettings({ reducedMotion: !settings.reducedMotion })} />
       <div className={styles.downstairs} hidden={floor !== 'library'}>
         {showLoading && <p className={styles.center} role="status">正在翻閱…</p>}
         {!vaultInfo?.exists && (vaultError || vaultInfo) && <section className={styles.center}>
@@ -131,7 +119,7 @@ export function App() {
           </div>
         </section>}
         {vaultInfo?.exists && <Library key={vaultInfo.key} query={query} deskMode={settings.deskMode} refreshToken={attempt}
-          onToggleMode={toggleDesk} onNode={openNode} active={floor === 'library'} />}
+          onToggleMode={toggleDesk} active={floor === 'library'} />}
       </div>
     </main>
   </div>;

@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VaultApi } from '../../shared/ipc';
-import type { MemoryEntry, MemoryEntryDetail, NodeCrystal, VaultInfo, ViewSettings } from '../../shared/types';
+import type { CrystalList, MemoryEntry, MemoryEntryDetail, VaultInfo, ViewSettings } from '../../shared/types';
 import { App } from './App';
 
 const vaultInfo: VaultInfo = { key: 'fixture-vault', path: 'fixtures/memory-vault', exists: true, wakeAvailable: false };
@@ -23,7 +23,9 @@ const bookmark: MemoryEntry = { ...baseEntry, path: 'knowledge/試驗/追蹤.md'
 const previous: MemoryEntry = { ...baseEntry, path: 'cases/試驗/2025-0002.md', title: '舊採樣記錄',
   caseId: '2025-0002', superseded: true, previousCount: 0 };
 const entries = [baseEntry, archive, bookmark, previous];
-const crystal: NodeCrystal = { nodeId: 'node-test', name: '霧苔', role: null, status: '封存', canWake: false, projectNames: [] };
+const crystal: CrystalList['crystals'][number] = {
+  nodeId: 'node-test', name: '霧苔', role: null, status: '封存', canWake: false, projectNames: [], position: [20, 40, -180],
+};
 
 function detail(entry: MemoryEntry): MemoryEntryDetail {
   return {
@@ -106,21 +108,23 @@ describe('典藏室', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  it('樓層可往返；點首字徽章只交接節點，不開卷', async () => {
+  it('可用兩層頂列往返；頭像章仍可見，跳轉留待 M5b', async () => {
     const vault = await renderApp();
     const library = button('樓下｜典藏室');
     const sky = button('樓上｜星象召喚盤');
     expect(container.querySelector('h1')?.textContent).toBe('記憶寶庫');
     expect(library.getAttribute('aria-pressed')).toBe('true');
-    const seal = card(baseEntry).querySelector<HTMLButtonElement>('button[aria-label="承辦：霧苔"]')!;
+    const seal = card(baseEntry).querySelector<HTMLElement>('[aria-label="承辦：霧苔"]')!;
     expect(seal.textContent).toBe('霧');
     expect(seal.tabIndex).toBe(-1);
     act(() => seal.click());
-    expect(sky.getAttribute('aria-pressed')).toBe('true');
-    expect(container.querySelector('main section > p')?.textContent).toBe('霧苔');
+    expect(container.querySelector('[data-sky]')?.hasAttribute('hidden')).toBe(true);
+    await act(async () => sky.click());
+    expect(container.querySelector('[data-sky]')?.hasAttribute('hidden')).toBe(false);
+    expect(container.querySelector('[data-crystal="node-test"]')?.textContent).toContain('霧苔');
     expect(vault.readEntry).not.toHaveBeenCalled();
-    act(() => library.click());
-    expect(library.getAttribute('aria-pressed')).toBe('true');
+    act(() => button('俯瞰圖書館').click());
+    expect(button('樓下｜典藏室').getAttribute('aria-pressed')).toBe('true');
   });
 
   it('記憶庫不存在時可選擇其他資料夾；空藏書架有說明', async () => {
@@ -286,7 +290,9 @@ describe('典藏室', () => {
     await act(async () => button(legacy.title, card(legacy)).click());
     const footer = container.querySelector('[aria-label="閱讀桌"] footer')!;
     expect(footer.textContent).toContain('此檔為舊格式，尚不支援寫入');
-    expect([...footer.querySelectorAll('button')].every((item) => item.getAttribute('aria-disabled') === 'true')).toBe(true);
+    expect(button('確認', footer).getAttribute('aria-disabled')).toBe('true');
+    expect(button('退回', footer).getAttribute('aria-disabled')).toBe('true');
+    expect(button('移入回收', footer).getAttribute('aria-disabled')).toBe('false');
     act(() => button('確認', footer).click());
     expect(vault.setStatus).not.toHaveBeenCalled();
   });

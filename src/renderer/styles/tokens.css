@@ -28,6 +28,17 @@
   --gem-off: #8a7965;
   --gem-on-stroke: #4b3423;
   --ember: #8c3a27;
+  --sky-cyan: #5ce1e6;
+  --sky-violet: #a78bfa;
+  --sky-amber: #f5b963;
+  --sky-gold: #fde68a;
+  --sky-text: #f1f5f9;
+  --sky-muted: #94a3b8;
+  --glow-1-white: #e8eef5;
+  --link-inherit: #f59e0b;
+  --link-collab: #38bdf8;
+  --link-meeting: #a78bfa;
+  --link-project: #34d399;
 
   --font-serif: 'Noto Serif TC Variable', 'Noto Serif TC', serif;
   --font-ui: 'Noto Sans TC Variable', 'Noto Sans TC', sans-serif;
