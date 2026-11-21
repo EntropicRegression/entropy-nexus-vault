@@ -26,3 +26,6 @@ Thumbs.db
 /docs/設計稿/v9/_shot-deskA.png
 /docs/設計稿/v9/_shot-deskB1280.png
 /docs/設計稿/v9/_shot-deskB1600.png
+
+# M5 之後的開窗驗收截圖只留在本機,不入庫(M3、M4 的歷史截圖已入庫)
+docs/設計稿/驗收/M5*/
