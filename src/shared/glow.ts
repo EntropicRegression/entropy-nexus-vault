@@ -15,14 +15,22 @@ export interface RichnessInput {
   participatedCases: number;
   /** Highest 完成數 this machine has seen for the node (userData/glow-peaks.json). */
   completedPeak: number;
-  /** 退回數 recorded when that peak was reached. */
-  rejectedAtPeak: number;
+  /**
+   * Highest 退回數 seen, recorded independently of the 完成數 peak (M5c review B1): a rejection pressed later, without a
+   * new completion, still lowers the effective completed count.
+   */
+  rejectedPeak: number;
   /** Current 完成數 in the console's 180-day window; used only for the rejection rate. */
   completedNow: number;
   /** Current 退回數 in the same window. */
   rejectedNow: number;
   /** Distinct projects (by opaque project key). */
   projects: number;
+  /**
+   * git = only projects the stats' 專案表 marks as git repos were counted (M5c review B4); all = the stats had no
+   * 專案表, so shared non-git folders are counted too (approximate).
+   */
+  projectScope?: 'git' | 'all';
 }
 
 export interface RichnessParts {
@@ -50,8 +58,15 @@ export interface Richness {
   scoreTier: AutoGlowTier;
   tier: AutoGlowTier;
   caps: GlowCap[];
-  /** Rejection rate of the current window, or null when there are fewer completed tasks than the gate needs. */
+  /**
+   * The rejection rate the gate used: the less favourable of the current window and the peaks (M5c review B1), each
+   * only when it has enough completed tasks; null when neither has.
+   */
   rejectionRate: number | null;
+  /** 退回 ÷ 完成 of the current window (null below the sample size). */
+  windowRejectionRate: number | null;
+  /** 退回峰值 ÷ 完成峰值 (null below the sample size). */
+  peakRejectionRate: number | null;
 }
 
 export interface GlowThresholds {
@@ -85,7 +100,7 @@ const count = (value: number) => Number.isFinite(value) && value > 0 ? Math.floo
 export function computeRichness(input: RichnessInput, t: GlowThresholds = defaultGlowThresholds): Richness {
   const confirmed = count(input.confirmedCases);
   const projects = count(input.projects);
-  const effectiveCompleted = Math.max(0, count(input.completedPeak) - count(input.rejectedAtPeak));
+  const effectiveCompleted = Math.max(0, count(input.completedPeak) - count(input.rejectedPeak));
   const parts: RichnessParts = {
     confirmedCases: confirmed * t.weights.confirmedCase,
     participatedCases: Math.min(t.limits.participated, count(input.participatedCases) * t.weights.participatedCase),
@@ -94,7 +109,11 @@ export function computeRichness(input: RichnessInput, t: GlowThresholds = defaul
   };
   const score = parts.confirmedCases + parts.participatedCases + parts.projects + parts.completed;
   const completedNow = count(input.completedNow);
-  const rejectionRate = completedNow >= t.rejectionSample ? count(input.rejectedNow) / completedNow : null;
+  const completedPeak = count(input.completedPeak);
+  const windowRejectionRate = completedNow >= t.rejectionSample ? count(input.rejectedNow) / completedNow : null;
+  const peakRejectionRate = completedPeak >= t.rejectionSample ? count(input.rejectedPeak) / completedPeak : null;
+  const rates = [windowRejectionRate, peakRejectionRate].filter((rate): rate is number => rate !== null);
+  const rejectionRate = rates.length ? Math.max(...rates) : null;
 
   const scoreTier = [...glowTiers].reverse().find((tier) => score >= t.minimumScore[tier]) ?? 'white';
   const caps: GlowCap[] = [];
@@ -121,10 +140,11 @@ export function computeRichness(input: RichnessInput, t: GlowThresholds = defaul
     tier = glowTiers[index - 1];
   }
   const counted: RichnessInput = {
-    confirmedCases: confirmed, participatedCases: count(input.participatedCases), completedPeak: count(input.completedPeak),
-    rejectedAtPeak: count(input.rejectedAtPeak), completedNow, rejectedNow: count(input.rejectedNow), projects,
+    confirmedCases: confirmed, participatedCases: count(input.participatedCases), completedPeak,
+    rejectedPeak: count(input.rejectedPeak), completedNow, rejectedNow: count(input.rejectedNow), projects,
+    projectScope: input.projectScope ?? 'all',
   };
-  return { input: counted, effectiveCompleted, score, parts, scoreTier, tier, caps, rejectionRate };
+  return { input: counted, effectiveCompleted, score, parts, scoreTier, tier, caps, rejectionRate, windowRejectionRate, peakRejectionRate };
 }
 
 export interface GlowAward {

@@ -24,16 +24,30 @@ afterEach(async () => {
 });
 
 describe('userData/glow-peaks.json(docs/架構.md §9.2)', () => {
-  it('只升不降:完成數下降時沿用峰值與當時的退回數;創新高才改寫', async () => {
+  it('只升不降:數字下降時沿用兩個峰值;峰值沒上升時不改寫檔案', async () => {
     const { file, store } = await setup();
     const peaks = store();
     expect(await peaks.update(vaultA, counts({ n1: [40, 3] }))).toEqual(counts({ n1: [40, 3] }));
     const written = await readFile(file, 'utf8');
     expect(await peaks.update(vaultA, counts({ n1: [25, 1] }))).toEqual(counts({ n1: [40, 3] }));
     expect(await readFile(file, 'utf8')).toBe(written);
+    expect(await peaks.update(vaultA, counts({ n1: [40, 3] }))).toEqual(counts({ n1: [40, 3] }));
+    expect(await readFile(file, 'utf8')).toBe(written);
     expect(await peaks.update(vaultA, counts({ n1: [41, 6] }))).toEqual(counts({ n1: [41, 6] }));
-    // A new process reads the stored peak.
+    // A new process reads the stored peaks.
     expect(await store().update(vaultA, counts({ n1: [10, 0] }))).toEqual(counts({ n1: [41, 6] }));
+  });
+
+  it('B1:退回峰值獨立記錄,完成數沒創新高時晚到的退回也會記下;舊檔的退回數當作起點', async () => {
+    const { file, store } = await setup();
+    const peaks = store();
+    expect(await peaks.update(vaultA, counts({ n1: [100, 0] }))).toEqual(counts({ n1: [100, 0] }));
+    expect(await peaks.update(vaultA, counts({ n1: [100, 30] }))).toEqual(counts({ n1: [100, 30] }));
+    expect(JSON.parse(await readFile(file, 'utf8')).記憶庫[vaultA].n1).toMatchObject({ 完成數: 100, 退回數: 30 });
+    // Both fall when old tasks leave the window; both peaks stay.
+    expect(await peaks.update(vaultA, counts({ n1: [12, 1] }))).toEqual(counts({ n1: [100, 30] }));
+    // A new completion peak keeps the higher rejection peak.
+    expect(await peaks.update(vaultA, counts({ n1: [101, 2] }))).toEqual(counts({ n1: [101, 30] }));
   });
 
   it('不同記憶庫各自記錄', async () => {

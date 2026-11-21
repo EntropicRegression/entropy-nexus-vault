@@ -3,16 +3,16 @@ import { capText, computeRichness, glowOf, normaliseAwardReason } from './glow';
 import type { RichnessInput } from './glow';
 
 const base: RichnessInput = {
-  confirmedCases: 0, participatedCases: 0, completedPeak: 0, rejectedAtPeak: 0, completedNow: 0, rejectedNow: 0, projects: 0,
+  confirmedCases: 0, participatedCases: 0, completedPeak: 0, rejectedPeak: 0, completedNow: 0, rejectedNow: 0, projects: 0,
 };
 const node = (patch: Partial<RichnessInput>) => computeRichness({ ...base, ...patch });
 
 describe('經歷豐富度第 2 版(DESIGN.md §6.9 試算表)', () => {
   it.each([
-    ['claudia jr', { confirmedCases: 6, participatedCases: 1, projects: 2, completedPeak: 40, rejectedAtPeak: 3, completedNow: 40, rejectedNow: 3 }, 72, 'violet'],
-    ['claudia(一代)', { confirmedCases: 4, projects: 1, completedPeak: 26, rejectedAtPeak: 3, completedNow: 26, rejectedNow: 3 }, 46, 'blue'],
-    ['Hagemi', { confirmedCases: 3, projects: 2, completedPeak: 30, rejectedAtPeak: 2, completedNow: 30, rejectedNow: 2 }, 40, 'blue'],
-    ['gpt', { confirmedCases: 2, projects: 1, completedPeak: 17, rejectedAtPeak: 2, completedNow: 17, rejectedNow: 2 }, 25, 'green'],
+    ['claudia jr', { confirmedCases: 6, participatedCases: 1, projects: 2, completedPeak: 40, rejectedPeak: 3, completedNow: 40, rejectedNow: 3 }, 72, 'violet'],
+    ['claudia(一代)', { confirmedCases: 4, projects: 1, completedPeak: 26, rejectedPeak: 3, completedNow: 26, rejectedNow: 3 }, 46, 'blue'],
+    ['Hagemi', { confirmedCases: 3, projects: 2, completedPeak: 30, rejectedPeak: 2, completedNow: 30, rejectedNow: 2 }, 40, 'blue'],
+    ['gpt', { confirmedCases: 2, projects: 1, completedPeak: 17, rejectedPeak: 2, completedNow: 17, rejectedNow: 2 }, 25, 'green'],
     ['新節點', { projects: 1, completedPeak: 5, completedNow: 5 }, 4, 'white'],
     ['灌水:200 件瑣碎任務、6 專案、0 判例', { projects: 6, completedPeak: 200, completedNow: 200 }, 44, 'blue'],
   ] as const)('%s', (_name, input, score, tier) => {
@@ -29,8 +29,8 @@ describe('經歷豐富度第 2 版(DESIGN.md §6.9 試算表)', () => {
   });
 
   it('有效完成 = 完成峰值 − 達峰時的退回數,每 10 件 1 分;退回多於完成時為 0', () => {
-    expect(node({ completedPeak: 59, rejectedAtPeak: 10 }).parts.completed).toBe(4);
-    expect(node({ completedPeak: 3, rejectedAtPeak: 9 }).effectiveCompleted).toBe(0);
+    expect(node({ completedPeak: 59, rejectedPeak: 10 }).parts.completed).toBe(4);
+    expect(node({ completedPeak: 3, rejectedPeak: 9 }).effectiveCompleted).toBe(0);
   });
 
   it.each([
@@ -69,9 +69,38 @@ describe('經歷豐富度第 2 版(DESIGN.md §6.9 試算表)', () => {
   });
 
   it('退回率用目前窗口,有效完成用峰值:舊任務過期時分數不掉', () => {
-    const before = node({ confirmedCases: 3, completedPeak: 120, rejectedAtPeak: 0, completedNow: 120 });
-    const after = node({ confirmedCases: 3, completedPeak: 120, rejectedAtPeak: 0, completedNow: 12, rejectedNow: 0 });
+    const before = node({ confirmedCases: 3, completedPeak: 120, rejectedPeak: 0, completedNow: 120 });
+    const after = node({ confirmedCases: 3, completedPeak: 120, rejectedPeak: 0, completedNow: 12, rejectedNow: 0 });
     expect(after.score).toBe(before.score);
+  });
+
+  it('B1:完成數不變、之後才補按的退回 → 有效完成數下降,峰值退回率也進閘門', () => {
+    const before = node({ confirmedCases: 20, projects: 3, completedPeak: 100, rejectedPeak: 0, completedNow: 100, rejectedNow: 0 });
+    const after = node({ confirmedCases: 20, projects: 3, completedPeak: 100, rejectedPeak: 30, completedNow: 100, rejectedNow: 30 });
+    expect(before.parts.completed).toBe(10);
+    expect(after.parts.completed).toBe(7);
+    expect(after.score).toBe(before.score - 3);
+    expect(before.tier).toBe('red');
+    expect(after.tier).toBe('blue');
+    // Old tasks left the window (now 12 done, 1 rejected = 8%), but the peaks still say 30 / 100: the gate uses 30%.
+    const later = node({ confirmedCases: 20, projects: 3, completedPeak: 100, rejectedPeak: 30, completedNow: 12, rejectedNow: 1 });
+    expect(later.windowRejectionRate).toBeCloseTo(1 / 12);
+    expect(later.peakRejectionRate).toBeCloseTo(0.3);
+    expect(later.rejectionRate).toBeCloseTo(0.3);
+    expect(later.tier).toBe('blue');
+    // A recent bad window counts even when the peaks look fine.
+    const recent = node({ confirmedCases: 20, projects: 3, completedPeak: 200, rejectedPeak: 30, completedNow: 40, rejectedNow: 12 });
+    expect(recent.rejectionRate).toBeCloseTo(0.3);
+    expect(recent.tier).toBe('blue');
+  });
+
+  it('B2:退回數大於完成數(含失敗任務上的退回)時不出現負值', () => {
+    const result = node({ confirmedCases: 3, completedPeak: 5, rejectedPeak: 40, completedNow: 12, rejectedNow: 40 });
+    expect(result.effectiveCompleted).toBe(0);
+    expect(result.parts.completed).toBe(0);
+    expect(result.score).toBe(30);
+    expect(result.rejectionRate).toBeGreaterThan(1);
+    expect(result.tier).toBe('blue');
   });
 
   it('封頂說明文字', () => {

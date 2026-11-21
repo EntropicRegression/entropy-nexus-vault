@@ -2,8 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 /**
- * userData/glow-peaks.json (docs/架構.md §9.2): per vault, the highest 完成數 seen for each node and the 退回數 at
- * that moment. Peaks only rise. The file holds opaque vault keys, node IDs (hashed when they look like paths),
+ * userData/glow-peaks.json (docs/架構.md §9.2): per vault, the highest 完成數 and, independently, the highest 退回數
+ * seen for each node (M5c review B1: a rejection pressed later without a new completion must still count). Both only
+ * rise. Files written before this change stored the 退回數 at the 完成數 peak; they are read as a starting maximum. The file holds opaque vault keys, node IDs (hashed when they look like paths),
  * counts and times — never a path. It is never written into the vault.
  */
 export interface GlowPeak { completed: number; rejected: number }
@@ -47,8 +48,8 @@ export class GlowPeakStore {
   constructor(private readonly file: string, private readonly now = () => Date.now()) {}
 
   /**
-   * Records the current counts and returns each node's peak. A new peak is stored only when 完成數 exceeds the
-   * stored one; a lower count (old tasks leaving the console's 180-day window) keeps the stored peak.
+   * Records the current counts and returns each node's peaks. 完成數 and 退回數 rise independently; a lower count (old
+   * tasks leaving the console's 180-day window) keeps the stored peak. The file is written only when a peak rises.
    */
   update(key: string, current: ReadonlyMap<string, GlowPeak>): Promise<ReadonlyMap<string, GlowPeak>> {
     const next = this.pending.then(() => this.apply(key, current));
@@ -83,13 +84,13 @@ export class GlowPeakStore {
     const peaks = this.vaults.get(key) ?? new Map<string, StoredPeak>();
     for (const [id, value] of current) {
       const stored = peaks.get(storageId(id));
-      if (!stored || value.completed > stored.完成數) {
-        peaks.set(storageId(id), { 完成數: value.completed, 退回數: value.rejected, 記錄時間: new Date(this.now()).toISOString() });
+      const completed = Math.max(stored?.完成數 ?? 0, value.completed);
+      const rejected = Math.max(stored?.退回數 ?? 0, value.rejected);
+      if (!stored || completed !== stored.完成數 || rejected !== stored.退回數) {
+        peaks.set(storageId(id), { 完成數: completed, 退回數: rejected, 記錄時間: new Date(this.now()).toISOString() });
         this.dirty = true;
-        result.set(id, value);
-      } else {
-        result.set(id, { completed: stored.完成數, rejected: stored.退回數 });
       }
+      result.set(id, { completed, rejected });
     }
     this.vaults.set(key, peaks);
     // When the file could not be read, peaks still apply for this process but nothing is written over it.
