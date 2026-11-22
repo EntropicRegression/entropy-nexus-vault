@@ -198,6 +198,12 @@ export interface NodeCrystalDetail extends NodeCrystal {
   stats: CrystalStats | null;
   archives: Array<{ path: string; archivedAt: string }>;
   relatedEntries: MemoryEntry[];
+  /**
+   * The node's 典藏 entries on the downstairs archive shelf: knowledge/preferences whose 節點ID (written by) or
+   * 參與節點ID (took part) names this node; newest first, superseded versions left out (DESIGN.md §6.6.4).
+   * Optional for older view fixtures.
+   */
+  archiveEntries?: MemoryEntry[];
   confirmedCaseCount: number;
   specialty: string;
   workflow: string;

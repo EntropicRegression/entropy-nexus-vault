@@ -53,6 +53,11 @@ export interface CrystalRecord {
   stats: CrystalStats | null;
   archives: Array<{ path: string; archivedAt: string }>;
   relatedEntries: MemoryEntry[];
+  /**
+   * The node's 典藏 entries (DESIGN.md §6.6.4): archive-shelf knowledge and preferences whose 節點ID (author) is this
+   * node or whose 參與節點ID lists it. Only these structured fields count; free text such as 來源節點 is not used.
+   */
+  archiveEntries: MemoryEntry[];
 }
 
 export function profileHighlights(profile: ParsedEntry | undefined, stats: CrystalStats | null) {
@@ -116,8 +121,16 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
   const files = new Map<string, NodeFiles>();
   const idByPath = new Map<string, string>();
   const casesByNode = new Map<string, MemoryEntry[]>();
+  const archiveByNode = new Map<string, MemoryEntry[]>();
   for (const parsed of entries) {
     const { entry } = parsed;
+    if (entry.shelf === 'archive') {
+      for (const id of new Set([entry.nodeId, ...entry.participantNodeIds].filter(Boolean))) {
+        const related = archiveByNode.get(id) ?? [];
+        related.push(entry);
+        archiveByNode.set(id, related);
+      }
+    }
     if (entry.kind === 'case') {
       for (const id of new Set([entry.nodeId, ...entry.participantNodeIds].filter(Boolean))) {
         const related = casesByNode.get(id) ?? [];
@@ -202,6 +215,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       stats,
       archives: archives.map(({ parsed, archivedAt }) => ({ path: parsed.entry.path, archivedAt })),
       relatedEntries,
+      archiveEntries: archiveByNode.get(nodeId) ?? [],
     });
     for (const [key, name] of projects) {
       const project = projectMembers.get(key) ?? { name, members: [] };

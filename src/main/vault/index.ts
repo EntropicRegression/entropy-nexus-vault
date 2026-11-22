@@ -1,3 +1,4 @@
+import { searchTerms } from '../../shared/node-search';
 import { join } from 'node:path';
 import { heatDecayAt } from '../../shared/heat';
 import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit, ReadableNodeProfile } from '../../shared/types';
@@ -85,8 +86,7 @@ export class VaultSnapshot {
    * The console's 角色 is the name of the node's portrait folder, not a job title (M5b review S6).
    */
   searchNodes(query: string): NodeHit[] {
-    if (typeof query !== 'string') return [];
-    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const terms = searchTerms(query);
     if (!terms.length) return [];
     const hits: NodeHit[] = [];
     for (const { hit, fields } of this.searchIndex()) {
@@ -174,6 +174,9 @@ export class VaultSnapshot {
       stats: record.stats,
       archives: record.archives,
       relatedEntries: record.relatedEntries,
+      // Newest first; replaced (superseded) versions are left out, as on the shelves.
+      archiveEntries: record.archiveEntries.filter((entry) => !entry.superseded)
+        .sort((a, b) => b.updatedAt - a.updatedAt || a.path.localeCompare(b.path, 'zh-Hant')),
         confirmedCaseCount: record.relatedEntries.filter((entry) =>
           entry.path.startsWith('cases/') && entry.status === '已確認' && entry.nodeId === nodeId).length,
       ...profileHighlights(record.profile, record.stats),
