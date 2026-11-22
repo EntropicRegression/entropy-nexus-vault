@@ -9,11 +9,13 @@
   },
   "scripts": {
     "dev": "electron-vite build --mode development --outDir out-dev && electron-vite preview --skipBuild --entry out-dev/main/index.js",
+    "build:dev": "electron-vite build --mode development --outDir out-dev",
     "build": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true})\" && electron-vite build",
     "verify:build": "node scripts/verify-production-build.cjs out",
     "verify:package": "node scripts/verify-packaged-app.cjs",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.renderer.json",
     "test": "vitest run",
+    "smoke": "node scripts/smoke.cjs",
     "postinstall": "node node_modules/electron/install.js",
     "dist": "npm run build && npm run verify:build && electron-builder --win nsis"
   },
