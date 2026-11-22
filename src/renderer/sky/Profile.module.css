@@ -1,0 +1,49 @@
+/* Full profile reader and editor over the star map (DESIGN.md §6.6.1–6.6.2): the downstairs reading paper on a dark
+   veil. Absolute, not fixed: the camera world is transformed. */
+.overlay {
+  position: absolute; inset: 0; z-index: 45; display: grid; place-items: center;
+  /* Top clears the floor switch bar (the scene's own top padding is 74px); bottom clears the skylight tab. */
+  padding: 80px 48px 40px;
+  background: rgba(4, 7, 19, 0.8); animation: reveal var(--paper-fade, 240ms) ease-out both;
+  font-family: var(--font-serif);
+}
+@keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+.paper { display: flex; flex-direction: column; max-height: 100%; }
+.paper:focus { outline: none; }
+.body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; font-size: 15px; }
+.appendix { margin-top: 22px; padding-top: 12px; border-top: 1px dashed rgba(107, 74, 46, 0.45); }
+.appendix h3 { margin: 0 0 4px; font-size: 12.5px; letter-spacing: 0.12em; }
+.appendixNote { margin: 0 0 10px; color: var(--ink-paper-muted); font-size: 12px; }
+.notice { margin: 0 0 10px; padding: 6px 10px; border-left: 3px solid var(--wood-warm); background: rgba(107, 74, 46, 0.1); font-size: 13px; }
+.help { margin: 0 0 10px; color: var(--ink-paper-muted); font-size: 12.5px; }
+
+/* The editor: a transparent textarea over a layer that draws the same text with placeholders as small labels. */
+.editorFrame { position: relative; border: 1px solid rgba(107, 74, 46, 0.55); background: var(--paper-1); }
+.highlights, .editor {
+  margin: 0; padding: 12px 14px; font: 400 15px/1.8 var(--font-serif); letter-spacing: normal;
+  white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; tab-size: 4;
+}
+.highlights { position: absolute; inset: 0; overflow: hidden; color: transparent; pointer-events: none; }
+.editor {
+  position: relative; display: block; width: 100%; min-height: 46vh; max-height: 56vh; resize: vertical; overflow: auto;
+  border: 0; background: transparent; color: var(--ink-paper); caret-color: var(--ink-paper);
+}
+.editor:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: -2px; }
+.token { color: transparent; background: rgba(217, 164, 65, 0.32); border-radius: 3px; box-shadow: 0 0 0 1px rgba(107, 74, 46, 0.55); }
+.token[data-token='bad'] { background: rgba(190, 60, 50, 0.32); }
+.placeholders { margin-top: 10px; font-size: 12.5px; }
+.placeholders p { margin: 0 0 6px; color: var(--ink-paper-muted); }
+.placeholders ul { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; }
+.placeholders li { display: flex; align-items: center; gap: 6px; }
+.placeholders li .token { color: var(--ink-paper); padding: 0 4px; }
+.placeholders li[data-state='missing'] { color: #8a3b2b; }
+.placeholders button, .check input { font: inherit; font-size: 12px; }
+.placeholders button { padding: 1px 8px; border: 1px solid var(--wood-warm); background: none; color: var(--ink-paper); cursor: pointer; }
+.warnings p { margin: 8px 0 0; color: #8a3b2b; font-size: 12.5px; }
+.conflict { margin-top: 12px; }
+.conflict h3 { margin: 0 0 6px; font-size: 12.5px; }
+.conflict textarea { width: 100%; min-height: 120px; font: 400 13px/1.6 var(--font-serif); background: var(--paper-1); border: 1px dashed var(--wood-warm); }
+.error { color: #8a3b2b; font-size: 12.5px; }
+.check { display: flex; align-items: center; gap: 6px; color: var(--sky-muted); font-size: 12.5px; }
+:global([data-reduced-motion='true']) .overlay { animation: none; }
+@media (prefers-reduced-motion: reduce) { .overlay { animation: none; } }

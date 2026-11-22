@@ -25,7 +25,7 @@ function inline(text: string, related: ReadonlyMap<string, string>, open: OpenEn
 }
 
 /** Render repository Markdown as text/components without allowing HTML, remote loads or arbitrary links. */
-function Markdown({ body, related, onOpen }: { body: string; related: ReadonlyMap<string, string>; onOpen: OpenEntry }) {
+export function Markdown({ body, related, onOpen }: { body: string; related: ReadonlyMap<string, string>; onOpen: OpenEntry }) {
   const lines = body.split(/\r?\n/);
   const blocks: ReactNode[] = [];
   let index = 0;
