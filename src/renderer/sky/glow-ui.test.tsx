@@ -9,7 +9,7 @@ import type { GlowTier } from '../../shared/glow';
 import type { AwardWriteResult, CrystalList, NodeCrystalDetail } from '../../shared/types';
 import { manualClock } from '../test-support/manual-clock';
 import { Sky } from './Sky';
-import skyCss from './Sky.module.css?raw';
+import prismCss from './PrismCrystal.module.css?raw';
 
 const tiers: GlowTier[] = ['white', 'green', 'blue', 'violet', 'gold', 'red', 'rainbow'];
 const version = { mtime: 1700000000000, size: 120 };
@@ -204,14 +204,14 @@ describe('經歷等級光暈與彩虹頒發(介面)', () => {
     await render(true);
     expect(host.querySelector<HTMLElement>('[data-sky]')!.dataset.quiet).toBe('true');
     expect(crystal('n-rainbow').dataset.glow).toBe('rainbow');
-    const css = skyCss;
-    // The oval aura itself never rotates; only its inner conic layer does (M5c review, visual item).
-    expect(css).toMatch(/\.skyScene \.crystal\[data-glow='rainbow'\] \.crystalAura \{[^}]*background: none; overflow: hidden;[^}]*mask-image: radial-gradient/);
-    // M5f: auras are radial gradients, never a blur filter (performance; DESIGN.md §10.1).
-    expect(css).not.toMatch(/\.crystalAura \{[^}]*filter: blur/);
-    expect(css).toMatch(/\.crystalAura::before \{[^}]*animation: rainbowSpin 10s linear infinite;/);
-    expect(css).not.toMatch(/\.crystalAura \{[^}]*animation: rainbowSpin/);
-    expect(css).toContain(".skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; }");
-    expect(css).toContain("@media (prefers-reduced-motion: reduce) { .skyScene .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; } }");
+    const css = prismCss.replace(/\r\n/g, '\n');
+    // The oval aura itself never rotates; only its inner conic layer does (M5c review, visual item). M5h: the prism.
+    expect(css).toMatch(/\.prism\[data-glow='rainbow'\] > \.aura \{[^}]*background: none; overflow: hidden;[^}]*mask-image: radial-gradient/);
+    // Auras are radial gradients, never a blur filter (performance; DESIGN.md §10.1).
+    expect(css).not.toMatch(/\.aura \{[^}]*filter: blur/);
+    expect(css).toMatch(/\.aura::before \{[^}]*animation: prismRainbow 10s linear infinite;/);
+    expect(css).not.toMatch(/\.aura \{[^}]*animation: prismRainbow/);
+    expect(css).toContain("[data-quiet='true'] .prism[data-glow='rainbow'] > .aura::before { animation: none; }");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[^@]*\.prism\[data-glow='rainbow'\] > \.aura::before \{ animation: none; \}/);
   });
 });

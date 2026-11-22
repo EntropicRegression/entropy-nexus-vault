@@ -1,0 +1,145 @@
+/* Prismatic gem crystal (Hagemi's spec; DESIGN.md §6.5, §6.9). Reusable: the star map and the galaxy interior both
+   use PrismCrystal.tsx. Performance rules (DESIGN.md §10.1): no blur filter anywhere (the spec's 1–1.2px blur on the
+   ring layers is dropped), the aura is a radial gradient, the ring mask is a same-origin SVG file (the CSP blocks data:
+   images), and with many crystals ([data-dense]) the colour-fringe layers are not drawn. */
+
+.prism {
+  position: relative; display: flex; flex-direction: column; align-items: center; will-change: transform;
+  /* Tier defaults (white). */
+  --glow: #e2e8f0; --glow-rgb: 226, 232, 240;
+  --aura-scale: 1.22; --aura-opacity: 0.5;
+  --backlight: radial-gradient(ellipse at 50% 42%, rgba(226,232,240,0.34) 0%, rgba(226,232,240,0.12) 52%, transparent 80%);
+  --inner: inset 0 0 20px rgba(226,232,240,0.38);
+  --ped-ring: rgba(226,232,240,0.58);
+  --ped-glow: 0 0 12px rgba(226,232,240,0.34), inset 0 0 8px rgba(226,232,240,0.26);
+}
+.prism[data-glow='green'] {
+  --glow: #4ade80; --glow-rgb: 74, 222, 128; --aura-scale: 1.3; --aura-opacity: 0.56;
+  --backlight: radial-gradient(ellipse at 50% 42%, rgba(74,222,128,0.36) 0%, rgba(74,222,128,0.14) 52%, transparent 80%);
+  --inner: inset 0 0 22px rgba(74,222,128,0.42); --ped-ring: rgba(74,222,128,0.65);
+  --ped-glow: 0 0 15px rgba(74,222,128,0.42), inset 0 0 10px rgba(74,222,128,0.32);
+}
+.prism[data-glow='blue'] {
+  --glow: #3b82f6; --glow-rgb: 59, 130, 246; --aura-scale: 1.38; --aura-opacity: 0.62;
+  --backlight: radial-gradient(ellipse at 50% 42%, rgba(96,165,250,0.4) 0%, rgba(59,130,246,0.18) 54%, transparent 82%);
+  --inner: inset 0 0 24px rgba(59,130,246,0.46); --ped-ring: rgba(59,130,246,0.72);
+  --ped-glow: 0 0 18px rgba(59,130,246,0.48), inset 0 0 11px rgba(59,130,246,0.36);
+}
+.prism[data-glow='violet'] {
+  --glow: #c084fc; --glow-rgb: 192, 132, 252; --aura-scale: 1.46; --aura-opacity: 0.66;
+  --backlight: radial-gradient(ellipse at 50% 42%, rgba(216,180,254,0.42) 0%, rgba(192,132,252,0.2) 54%, transparent 82%);
+  --inner: inset 0 0 26px rgba(192,132,252,0.48); --ped-ring: rgba(192,132,252,0.75);
+  --ped-glow: 0 0 20px rgba(192,132,252,0.52), inset 0 0 12px rgba(192,132,252,0.38);
+}
+.prism[data-glow='gold'] {
+  --glow: #f59e0b; --glow-rgb: 245, 158, 11; --aura-scale: 1.54; --aura-opacity: 0.72;
+  --backlight: radial-gradient(ellipse at 50% 42%, rgba(253,224,71,0.38) 0%, rgba(245,158,11,0.2) 54%, transparent 82%);
+  --inner: inset 0 0 28px rgba(245,158,11,0.52); --ped-ring: rgba(245,158,11,0.8);
+  --ped-glow: 0 0 22px rgba(245,158,11,0.56), inset 0 0 13px rgba(245,158,11,0.42);
+}
+.prism[data-glow='red'] {
+  --glow: #f43f5e; --glow-rgb: 244, 63, 94; --aura-scale: 1.62; --aura-opacity: 0.78;
+  --backlight: radial-gradient(ellipse at 50% 42%, rgba(253,164,175,0.38) 0%, rgba(244,63,94,0.22) 55%, transparent 84%);
+  --inner: inset 0 0 30px rgba(244,63,94,0.54); --ped-ring: rgba(244,63,94,0.82);
+  --ped-glow: 0 0 24px rgba(244,63,94,0.58), inset 0 0 14px rgba(244,63,94,0.44);
+}
+.prism[data-glow='rainbow'] {
+  --glow: #fde68a; --glow-rgb: 253, 230, 138; --aura-scale: 1.62; --aura-opacity: 0.8;
+  --backlight: radial-gradient(ellipse at 50% 40%, rgba(254,249,195,0.36) 0%, rgba(192,132,252,0.22) 44%, rgba(56,189,248,0.16) 72%, transparent 88%);
+  --inner: inset 0 0 28px rgba(255,255,255,0.48), inset 0 0 16px rgba(192,132,252,0.4); --ped-ring: rgba(253,230,138,0.85);
+  --ped-glow: 0 0 22px rgba(92,225,230,0.5), 0 0 32px rgba(244,63,94,0.35), inset 0 0 14px rgba(253,230,138,0.45);
+}
+
+/* Aura: a radial gradient (no blur filter); size and strength step up with the tier. */
+.aura {
+  position: absolute; z-index: -1; border-radius: 50%; pointer-events: none;
+  width: calc(124px * var(--aura-scale)); height: calc(152px * var(--aura-scale)); top: calc(-6px - 76px * (var(--aura-scale) - 1));
+  background: radial-gradient(ellipse closest-side, rgba(var(--glow-rgb), 1) 0%, rgba(var(--glow-rgb), 0.62) 52%, transparent 100%);
+  opacity: var(--aura-opacity); transition: opacity var(--hover-dur, 180ms) ease-out;
+}
+/* Selected or hovered: a brighter aura of the same colour (M5c rule). */
+[aria-pressed='true'] > .prism > .aura, :hover > .prism > .aura { opacity: min(0.95, calc(var(--aura-opacity) + 0.24)); }
+/* Rainbow: only the colours turn (a round conic layer inside the oval), softened by a radial mask; still under low motion. */
+.prism[data-glow='rainbow'] > .aura {
+  background: none; overflow: hidden;
+  mask-image: radial-gradient(ellipse closest-side, #000 25%, transparent 100%);
+}
+.prism[data-glow='rainbow'] > .aura::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
+  border-radius: 50%; background: var(--glow-rainbow); opacity: 0.8; animation: prismRainbow 10s linear infinite;
+}
+@keyframes prismRainbow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.shape {
+  position: relative; z-index: 1; width: 96px; height: 136px; overflow: hidden; pointer-events: auto;
+  clip-path: polygon(50% 0%, 92% 24%, 92% 76%, 50% 100%, 8% 76%, 8% 24%);
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(254, 240, 138, 0.24), transparent 48%),
+    linear-gradient(145deg, rgba(56, 189, 248, 0.24) 0%, rgba(168, 85, 247, 0.2) 48%, rgba(244, 114, 182, 0.24) 100%);
+  box-shadow: var(--inner);
+}
+[aria-pressed='true'] > .prism .shape { box-shadow: inset 0 0 30px rgba(253, 230, 138, 0.68); }
+.backlight { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: var(--backlight); }
+
+/* The picture fills the hexagon; its face sits in the clear 52×106 central table, unblended so it stays sharp. */
+.portrait { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+/* No portrait: the constellation glyph, tinted with the tier colour through a mask (no filter). */
+.sigil, .sigilFringe {
+  position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  mask: url('../../../assets/ui/constellation.svg') center / contain no-repeat;
+}
+.sigil { z-index: 3; background: color-mix(in srgb, var(--glow) 35%, #ffffff); }
+
+/* Refraction ring: only the six outer facets (the central table is cut out by the mask), magnified ×1.13, with ±2px
+   cyan and pink fringes. The spec's blur on these layers is not used (no blur filters, DESIGN.md §10.1). */
+.ring {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden;
+  mask: url('../../../assets/ui/crystal-ring-mask.svg') 0 0 / 100% 100% no-repeat;
+}
+.ring img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.ringBase { transform: scale(1.13) translateY(-1px); filter: brightness(1.18) saturate(1.25); opacity: 0.92; }
+.fringeCyan, .fringePink { mix-blend-mode: screen; }
+img.fringeCyan { transform: scale(1.15) translate(-2px, -1px); filter: hue-rotate(-35deg) saturate(1.6) brightness(1.25); opacity: 0.45; }
+img.fringePink { transform: scale(1.15) translate(2px, 1px); filter: hue-rotate(42deg) saturate(1.6) brightness(1.2); opacity: 0.42; }
+.sigilFringe { opacity: 0.55; }
+.sigilFringe.fringeCyan { background: #67e8f9; transform: translate(-2px, -1px) scale(1.12); }
+.sigilFringe.fringePink { background: #f472b6; transform: translate(2px, 1px) scale(1.12); }
+
+.facets { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; pointer-events: none; }
+/* One screen-blended group for the facet gradients (cheaper than blending each polygon). */
+.facetGlow { mix-blend-mode: screen; }
+
+/* Hover: one diagonal sheen sweep (DESIGN.md §10.1 micro-interaction); none under low motion. */
+.sheen {
+  position: absolute; inset: -30%; z-index: 5; pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.36) 49%, rgba(255,255,255,0.08) 54%, transparent 65%);
+  transform: translateX(-110%); transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+:hover > .prism .sheen { transform: translateX(110%); }
+
+/* Brass pedestal with a tier-coloured ring; selected turns pale gold (M5c rule). */
+.pedestal {
+  position: relative; z-index: 1; width: 92px; height: 22px; margin-top: -8px; border-radius: 50%; pointer-events: auto;
+  background: radial-gradient(ellipse at 50% 35%, rgba(154,118,72,0.9) 0%, rgba(44,30,20,0.96) 72%, rgba(24,16,10,1) 100%);
+  border: 1.5px solid var(--ped-ring);
+  box-shadow: var(--ped-glow);
+}
+[aria-pressed='true'] > .prism .pedestal { border-color: #fde68a; box-shadow: 0 0 0 1.5px #fde68a, 0 0 16px rgba(253,230,138,0.5); }
+
+/* Archived crystals: the glass dims and the aura is weaker (×0.45 in the spec). */
+[data-archived='true'] > .prism .shape { opacity: 0.8; filter: saturate(0.72) brightness(0.92); }
+[data-archived='true'] > .prism > .aura { opacity: calc(var(--aura-opacity) * 0.45); }
+[data-archived='true'] > .prism .ringBase { opacity: 0.65; }
+
+/* Many crystals at once: drop the colour-fringe layers (two blended copies per crystal). */
+[data-dense] .fringeCyan, [data-dense] .fringePink { display: none; }
+
+/* Low motion (the scene's data-quiet covers the app setting and the system setting): no sheen, no rainbow turn. */
+[data-quiet='true'] .sheen { display: none; }
+[data-quiet='true'] .prism[data-glow='rainbow'] > .aura::before { animation: none; }
+[data-quiet='true'] .aura { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .sheen { display: none; }
+  .prism[data-glow='rainbow'] > .aura::before { animation: none; }
+}

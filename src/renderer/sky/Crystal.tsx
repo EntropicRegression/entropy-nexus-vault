@@ -2,6 +2,7 @@ import type { MouseEvent } from 'react';
 import type { NodeCrystal } from '../../shared/types';
 import constellation from '../../../assets/ui/constellation.svg';
 import { usePortraitChain } from '../brand/brand-portrait';
+import { PrismCrystal } from './PrismCrystal';
 import styles from './Sky.module.css';
 
 /**
@@ -32,12 +33,7 @@ export function Crystal({ node, index, selected, setAnchor, onClick }: {
   return <div ref={setAnchor} className={styles.nodeAnchor} data-crystal-anchor={node.nodeId}>
     <button className={styles.crystal} data-crystal={node.nodeId} data-archived={node.status === '封存'} data-status={node.status} data-glow={node.glow ?? 'white'}
       type="button" aria-pressed={selected} aria-label={node.name + ' ' + badge.text} onClick={onClick}>
-      <span className={styles.crystalAura} aria-hidden="true" />
-      <span className={styles.crystalShape} style={{ animationDelay: index * 0.6 + 's' }}>
-        <CrystalPortrait node={node} />
-        <span className={styles.crystalFacet} aria-hidden="true" />
-      </span>
-      <span className={styles.crystalPedestal} aria-hidden="true" />
+      <PrismCrystal node={node} glow={node.glow ?? 'white'} />
       <span className={styles.crystalLabel} data-crystal-label="" title={node.name}>
         <strong>{node.name}</strong>
         <span className={styles.crystalBadge + ' ' + badge.style}>{badge.text}</span>

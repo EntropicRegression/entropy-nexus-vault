@@ -92,7 +92,8 @@ describe('正式打包的 ASAR 與字型授權', () => {
       [assetDir + 'library-starry-xyz.png']: 'synthetic background',
       [assetDir + 'constellation-abc.svg']: '<svg />',
       [assetDir + 'paper-grain-def.svg']: '<svg>grain</svg>',
-      [assetDir + 'index-x.css']: 'a{background:url(/assets/library-starry-xyz.png)}b{background:url(/assets/paper-grain-def.svg)}',
+      [assetDir + 'crystal-ring-mask-ghi.svg']: '<svg>ring</svg>',
+      [assetDir + 'index-x.css']: 'a{background:url(/assets/library-starry-xyz.png)}b{background:url(/assets/paper-grain-def.svg)}c{mask:url(/assets/crystal-ring-mask-ghi.svg)}',
       [assetDir + 'index-x.js']: 'const fallback="/assets/constellation-abc.svg";',
       ...Object.fromEntries(families.map((name) => [assetDir + name + '-x.woff2', 'wOF2 synthetic header'])),
       ...extra,
@@ -109,6 +110,7 @@ describe('正式打包的 ASAR 與字型授權', () => {
       'assets/bg/library-starry.png': 'synthetic background',
       'assets/ui/constellation.svg': '<svg />',
       'assets/ui/paper-grain.svg': '<svg>grain</svg>',
+      'assets/ui/crystal-ring-mask.svg': '<svg>ring</svg>',
       ...Object.fromEntries(families.map((name) => ['node_modules/@fontsource-variable/' + name + '/LICENSE', 'license ' + name])),
     });
     await write(resources, Object.fromEntries(families.filter((name) => includeLicense || name !== families[0])
@@ -121,7 +123,7 @@ describe('正式打包的 ASAR 與字型授權', () => {
   it('確認 ASAR 入口、圖像、三種字型與原始授權', async () => {
     expect(await packed()).toMatchObject({
       problems: [],
-      graphics: expect.arrayContaining([expect.stringContaining('library-starry'), expect.stringContaining('constellation'), expect.stringContaining('paper-grain')]),
+      graphics: expect.arrayContaining([expect.stringContaining('library-starry'), expect.stringContaining('constellation'), expect.stringContaining('paper-grain'), expect.stringContaining('crystal-ring-mask')]),
       fonts: { 'noto-serif-tc': 1, 'noto-sans-tc': 1, 'jetbrains-mono': 1 },
     });
   });

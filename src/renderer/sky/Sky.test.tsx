@@ -144,13 +144,13 @@ describe('星象召喚盤', () => {
     const avatar = crystal('iris').querySelector('img')!;
     expect(avatar.getAttribute('src')).toBe('vault-image://node/iris/portrait');
     expect(crystal('iris').dataset.archived).toBe('true');
-    expect(crystal('quill').querySelector('img')?.dataset.portrait).toBe('constellation');
+    expect(crystal('quill').querySelector<HTMLElement>('[data-portrait]')?.dataset.portrait).toBe('constellation');
     expect(crystal('quill').textContent).toContain('● 現役');
     expect(crystal('flint').textContent).toContain('● 休眠');
     expect(crystal('dawn').textContent).toContain('◇ 封存 · 純紀念');
     expect(crystal('iris').textContent).toContain('✦ 封存 · 可喚醒');
     act(() => avatar.dispatchEvent(new Event('error')));
-    expect(crystal('iris').querySelector('img')?.dataset.portrait).toBe('constellation');
+    expect(crystal('iris').querySelector<HTMLElement>('[data-portrait]')?.dataset.portrait).toBe('constellation');
 
     await act(async () => crystal('iris').click());
     expect(readCrystal).toHaveBeenCalledWith('iris');

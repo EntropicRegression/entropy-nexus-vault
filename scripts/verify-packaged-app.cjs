@@ -14,6 +14,8 @@ const requiredGraphics = [
   { source: 'assets/ui/constellation.svg', name: /^constellation-[\w-]+\.svg$/ },
   // Premium finish paper grain (DESIGN.md §10.1); a file rather than a data: URL, which the CSP blocks.
   { source: 'assets/ui/paper-grain.svg', name: /^paper-grain-[\w-]+\.svg$/ },
+  // Prismatic crystal: the mask that cuts the central table out of the refraction ring (DESIGN.md §6.5; M5h).
+  { source: 'assets/ui/crystal-ring-mask.svg', name: /^crystal-ring-mask-[\w-]+\.svg$/ },
 ];
 const fontFamilies = ['noto-serif-tc', 'noto-sans-tc', 'jetbrains-mono'];
 const requiredEntries = ['package.json', 'out/main/index.js', 'out/preload/index.js', renderer + 'index.html'];
