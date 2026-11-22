@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>專案星系總覽｜渾天儀質感精修版</title>
+<style>
+  :root {
+    --cyan: #5ce1e6;
+    --violet: #a78bfa;
+    --amber: #f5b963;
+    --gold: #fde68a;
+    --brass: #7A5B35;
+    --gold-warm: #D9A441;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --fly-dur: 550ms;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    background:
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 4px),
+      radial-gradient(circle at 50% 48%, rgba(30, 41, 82, 0.35), transparent 62%),
+      linear-gradient(180deg, #070B1A 0%, #0C132D 75%, #131836 100%);
+    color: var(--text);
+    user-select: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root { --fly-dur: 150ms; }
+    .astro-ring, .crystal-aura.is-rainbow { animation: none !important; }
+  }
+  body.low-motion { --fly-dur: 150ms; }
+  body.low-motion .astro-ring,
+  body.low-motion .crystal-aura.is-rainbow { animation: none !important; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* Top HUD (backdrop-filter only on topbar & resume drawer) */
+  .top-hud {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 60; display: flex; align-items: center; gap: 10px; padding: 7px 18px;
+    background: linear-gradient(180deg, rgba(16, 22, 42, 0.92), rgba(8, 12, 24, 0.92));
+    border: 1px solid rgba(217, 164, 65, 0.45);
+    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    flex-wrap: wrap;
+  }
+  .brand {
+    font-size: 12px; letter-spacing: 0.16em; font-weight: 800; color: var(--gold);
+    padding-right: 12px; border-right: 1px solid rgba(217, 164, 65, 0.3);
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .diamond { width: 7px; height: 7px; transform: rotate(45deg); background: var(--cyan); }
+  .hud-btn {
+    border: 1px solid rgba(217,164,65,0.28); background: rgba(255,255,255,0.04);
+    color: #cbd5e1; padding: 5px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border-radius: 3px; white-space: nowrap;
+  }
+  .hud-btn:hover { color: #fff; border-color: var(--gold-warm); }
+  .hud-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(217, 164, 65, 0.16); }
+  .hud-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .main-stage {
+    position: relative; width: 100vw; height: 100vh;
+    padding: 72px 24px 24px; display: flex; gap: 18px;
+  }
+
+  .universe-frame {
+    position: relative; flex: 1; height: 100%;
+    background: rgba(7, 12, 28, 0.54);
+    border: 1px solid rgba(217, 164, 65, 0.34);
+    box-shadow: inset 0 2px 18px rgba(0,0,0,0.65);
+    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
+    overflow: hidden;
+  }
+  .star-bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+
+  /* Overview Layer */
+  .overview-layer {
+    position: absolute; inset: 0; z-index: 2;
+    transition: transform var(--fly-dur) cubic-bezier(0.22, 1, 0.36, 1), opacity var(--fly-dur) ease;
+  }
+  body.view-galaxy .overview-layer, body.view-flat .overview-layer { opacity: 0; pointer-events: none; }
+
+  /* Outer Dust Belt (88% x 82%) */
+  .dust-belt-ring {
+    position: absolute; left: 50%; top: 50%;
+    width: 88%; height: 82%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px dashed rgba(148, 163, 184, 0.24);
+    pointer-events: none;
+  }
+  .dust-belt-label {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #94a3b8; letter-spacing: 0.14em;
+    background: rgba(7, 11, 26, 0.85); padding: 2px 12px; border-radius: 10px;
+  }
+
+  .bridge-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+  .bridge-hit { pointer-events: stroke; cursor: pointer; }
+  .bridge-tooltip {
+    position: fixed; z-index: 80; pointer-events: none; display: none;
+    background: rgba(6, 11, 26, 0.95); border: 1px solid var(--gold-warm);
+    color: #fde68a; font-size: 11.5px; padding: 4px 10px; border-radius: 3px;
+  }
+
+  /* Center Chief Hub (84px) */
+  .chief-hub {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 6; background: none; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text);
+  }
+  .chief-hub:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 50%; }
+  .chief-sun {
+    width: 84px; height: 84px; border-radius: 50%;
+    border: 1.5px solid var(--gold-warm);
+    box-shadow: 0 0 22px rgba(217, 164, 65, 0.35), inset 0 0 14px rgba(253, 230, 138, 0.28);
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle, rgba(253, 230, 138, 0.32) 0%, rgba(122, 91, 53, 0.18) 62%, transparent 74%);
+  }
+  .chief-inner-ring {
+    width: 56px; height: 56px; border-radius: 50%;
+    border: 1px dashed rgba(245, 185, 99, 0.8);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--gold);
+  }
+  .hub-plate {
+    background: rgba(6, 11, 26, 0.92); border: 1px solid rgba(217, 164, 65, 0.55);
+    padding: 3px 12px; font-size: 11.5px; color: var(--gold); white-space: nowrap;
+  }
+
+  /* Armillary Galaxies (150-210px) & Layered Clouds */
+  .cluster-node {
+    position: absolute; transform: translate(-50%, -50%); z-index: 5;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    transition: left 0.65s cubic-bezier(0.22, 1, 0.36, 1), top 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .cluster-btn { background: none; border: none; cursor: pointer; color: var(--text); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px; }
+  .cluster-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 8px; }
+  .cluster-btn:hover .armillary-svg { transform: scale(1.04); }
+  .armillary-svg { transition: transform 0.2s ease; }
+
+  .cluster-plate {
+    background: rgba(6, 11, 26, 0.92); border: 1px solid rgba(217, 164, 65, 0.38);
+    padding: 4px 12px; font-size: 12px; text-align: center; white-space: nowrap;
+    position: relative;
+  }
+  .cluster-plate::before, .cluster-plate::after {
+    content: ""; position: absolute; top: 50%; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--gold-warm); transform: translateY(-50%);
+  }
+  .cluster-plate::before { left: 4px; }
+  .cluster-plate::after { right: 4px; }
+  .cluster-plate .sub { display: block; font-size: 10.5px; color: #94a3b8; margin-top: 1px; }
+
+  .upgrade-btn {
+    border: 1px solid rgba(92, 225, 230, 0.45); background: rgba(11, 18, 40, 0.92);
+    color: #bae6fd; font-size: 10.5px; padding: 2px 9px; border-radius: 3px; cursor: pointer;
+  }
+  .upgrade-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  .dust-node {
+    position: absolute; transform: translate(-50%, -50%); z-index: 4;
+    background: none; border: none; cursor: pointer; color: #94a3b8;
+    display: flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 8px; border-radius: 10px;
+  }
+  .dust-node:hover { color: #e2e8f0; background: rgba(148, 163, 184, 0.14); }
+  .dust-dot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; opacity: 0.75; }
+
+  /* ==================== INTERIOR: ORIGINAL 3D ORBITAL PROJECTION ==================== */
+  .interior-layer {
+    position: absolute; inset: 0; z-index: 4;
+    opacity: 0; pointer-events: none; transform: scale(0.94);
+    transition: opacity var(--fly-dur) ease, transform var(--fly-dur) cubic-bezier(0.22, 1, 0.36, 1);
+    cursor: grab;
+  }
+  .interior-layer:active { cursor: grabbing; }
+  body.view-galaxy .interior-layer, body.view-flat .interior-layer { opacity: 1; pointer-events: auto; transform: scale(1); }
+
+  .interior-topbar {
+    position: absolute; top: 14px; left: 16px; right: 16px; z-index: 12;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; pointer-events: none;
+  }
+  .interior-topbar > * { pointer-events: auto; }
+  .back-btn {
+    border: 1px solid rgba(217, 164, 65, 0.6); background: rgba(6, 11, 26, 0.9);
+    color: var(--gold); padding: 6px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .link-filter-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+  .link-pill {
+    font-size: 11px; font-weight: 700; padding: 4px 10px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(6, 11, 26, 0.84); color: #94a3b8;
+  }
+  .link-pill.on-inherit { border-color: #f59e0b; color: #fde68a; background: rgba(245,158,11,0.18); }
+  .link-pill.on-collab  { border-color: #38bdf8; color: #bae6fd; background: rgba(56,189,248,0.18); }
+  .link-pill.on-meeting { border-color: #a78bfa; color: #e9d5ff; background: rgba(167,139,250,0.20); }
+  .link-pill.on-project { border-color: #34d399; color: #a7f3d0; background: rgba(52,211,153,0.16); }
+
+  .astrolabe-3d-wrap {
+    position: absolute; left: 50%; top: 52%; width: 500px; height: 500px;
+    transform: translate(-50%, -50%); pointer-events: none; perspective: 950px; z-index: 1;
+  }
+  .armillary-3d { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; }
+  .astro-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; transform-style: preserve-3d; }
+  .ring-outer { width: 460px; height: 460px; margin: -230px 0 0 -230px; border: 1.5px dashed rgba(122, 91, 53, 0.55); animation: orbit1 32s linear infinite; }
+  .ring-mid { width: 370px; height: 370px; margin: -185px 0 0 -185px; border: 1.5px solid rgba(217, 164, 65, 0.42); animation: orbit2 24s linear infinite; }
+  .ring-inner { width: 270px; height: 270px; margin: -135px 0 0 -135px; border: 1px dashed rgba(92, 225, 230, 0.4); animation: orbit3 18s linear infinite; }
+  @keyframes orbit1 { from { transform: rotateX(62deg) rotateY(14deg) rotateZ(0deg); } to { transform: rotateX(62deg) rotateY(14deg) rotateZ(360deg); } }
+  @keyframes orbit2 { from { transform: rotateX(28deg) rotateY(58deg) rotateZ(360deg); } to { transform: rotateX(28deg) rotateY(58deg) rotateZ(0deg); } }
+  @keyframes orbit3 { from { transform: rotateX(72deg) rotateY(-38deg) rotateZ(0deg); } to { transform: rotateX(72deg) rotateY(-38deg) rotateZ(360deg); } }
+
+  .constellation-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+
+  /* Crystal Specimen: Dual Angled Glass Facets + Solid Brass Pedestal + Radial-Gradient Aura */
+  .crystal-node {
+    position: absolute; transform: translate(-50%, -50%); width: 144px;
+    display: flex; flex-direction: column; align-items: center; cursor: pointer; z-index: 5;
+    background: none; border: none; color: var(--text);
+  }
+  .crystal-node.is-dormant { opacity: 0.48; filter: saturate(0.65); }
+  .crystal-aura {
+    position: absolute; width: 148px; height: 168px; top: -12px; border-radius: 50%; z-index: -1; pointer-events: none;
+  }
+  .crystal-aura.is-rainbow {
+    background: conic-gradient(from 0deg, rgba(244,63,94,.42), rgba(245,158,11,.42), rgba(74,222,128,.42), rgba(59,130,246,.42), rgba(192,132,252,.42), rgba(244,63,94,.42));
+    mask-image: radial-gradient(circle, rgba(0,0,0,0.9) 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0.9) 20%, transparent 70%);
+    animation: slowSpin 10s linear infinite;
+  }
+  .crystal-shape {
+    width: 96px; height: 136px; position: relative;
+    clip-path: polygon(50% 0%, 92% 24%, 92% 76%, 50% 100%, 8% 76%, 8% 24%);
+    background:
+      linear-gradient(125deg, rgba(255,255,255,0.22) 0%, transparent 40%, rgba(255,255,255,0.08) 100%),
+      linear-gradient(235deg, rgba(92,225,230,0.14) 0%, rgba(167,139,250,0.26) 100%);
+    box-shadow: inset 0 0 22px rgba(255,255,255,0.28);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .crystal-node.selected .crystal-shape { box-shadow: inset 0 0 28px rgba(253,230,138,0.62); }
+  .crystal-shape svg { width: 64px; height: 64px; }
+
+  /* Solid Brass Dual-Ring Pedestal */
+  .crystal-pedestal {
+    width: 92px; height: 22px; margin-top: -8px; border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(122, 91, 53, 0.85) 0%, rgba(44, 30, 20, 0.95) 75%);
+    border: 1.5px solid var(--brass);
+    box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.55), 0 4px 10px rgba(0,0,0,0.7);
+  }
+  .crystal-node.selected .crystal-pedestal {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1.5px var(--gold), 0 0 16px rgba(253,230,138,0.5);
+  }
+
+  .crystal-label {
+    margin-top: 6px; text-align: center; background: rgba(6, 11, 26, 0.92);
+    padding: 3px 12px; border: 1px solid rgba(217, 164, 65, 0.4); font-size: 12px; position: relative;
+  }
+  .crystal-label::before, .crystal-label::after { content: ""; position: absolute; top: 50%; width: 2.5px; height: 2.5px; border-radius: 50%; background: var(--gold-warm); transform: translateY(-50%); }
+  .crystal-label::before { left: 4px; }
+  .crystal-label::after { right: 4px; }
+  .crystal-badge { font-size: 10px; display: inline-block; padding: 1px 6px; border-radius: 3px; margin-top: 2px; background: rgba(92,225,230,0.14); color: #bae6fd; }
+
+  .exit-bar { position: absolute; bottom: 16px; left: 20px; right: 20px; z-index: 12; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .exit-chip { border: 1px solid rgba(56, 189, 248, 0.45); background: rgba(6, 11, 26, 0.9); color: #bae6fd; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+  .exit-chip.inherit-chip { border-color: rgba(217, 164, 65, 0.7); color: var(--gold); }
+
+  .flat-banner { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 12; background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(245, 185, 99, 0.45); color: var(--gold); font-size: 12px; padding: 5px 14px; border-radius: 3px; display: none; }
+  body.view-flat .flat-banner { display: block; }
+
+  /* Right Resume Drawer */
+  .detail-panel {
+    width: 390px; height: 100%; padding: 20px 22px;
+    background: rgba(11, 18, 40, 0.9); border: 1px solid rgba(217, 164, 65, 0.38);
+    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
+    backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; gap: 12px; overflow-y: auto;
+  }
+  .detail-panel.collapsed { display: none; }
+  .box-note { padding: 10px 12px; background: rgba(0,0,0,0.3); border-left: 2px solid var(--gold-warm); font-size: 12.5px; line-height: 1.65; color: #cbd5e1; }
+
+  .toast-bar {
+    position: fixed; bottom: 18px; left: 24px; z-index: 80;
+    background: rgba(10, 15, 36, 0.96); border: 1px solid var(--gold-warm);
+    color: var(--text); padding: 8px 14px; font-size: 12.5px; display: none; align-items: center; gap: 10px;
+  }
+  .toast-bar.visible { display: flex; }
+</style>
+</head>
+<body class="view-overview">
+
+<div id="liveAnnounce" class="sr-only" aria-live="polite"></div>
+
+<div class="top-hud">
+  <div class="brand"><span class="diamond"></span> ENTROPY NEXUS · 渾天星系總覽</div>
+  <button class="hud-btn" id="btnArrange" onclick="arrangeByCollab()">整理一次（依合作排列）</button>
+  <button class="hud-btn" id="btnFlat" onclick="toggleFlatFallback()">模擬舊資料：平面星圖</button>
+  <button class="hud-btn" id="btnMotion" onclick="toggleLowMotion()">低動態：關</button>
+</div>
+
+<div class="main-stage">
+  <div class="universe-frame" id="universeFrame">
+    <canvas class="star-bg-canvas" id="starBgCanvas"></canvas>
+
+    <!-- 1. OVERVIEW LAYER -->
+    <div class="overview-layer" id="overviewLayer" aria-label="專案星系總覽">
+      <div class="dust-belt-ring"><span class="dust-belt-label">外環星塵帶（無專案全域節點 · 舊封存散落節點）</span></div>
+      <svg class="bridge-svg" id="bridgeSvg" viewBox="0 0 1000 620" preserveAspectRatio="none"></svg>
+
+      <button class="chief-hub" id="chiefHub"
+              aria-label="總管中樞 administrator，懸停或點擊檢視指揮連線"
+              onmouseenter="setChiefHover(true)" onmouseleave="setChiefHover(false)"
+              onfocus="setChiefHover(true)" onblur="setChiefHover(false)"
+              onclick="selectDustOrChief('chief')">
+        <div class="chief-sun"><div class="chief-inner-ring">✦</div></div>
+        <div class="hub-plate">總管中樞 · administrator</div>
+      </button>
+
+      <div id="clusterLayer"></div>
+      <div id="dustLayer"></div>
+    </div>
+
+    <!-- 2. INTERIOR LAYER (ORIGINAL 3D ORBITAL PROJECTION) -->
+    <div class="interior-layer" id="interiorLayer" aria-label="星系內部 3D 水晶星圖">
+      <div class="interior-topbar">
+        <button class="back-btn" id="btnBackOverview" onclick="exitGalaxy()">← 返回星系總覽（Esc）</button>
+        <div class="link-filter-bar" id="linkFilterBar" onclick="event.stopPropagation()">
+          <button class="link-pill on-inherit" onclick="toggleEdge('inherit', this)">━ 經驗傳承</button>
+          <button class="link-pill on-collab"  onclick="toggleEdge('collab', this)">┄ 交辦協作</button>
+          <button class="link-pill on-meeting" onclick="toggleEdge('meeting', this)">⋯ 會議同席</button>
+          <button class="link-pill on-project" onclick="toggleEdge('project', this)">◇ 同專案</button>
+        </div>
+      </div>
+
+      <div class="flat-banner">退路模式：統計檔尚無專案表時，維持現有平面星圖（不分群）</div>
+
+      <div class="astrolabe-3d-wrap">
+        <div class="armillary-3d" id="armillary3d">
+          <div class="astro-ring ring-outer"></div>
+          <div class="astro-ring ring-mid"></div>
+          <div class="astro-ring ring-inner"></div>
+        </div>
+      </div>
+      <canvas class="constellation-canvas" id="linkCanvas"></canvas>
+      <div id="crystalLayer"></div>
+      <div class="exit-bar" id="exitBar" onclick="event.stopPropagation()"></div>
+    </div>
+  </div>
+
+  <aside class="detail-panel collapsed" id="detailPanel" aria-label="節點標本履歷欄"></aside>
+</div>
+
+<div class="bridge-tooltip" id="bridgeTooltip"></div>
+<div class="toast-bar" id="toastBar" aria-live="polite"></div>
+
+<script>
+const CONSTELLATION_C = `<svg viewBox="0 0 128 128" fill="none" aria-hidden="true">
+  <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.45"><line x1="64" y1="24" x2="64" y2="104"/><line x1="34" y1="62" x2="94" y2="62"/><line x1="46" y1="44" x2="82" y2="44"/></g>
+  <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"><polygon points="64,24 94,62 64,104 34,62"/><polyline points="46,44 64,52 82,44"/></g>
+  <g fill="currentColor" opacity="0.45"><circle cx="46" cy="44" r="2.2"/><circle cx="82" cy="44" r="2.2"/></g>
+  <g fill="currentColor" opacity="0.9"><circle cx="64" cy="24" r="2.5"/><circle cx="94" cy="62" r="2.5"/><circle cx="64" cy="104" r="2.5"/><circle cx="34" cy="62" r="2.5"/><circle cx="64" cy="52" r="3.8"/><circle cx="64" cy="52" r="6.4" fill="none" stroke="currentColor" stroke-width="1" opacity="0.45"/></g>
+</svg>`;
+
+/* 1600x900 balanced mid-ring layout (diameter 150-210px, center distance >= 260px) */
+const CLUSTERS = [
+  { id: 'g-nexus', name: 'entropy-nexus', kind: 'git', active: 4, archived: 1, x: 25, y: 27, arrangedX: 32, arrangedY: 31, size: 204 },
+  { id: 'g-vault', name: 'memory-vault',  kind: 'git', active: 3, archived: 2, x: 75, y: 27, arrangedX: 68, arrangedY: 31, size: 196 },
+  { id: 'g-voice', name: 'voice-bridge',  kind: 'git', active: 2, archived: 1, x: 24, y: 72, arrangedX: 30, arrangedY: 69, size: 168 },
+  { id: 'g-cli',   name: 'cli-adapter',   kind: 'git', active: 3, archived: 0, x: 76, y: 72, arrangedX: 70, arrangedY: 69, size: 176 },
+  { id: 'g-docs',  name: 'orbit-docs',    kind: 'git', active: 1, archived: 1, x: 50, y: 18, arrangedX: 50, arrangedY: 20, size: 152 },
+  { id: 'c-test',    name: 'test',    kind: 'folder', active: 5, archived: 2, x: 14, y: 50, arrangedX: 15, arrangedY: 50, size: 142 },
+  { id: 'c-sandbox', name: 'sandbox', kind: 'folder', active: 2, archived: 1, x: 86, y: 50, arrangedX: 85, arrangedY: 50, size: 132 }
+];
+
+const BRIDGES = [
+  { from: 'g-nexus', to: 'g-vault', count: 14, width: 2.4, beads: 3 },
+  { from: 'g-nexus', to: 'g-docs',  count: 3,  width: 1.2, beads: 1 },
+  { from: 'g-vault', to: 'g-cli',   count: 9,  width: 2.0, beads: 2 },
+  { from: 'g-voice', to: 'g-cli',   count: 2,  width: 1.2, beads: 1 },
+  { from: 'g-voice', to: 'g-nexus', count: 7,  width: 1.6, beads: 1 }
+];
+
+const DUST_NODES = [
+  { id: 'dust-1', name: '全域書記・諾亞', state: '全域無專案', x: 11, y: 17, specialty: '跨專案例行清理與索引備份（無固定專案）。', otherProjects: [] },
+  { id: 'dust-2', name: '舊紀封存・零號', state: '舊封存（無判例）', x: 89, y: 18, specialty: '早期封存節點，無結構化專案欄位亦無關聯判例。', otherProjects: [] },
+  { id: 'dust-3', name: '巡檢員・微光',   state: '舊封存（無判例）', x: 88, y: 83, specialty: '歷史測試殘留之封存節點，僅供查閱。', otherProjects: [] }
+];
+
+const GALAXY_INTERIORS = {
+  'g-nexus': {
+    nodes: [
+      { id: 'nx-1', specNo: 'SP-01', name: '架構師・克勞德', status: '線上', dormant: false, glow: 'rainbow', tier: '彩虹（手動頒發）', pos3d: [-125, -50, 80], specialty: '主程序架構與記憶庫安全界線設計。', otherProjects: ['memory-vault'] },
+      { id: 'nx-2', specNo: 'SP-02', name: '視覺師・哈格米', status: '線上', dormant: false, glow: 'gold',    tier: '金', pos3d: [145, -60, 45], specialty: '星圖視覺層次與書閣介面規範。', otherProjects: ['memory-vault', 'orbit-docs'] },
+      { id: 'nx-3', specNo: 'SP-03', name: '哨兵・格普特',   status: '休眠', dormant: true,  glow: 'blue',    tier: '藍', pos3d: [85, 100, -105], specialty: '型別邊界與回歸驗證（目前休眠）。', otherProjects: ['voice-bridge'] },
+      { id: 'nx-4', specNo: 'SP-04', name: '奠基者・一代目', status: '封存', dormant: true,  glow: 'white',   tier: '白', pos3d: [-185, 95, -65], specialty: '早期轉接器原型作者（已封存）。', otherProjects: [] }
+    ],
+    edges: [
+      { from: 'nx-1', to: 'nx-2', kind: 'collab',  label: '交辦 ×6' },
+      { from: 'nx-1', to: 'nx-3', kind: 'meeting', label: '同席 ×3' },
+      { from: 'nx-4', to: 'nx-1', kind: 'inherit', label: '接回自' },
+      { from: 'nx-2', to: 'nx-3', kind: 'project', label: '同專案' }
+    ],
+    exits: [
+      { target: 'g-vault', label: '→ memory-vault（14）', isInherit: false },
+      { target: 'g-voice', label: '→ voice-bridge（7）', isInherit: false },
+      { target: 'g-docs',  label: '→ orbit-docs（3）', isInherit: false },
+      { target: 'g-vault', selectNode: 'mv-1', label: '傳承自 → memory-vault 的〈守卷人・艾連〉', isInherit: true }
+    ]
+  },
+  'g-vault': {
+    nodes: [
+      { id: 'mv-1', specNo: 'SP-05', name: '守卷人・艾連', status: '線上', dormant: false, glow: 'gold',   tier: '金', pos3d: [-110, -40, 70], specialty: '專司判例收錄、取代演化鏈與封存校驗。', otherProjects: ['entropy-nexus'] },
+      { id: 'mv-2', specNo: 'SP-06', name: '檢校官・薇安', status: '線上', dormant: false, glow: 'purple', tier: '紫', pos3d: [130, -35, 30], specialty: '閱讀桌可讀性與邊界契約測試。', otherProjects: ['cli-adapter'] },
+      { id: 'mv-3', specNo: 'SP-07', name: '譯典官・墨爾', status: '休眠', dormant: true,  glow: 'green',  tier: '綠', pos3d: [20, 95, -90], specialty: '編目規範整理（休眠中）。', otherProjects: [] }
+    ],
+    edges: [
+      { from: 'mv-1', to: 'mv-2', kind: 'collab',  label: '交辦 ×4' },
+      { from: 'mv-1', to: 'mv-3', kind: 'inherit', label: '接回自' },
+      { from: 'mv-2', to: 'mv-3', kind: 'project', label: '同專案' }
+    ],
+    exits: [
+      { target: 'g-nexus', label: '→ entropy-nexus（14）', isInherit: false },
+      { target: 'g-cli',   label: '→ cli-adapter（9）', isInherit: false }
+    ]
+  }
+};
+
+function getInteriorData(clusterId) {
+  if (GALAXY_INTERIORS[clusterId]) return GALAXY_INTERIORS[clusterId];
+  const c = CLUSTERS.find(x => x.id === clusterId) || { name: clusterId };
+  return {
+    nodes: [
+      { id: `${clusterId}-1`, specNo: 'SP-08', name: `${c.name}・主節點`, status: '線上', dormant: false, glow: 'blue',  tier: '藍', pos3d: [-110, -30, 65], specialty: `負責「${c.name}」主要日常任務。`, otherProjects: ['entropy-nexus'] },
+      { id: `${clusterId}-2`, specNo: 'SP-09', name: `${c.name}・協作者`, status: '休眠', dormant: true,  glow: 'white', tier: '白', pos3d: [120, 45, -50], specialty: '輔助檢索與文件整理（休眠中）。', otherProjects: [] },
+      { id: `${clusterId}-3`, specNo: 'SP-10', name: `${c.name}・記錄者`, status: '線上', dormant: false, glow: 'green', tier: '綠', pos3d: [0, -85, -35], specialty: '維護任務紀錄與快照。', otherProjects: [] }
+    ],
+    edges: [
+      { from: `${clusterId}-1`, to: `${clusterId}-2`, kind: 'collab', label: '協作' },
+      { from: `${clusterId}-1`, to: `${clusterId}-3`, kind: 'project', label: '同專案' }
+    ],
+    exits: [{ target: 'g-nexus', label: '→ entropy-nexus（協作）', isInherit: false }]
+  };
+}
+
+const EDGE_STYLE = {
+  inherit: { color: 'rgba(245, 185, 99, 0.85)', width: 2.2, dash: [] },
+  collab:  { color: 'rgba(56, 189, 248, 0.7)',  width: 1.7, dash: [7, 5] },
+  meeting: { color: 'rgba(167, 139, 250, 0.7)', width: 1.7, dash: [3, 5] },
+  project: { color: 'rgba(52, 211, 153, 0.55)', width: 1.4, dash: [10, 8] }
+};
+
+const GLOW_RGBA = {
+  white:  ['#E2E8F0', 'rgba(226, 232, 240, 0.34)'],
+  green:  ['#4ADE80', 'rgba(74, 222, 128, 0.38)'],
+  blue:   ['#3B82F6', 'rgba(59, 130, 246, 0.42)'],
+  purple: ['#C084FC', 'rgba(192, 132, 252, 0.44)'],
+  gold:   ['#F59E0B', 'rgba(245, 158, 11, 0.46)'],
+  red:    ['#F43F5E', 'rgba(244, 63, 94, 0.48)'],
+  rainbow:['#fde68a', 'rgba(245, 158, 11, 0.46)']
+};
+
+const state = {
+  view: 'overview',
+  activeClusterId: null,
+  selectedNodeId: null,
+  chiefHover: false,
+  arranged: false,
+  lowMotion: false,
+  pendingUpgradeId: null,
+  enabledEdges: { inherit: true, collab: true, meeting: true, project: true }
+};
+
+let camYaw = 0.25, camPitch = 0.14, camZoom = 1.0;
+let isDragging3D = false, dragMoved = false, lastDragX = 0, lastDragY = 0;
+
+function announce(msg) { document.getElementById('liveAnnounce').textContent = msg; }
+function showToast(msg, undoFn) {
+  const bar = document.getElementById('toastBar');
+  bar.innerHTML = `<span>${msg}</span>`;
+  if (undoFn) {
+    const b = document.createElement('button');
+    b.className = 'hud-btn active';
+    b.textContent = '撤銷';
+    b.onclick = () => { undoFn(); bar.classList.remove('visible'); };
+    bar.appendChild(b);
+  }
+  bar.classList.add('visible');
+  clearTimeout(bar._t);
+  bar._t = setTimeout(() => bar.classList.remove('visible'), 4000);
+}
+
+function quadBezierMid(ax, ay, cx, cy, bx, by, t) {
+  const u = 1 - t;
+  return [u*u*ax + 2*u*t*cx + t*t*bx, u*u*ay + 2*u*t*cy + t*t*by];
+}
+
+function renderOverview() {
+  const svg = document.getElementById('bridgeSvg');
+  let svgHtml = '';
+
+  // Independent curved Bezier thin-wire bridges anchored at outer ring edges
+  const bridgeOp = state.chiefHover ? '0.2' : '0.55';
+  BRIDGES.forEach(b => {
+    const a = CLUSTERS.find(c => c.id === b.from);
+    const d = CLUSTERS.find(c => c.id === b.to);
+    const ax = (state.arranged ? a.arrangedX : a.x) * 10;
+    const ay = (state.arranged ? a.arrangedY : a.y) * 6.2;
+    const bx = (state.arranged ? d.arrangedX : d.x) * 10;
+    const by = (state.arranged ? d.arrangedY : d.y) * 6.2;
+
+    const dxFull = bx - ax, dyFull = by - ay;
+    const centerDist = Math.hypot(dxFull, dyFull) || 1;
+    const ux = dxFull / centerDist, uy = dyFull / centerDist;
+
+    // Outer ring edge clearance in 1000x620 viewBox units
+    const rA = a.size * 0.30 + 6;
+    const rB = d.size * 0.30 + 6;
+    const sx = ax + ux * rA, sy = ay + uy * rA;
+    const ex = bx - ux * rB, ey = by - uy * rB;
+
+    const edgeDist = Math.hypot(ex - sx, ey - sy) || 1;
+    const mx = (sx + ex) * 0.5, my = (sy + ey) * 0.5;
+
+    // Perpendicular normal oriented away from screen center (500, 310)
+    let nx = -uy, ny = ux;
+    if ((mx - 500) * nx + (my - 310) * ny < 0) { nx = -nx; ny = -ny; }
+    const bow = edgeDist * 0.14;
+    const cx = mx + nx * bow;
+    const cy = my + ny * bow;
+
+    const w = b.width;
+    const ts = b.beads === 3 ? [0.44, 0.5, 0.56] : (b.beads === 2 ? [0.47, 0.53] : [0.5]);
+    const beads = ts.map(t => {
+      const [px, py] = quadBezierMid(sx, sy, cx, cy, ex, ey, t);
+      return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2" fill="#fde68a" fill-opacity="${state.chiefHover ? '0.35' : '0.9'}"/>`;
+    }).join('');
+
+    const pathD = `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+    svgHtml += `
+      <path d="${pathD}" fill="none" stroke="#D9A441" stroke-opacity="${bridgeOp}" stroke-width="${w}" />
+      ${beads}
+      <path d="${pathD}" fill="none" stroke="transparent" stroke-width="14" class="bridge-hit"
+            onmouseenter="showBridgeTip(event, '跨專案協作 ${b.count} 次')" onmousemove="moveBridgeTip(event)" onmouseleave="hideBridgeTip()"/>
+    `;
+  });
+
+  if (state.chiefHover) {
+    CLUSTERS.filter(c => c.kind === 'git').forEach(c => {
+      const tx = (state.arranged ? c.arrangedX : c.x) * 10;
+      const ty = (state.arranged ? c.arrangedY : c.y) * 6.2;
+      svgHtml += `<line x1="500" y1="310" x2="${tx}" y2="${ty}" stroke="#fde68a" stroke-opacity="0.72" stroke-width="1.4" stroke-dasharray="5 5"/>`;
+    });
+  }
+  svg.innerHTML = svgHtml;
+
+  // Armillary Galaxies (150-210px) & Layered Clouds
+  document.getElementById('clusterLayer').innerHTML = CLUSTERS.map(c => {
+    const px = state.arranged ? c.arrangedX : c.x;
+    const py = state.arranged ? c.arrangedY : c.y;
+    const total = c.active + c.archived;
+
+    if (c.kind === 'folder') {
+      const dustPoints = Array.from({ length: 8 }, (_, i) => {
+        const ang = (i / 8) * Math.PI * 2 + 0.3;
+        const rx = 24 + (i % 3) * 11;
+        const ry = 14 + (i % 2) * 10;
+        const r = 1 + (i % 3) * 0.65;
+        return `<circle cx="${64 + Math.cos(ang)*rx}" cy="${40 + Math.sin(ang)*ry}" r="${r}" fill="#bae6fd" opacity="${0.45 + (i % 2) * 0.3}"/>`;
+      }).join('');
+      const isConfirming = state.pendingUpgradeId === c.id;
+      return `
+        <div class="cluster-node" style="left:${px}%;top:${py}%;">
+          <button class="cluster-btn" aria-label="共用資料夾 ${c.name}，${total} 節點，點擊展開" onclick="enterGalaxy('${c.id}')">
+            <svg width="128" height="80" viewBox="0 0 128 80" aria-hidden="true">
+              <ellipse cx="64" cy="40" rx="52" ry="26" fill="rgba(148,163,184,0.12)" stroke="rgba(148,163,184,0.3)" stroke-dasharray="3 4"/>
+              <ellipse cx="58" cy="38" rx="34" ry="18" fill="rgba(92,225,230,0.08)"/>
+              ${dustPoints}
+            </svg>
+            <div class="cluster-plate">
+              <strong>${c.name}</strong>
+              <span class="sub">共用資料夾 · ${total} 節點（${c.active} 活躍 / ${c.archived} 封存）</span>
+            </div>
+          </button>
+          ${isConfirming
+            ? `<div style="display:flex;gap:4px;"><button class="upgrade-btn" style="border-color:#fde68a;color:#fde68a;" onclick="confirmUpgrade('${c.id}')">確定升格</button><button class="upgrade-btn" onclick="cancelUpgrade()">取消</button></div>`
+            : `<button class="upgrade-btn" onclick="askUpgrade('${c.id}')">升格為星系</button>`}
+        </div>
+      `;
+    }
+
+    // 3-ring Armillary Galaxy SVG (1.0R, 0.78R, 0.52R) + larger miniature specks (r 2-3px)
+    const R = c.size * 0.44;
+    const cx = c.size / 2, cy = c.size / 2;
+    let specks = '';
+    for (let i = 0; i < total; i++) {
+      const ang = (i / total) * Math.PI * 2 - 0.5;
+      const rad = R * (0.34 + (i % 2) * 0.28);
+      const sx = cx + Math.cos(ang) * rad;
+      const sy = cy + Math.sin(ang) * rad;
+      const sr = 2 + (i % 2);
+      specks += `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${sr}" fill="#e0f2fe" opacity="0.92"/>`;
+    }
+
+    return `
+      <div class="cluster-node" style="left:${px}%;top:${py}%;">
+        <button class="cluster-btn" aria-label="專案星系 ${c.name}，${total} 節點，點擊飛入" onclick="enterGalaxy('${c.id}')">
+          <svg class="armillary-svg" width="${c.size}" height="${c.size}" viewBox="0 0 ${c.size} ${c.size}" aria-hidden="true">
+            <circle cx="${cx}" cy="${cy}" r="${(R*0.65).toFixed(1)}" fill="rgba(92,225,230,0.06)"/>
+            <circle cx="${cx}" cy="${cy}" r="${R.toFixed(1)}" fill="none" stroke="#7A5B35" stroke-width="1" stroke-dasharray="2 6"/>
+            <circle cx="${cx}" cy="${cy}" r="${(R*0.78).toFixed(1)}" fill="none" stroke="#D9A441" stroke-width="1.2"/>
+            <circle cx="${cx}" cy="${cy}" r="${(R*0.52).toFixed(1)}" fill="none" stroke="rgba(92,225,230,0.45)" stroke-width="1"/>
+            <circle cx="${cx}" cy="${cy}" r="7" fill="#fde68a" opacity="0.88"/>
+            <circle cx="${cx}" cy="${cy}" r="14" fill="rgba(217,164,65,0.22)"/>
+            ${specks}
+          </svg>
+          <div class="cluster-plate">
+            <strong>${c.name}</strong>
+            <span class="sub">${total} 節點（${c.active} 活躍 / ${c.archived} 封存）</span>
+          </div>
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('dustLayer').innerHTML = DUST_NODES.map(d => `
+    <button class="dust-node" style="left:${d.x}%;top:${d.y}%;" aria-label="${d.name}，${d.state}" onclick="selectDustOrChief('${d.id}')">
+      <span class="dust-dot"></span><span>${d.name}</span>
+    </button>
+  `).join('');
+}
+
+/* ==================== 3D ORBITAL PROJECTION (project3D) ==================== */
+function project3D(pos, w, h) {
+  const [x0, y0, z0] = pos;
+  const cy = Math.cos(camYaw), sy = Math.sin(camYaw);
+  const cp = Math.cos(camPitch), sp = Math.sin(camPitch);
+  const x1 = x0 * cy - z0 * sy;
+  const z1 = x0 * sy + z0 * cy;
+  const y2 = y0 * cp - z1 * sp;
+  const z2 = y0 * sp + z1 * cp;
+  const fov = 620 * camZoom;
+  const dist = 560;
+  const scale = fov / Math.max(140, dist + z2);
+  return { sx: w * 0.5 + x1 * scale, sy: h * 0.52 + y2 * scale, scale, z: z2 };
+}
+
+function getActiveInterior() {
+  if (state.view === 'flat') {
+    return {
+      nodes: [
+        ...getInteriorData('g-nexus').nodes,
+        ...getInteriorData('g-vault').nodes.map(n => ({ ...n, pos3d: [n.pos3d[0] + 60, n.pos3d[1] + 55, n.pos3d[2] - 40] }))
+      ],
+      edges: [...getInteriorData('g-nexus').edges, ...getInteriorData('g-vault').edges],
+      exits: []
+    };
+  }
+  return state.activeClusterId ? getInteriorData(state.activeClusterId) : { nodes: [], edges: [], exits: [] };
+}
+
+function renderInteriorCrystals() {
+  const layer = document.getElementById('crystalLayer');
+  const { nodes, exits } = getActiveInterior();
+  layer.innerHTML = nodes.map(n => {
+    const isSel = state.selectedNodeId === n.id;
+    const isRainbow = n.glow === 'rainbow';
+    const [hex, auraRgba] = GLOW_RGBA[n.glow] || GLOW_RGBA.blue;
+    const auraBg = isRainbow ? '' : `background: radial-gradient(circle, ${auraRgba} 0%, transparent 68%);`;
+    return `
+      <button class="crystal-node ${n.dormant ? 'is-dormant' : ''} ${isSel ? 'selected' : ''}"
+              id="cnode-${n.id}"
+              aria-label="節點 ${n.name}，狀態 ${n.status}，經歷 ${n.tier}"
+              onclick="event.stopPropagation(); if(!dragMoved) selectCrystal('${n.id}')">
+        <div class="crystal-aura ${isRainbow ? 'is-rainbow' : ''}" style="${auraBg}"></div>
+        <div class="crystal-shape" style="color:${hex};">${CONSTELLATION_C}</div>
+        <div class="crystal-pedestal"></div>
+        <div class="crystal-label">
+          <div><strong>${n.name}</strong></div>
+          <span class="crystal-badge">${n.status} · ${n.tier}</span>
+        </div>
+      </button>
+    `;
+  }).join('');
+
+  document.getElementById('exitBar').innerHTML = exits.map(ex => `
+    <button class="exit-chip ${ex.isInherit ? 'inherit-chip' : ''}" onclick="enterGalaxy('${ex.target}', '${ex.selectNode || ''}')">${ex.label}</button>
+  `).join('');
+}
+
+function update3DLoop() {
+  if (state.view === 'galaxy' || state.view === 'flat') {
+    const stage = document.getElementById('interiorLayer');
+    const canvas = document.getElementById('linkCanvas');
+    if (stage && canvas) {
+      const w = stage.clientWidth, h = stage.clientHeight;
+      if (w > 0 && h > 0) {
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        const arm = document.getElementById('armillary3d');
+        if (arm) arm.style.transform = `scale(${camZoom}) rotateX(${-camPitch * 57.3}deg) rotateY(${camYaw * 57.3}deg)`;
+
+        const { nodes, edges } = getActiveInterior();
+        const projected = {};
+        nodes.forEach(n => {
+          const p = project3D(n.pos3d, w, h);
+          projected[n.id] = p;
+          const el = document.getElementById(`cnode-${n.id}`);
+          if (el) {
+            el.style.left = `${p.sx}px`;
+            el.style.top = `${p.sy}px`;
+            const s = Math.max(0.65, Math.min(1.22, p.scale * 0.92));
+            el.style.transform = `translate(-50%, -50%) scale(${s})`;
+            el.style.zIndex = Math.round(500 - p.z);
+          }
+        });
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+        edges.forEach(e => {
+          if (!state.enabledEdges[e.kind]) return;
+          const a = projected[e.from], b = projected[e.to];
+          if (!a || !b) return;
+          const st = EDGE_STYLE[e.kind];
+          ctx.save();
+          ctx.strokeStyle = st.color; ctx.lineWidth = st.width; ctx.setLineDash(st.dash);
+          ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+          const mx = (a.sx + b.sx) * 0.5, my = (a.sy + b.sy) * 0.5;
+          ctx.setLineDash([]); ctx.font = '600 10.5px Segoe UI, Noto Sans TC, sans-serif';
+          ctx.fillStyle = st.color; ctx.textAlign = 'center'; ctx.fillText(e.label, mx, my - 5);
+          ctx.restore();
+        });
+      }
+    }
+  }
+  requestAnimationFrame(update3DLoop);
+}
+
+function renderDetail(item) {
+  const panel = document.getElementById('detailPanel');
+  if (!item) { panel.classList.add('collapsed'); return; }
+  panel.classList.remove('collapsed');
+  const otherHtml = item.otherProjects && item.otherProjects.length
+    ? `<div class="box-note"><strong>同時參與專案（跨星系橋樑來源）：</strong><br/>${item.otherProjects.join('、')}</div>` : '';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:11px;color:#fde68a;letter-spacing:0.12em;">${item.specNo ? `標本編號 ${item.specNo}` : '節點履歷'}</span>
+      <button class="hud-btn" onclick="closeDetail()">✕</button>
+    </div>
+    <h2 style="font-size:18px;color:#fff;">${item.name}</h2>
+    <div style="font-size:12px;color:#7dd3fc;">狀態：${item.status || item.state}${item.tier ? ` · 經歷：${item.tier}` : ''}</div>
+    <div class="box-note">${item.specialty}</div>
+    ${otherHtml}
+  `;
+}
+
+function closeDetail() { state.selectedNodeId = null; renderDetail(null); if (state.view !== 'overview') renderInteriorCrystals(); }
+
+function enterGalaxy(clusterId, preselectNodeId) {
+  state.view = 'galaxy'; state.activeClusterId = clusterId; state.selectedNodeId = preselectNodeId || null;
+  document.body.classList.remove('view-overview', 'view-flat'); document.body.classList.add('view-galaxy');
+  const c = CLUSTERS.find(x => x.id === clusterId);
+  announce(`進入${c ? c.name : clusterId}星系`);
+  renderInteriorCrystals();
+  if (preselectNodeId) selectCrystal(preselectNodeId); else renderDetail(null);
+  document.getElementById('btnBackOverview').focus();
+}
+
+function exitGalaxy() {
+  state.view = 'overview'; state.activeClusterId = null; state.selectedNodeId = null;
+  document.body.classList.remove('view-galaxy', 'view-flat'); document.body.classList.add('view-overview');
+  document.getElementById('btnFlat').classList.remove('active');
+  renderDetail(null);
+  announce('返回星系總覽');
+}
+
+function askUpgrade(id) { state.pendingUpgradeId = id; renderOverview(); }
+function cancelUpgrade() { state.pendingUpgradeId = null; renderOverview(); }
+function confirmUpgrade(id) {
+  const c = CLUSTERS.find(x => x.id === id);
+  if (!c) return;
+  c.kind = 'git'; state.pendingUpgradeId = null;
+  renderOverview();
+  showToast(`已將「${c.name}」升格為正式星系`, () => { c.kind = 'folder'; renderOverview(); });
+}
+
+function arrangeByCollab() {
+  state.arranged = !state.arranged;
+  document.getElementById('btnArrange').classList.toggle('active', state.arranged);
+  announce(state.arranged ? '已依合作程度重新排列星系' : '已恢復初始星系位置');
+  renderOverview();
+}
+
+function toggleFlatFallback() {
+  const toFlat = state.view !== 'flat';
+  if (toFlat) {
+    state.view = 'flat';
+    document.body.classList.remove('view-overview', 'view-galaxy'); document.body.classList.add('view-flat');
+    document.getElementById('btnFlat').classList.add('active');
+    renderInteriorCrystals();
+    announce('切換至平面星圖退路模式');
+  } else { exitGalaxy(); }
+}
+
+function toggleLowMotion() {
+  state.lowMotion = !state.lowMotion;
+  document.body.classList.toggle('low-motion', state.lowMotion);
+  const b = document.getElementById('btnMotion');
+  b.classList.toggle('active', state.lowMotion);
+  b.textContent = `低動態：${state.lowMotion ? '開' : '關'}`;
+}
+
+function toggleEdge(kind, btn) {
+  state.enabledEdges[kind] = !state.enabledEdges[kind];
+  btn.className = state.enabledEdges[kind] ? `link-pill on-${kind}` : 'link-pill';
+}
+
+function setChiefHover(on) { state.chiefHover = on; renderOverview(); }
+
+function selectCrystal(id) {
+  state.selectedNodeId = id;
+  const found = getActiveInterior().nodes.find(n => n.id === id);
+  renderInteriorCrystals();
+  renderDetail(found);
+}
+
+function selectDustOrChief(id) {
+  if (id === 'chief') {
+    renderDetail({ name: '總管中樞 · administrator', state: '中樞固定（不屬於任何星系）', specialty: '負責跨專案派工與協調，不計入星系間距離與連線。', otherProjects: [] });
+    return;
+  }
+  renderDetail(DUST_NODES.find(x => x.id === id));
+}
+
+function showBridgeTip(e, text) { const tip = document.getElementById('bridgeTooltip'); tip.textContent = text; tip.style.display = 'block'; moveBridgeTip(e); }
+function moveBridgeTip(e) { const tip = document.getElementById('bridgeTooltip'); tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
+function hideBridgeTip() { document.getElementById('bridgeTooltip').style.display = 'none'; }
+
+// 3D drag-to-rotate & wheel-to-zoom inside interior
+const intEl = document.getElementById('interiorLayer');
+intEl.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.interior-topbar') || e.target.closest('.exit-bar') || e.target.closest('.crystal-node')) return;
+  isDragging3D = true; dragMoved = false; lastDragX = e.clientX; lastDragY = e.clientY;
+});
+window.addEventListener('pointermove', (e) => {
+  if (!isDragging3D) return;
+  const dx = e.clientX - lastDragX, dy = e.clientY - lastDragY;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+  camYaw += dx * 0.007; camPitch = Math.max(-0.95, Math.min(0.95, camPitch + dy * 0.007));
+  lastDragX = e.clientX; lastDragY = e.clientY;
+});
+window.addEventListener('pointerup', () => { setTimeout(() => { isDragging3D = false; }, 0); });
+intEl.addEventListener('wheel', (e) => {
+  if (state.view === 'overview') return;
+  e.preventDefault();
+  camZoom = Math.max(0.65, Math.min(1.65, camZoom - e.deltaY * 0.0008));
+}, { passive: false });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && (state.view === 'galaxy' || state.view === 'flat')) { e.preventDefault(); exitGalaxy(); }
+});
+
+(function initStars() {
+  const c = document.getElementById('starBgCanvas');
+  const ctx = c.getContext('2d');
+  const resize = () => { c.width = c.parentElement.clientWidth; c.height = c.parentElement.clientHeight; };
+  resize(); window.addEventListener('resize', resize);
+  const stars = Array.from({ length: 110 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.4 + 0.4, p: Math.random() * 6.28 }));
+  function draw() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    for (const s of stars) {
+      if (!state.lowMotion) s.p += 0.01;
+      const a = 0.25 + 0.5 * (0.5 + 0.5 * Math.sin(s.p));
+      ctx.fillStyle = `rgba(196, 225, 255, ${a})`;
+      ctx.beginPath(); ctx.arc(s.x * c.width, s.y * c.height, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+renderOverview();
+update3DLoop();
+</script>
+</body>
+</html>
