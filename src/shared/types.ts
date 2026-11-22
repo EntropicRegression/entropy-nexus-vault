@@ -132,6 +132,8 @@ export interface NodeHit {
   status: NodeCrystal['status'];
   matchedIn: '名稱' | '立繪角色' | '特長' | '側寫';
   avatarUrl?: string | null;
+  /** Supplied by the main process, with the same rules as NodeCrystal.brand. */
+  brand?: CrystalBrand;
 }
 
 export type CrystalLink =

@@ -46,7 +46,7 @@ function crystalProjects(projects: VaultStatsNode['projects'], snapshot: VaultSt
 }
 
 export interface CrystalRecord {
-  crystal: NodeCrystal;
+  crystal: NodeCrystal & { brand: CrystalBrand };
   /** Richness inputs known from the vault and the stats; the peaks come from userData (docs/架構.md §9.2). */
   richness: Omit<RichnessInput, 'completedPeak' | 'rejectedPeak'>;
   profile: ParsedEntry | undefined;
@@ -162,7 +162,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
     const fileName = profile && field(profile.attributes, '節點', '名稱', 'name');
     const fileRole = profile && field(profile.attributes, '角色', 'role');
     const stats = statsNode?.stats ?? archiveStats(latestArchive);
-    const crystal: NodeCrystal = {
+    const crystal: CrystalRecord['crystal'] = {
       nodeId,
       status,
       name: statsNode?.name || fileName || profile?.entry.title || nodeId,

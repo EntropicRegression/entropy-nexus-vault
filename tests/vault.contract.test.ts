@@ -117,7 +117,10 @@ describe('記憶庫唯讀契約', () => {
     ].join('\n'));
     const snapshot = await new VaultReader(root, now).read();
     const ids = (query: string) => snapshot.searchNodes(query).map(({ nodeId }) => nodeId);
-    expect(snapshot.searchNodes('星砂')).toEqual([{ nodeId: 'fixture-node-sand', name: '星砂', role: '潮汐校對', status: '未知', matchedIn: '名稱' }]);
+    expect(snapshot.searchNodes('星砂')).toEqual([{
+      nodeId: 'fixture-node-sand', name: '星砂', role: '潮汐校對', status: '未知', matchedIn: '名稱',
+      brand: { vendor: null, mode: 'dormant' },
+    }]);
     expect(snapshot.searchNodes('潮汐')[0]).toMatchObject({ nodeId: 'fixture-node-sand', matchedIn: '立繪角色' });
     expect(snapshot.searchNodes('潮位曲線')[0]).toMatchObject({ matchedIn: '特長' });
     expect(snapshot.searchNodes('鹽度計')[0]).toMatchObject({ matchedIn: '側寫' });

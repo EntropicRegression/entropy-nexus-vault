@@ -225,6 +225,11 @@ describe('主程序 IPC 來源驗證', () => {
     await saveVaultPath(join(electron.userData, 'settings.dev.json'), vault);
     const path = 'knowledge/月汐溫室/本機路徑驗證.md';
     const projectId = 'C:\\Users\\Synthetic\\Private project';
+    const statsPath = join(vault, '.nexus-stats.json');
+    const stats = JSON.parse(await readFile(statsPath, 'utf8'));
+    stats.節點['fixture-node-heron'].角色 = 'C:\\Users\\Synthetic\\SearchPortraits';
+    stats.節點['fixture-node-heron'].session.後台 = 'antigravity';
+    await writeFile(statsPath, JSON.stringify(stats));
     await writeFile(join(vault, path), [
       '---', '種類: 知識', '標題: 隱私驗證', '專案ID: ' + projectId, 'project-id: 隱藏別名',
       '工作目錄: /Users/Synthetic/Note', '其他: [公開, /home/user/private]', '公開欄位: 保留下來', '---',
@@ -262,10 +267,20 @@ describe('主程序 IPC 來源驗證', () => {
     expect(crystal).toMatchObject({ workflow: '參考 [本機路徑已隱藏]',
       stats: { accepted: 3, completed: 0, rejected: null, cases: null }, notRejectedRate: null });
     const fixtures = await invoke('readCrystal', 'fixture-node-moss');
-    const nodeHits = await invoke('searchNodes', '霜');
-    expect(nodeHits.length).toBeGreaterThan(0);
+    const nodeHits = [
+      ...await invoke('searchNodes', '霜'),
+      ...await invoke('searchNodes', '紙鷺'),
+      ...await invoke('searchNodes', '夜苔'),
+    ];
+    expect(nodeHits).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'fixture-private', brand: { vendor: null, mode: 'dormant' } }),
+      expect.objectContaining({
+        nodeId: 'fixture-node-heron', brand: { vendor: 'gemini', mode: 'active' }, role: '[本機路徑已隱藏]',
+      }),
+      expect.objectContaining({ nodeId: 'fixture-node-moss', brand: { vendor: 'claude', mode: 'dormant' } }),
+    ]));
     const snapshot = [rows, found, entry, crystal, fixtures, nodeHits, await invoke('listCrystals'), await invoke('getVaultInfo')];
-    expect(JSON.stringify(snapshot)).not.toMatch(/[a-z]:[\\/]|\/(?:Users|home|tmp|Volumes)\/|file:\/\/|test-server|RelativeName/i);
+    expect(JSON.stringify(snapshot)).not.toMatch(/[a-z]:[\\/]|\/(?:Users|home|tmp|Volumes)\/|file:\/\/|test-server|RelativeName|SearchPortraits/i);
   });
 
   it('專案星系 IPC:分群、連線、座標固定、升格與整理一次;整份 JSON 沒有路徑與原始專案ID', async () => {

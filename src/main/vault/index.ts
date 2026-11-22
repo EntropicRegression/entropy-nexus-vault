@@ -71,7 +71,7 @@ export class VaultSnapshot {
 
   private searchIndex() {
     this.nodeSearchIndex ??= [...this.crystals.records.values()].map(({ crystal, profile }) => ({
-      hit: { nodeId: crystal.nodeId, name: crystal.name, role: crystal.role, status: crystal.status },
+      hit: { nodeId: crystal.nodeId, name: crystal.name, role: crystal.role, status: crystal.status, brand: crystal.brand },
       fields: ([
         ['名稱', crystal.name], ['立繪角色', crystal.role ?? ''],
         ['特長', crystal.specialty ?? ''], ['側寫', profile?.body ?? ''],
