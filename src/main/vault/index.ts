@@ -177,7 +177,9 @@ export class VaultSnapshot {
       // Newest first; replaced (superseded) versions are left out, as on the shelves.
       archiveEntries: record.archiveEntries.filter((entry) => !entry.superseded)
         .sort((a, b) => b.updatedAt - a.updatedAt || a.path.localeCompare(b.path, 'zh-Hant')),
-        confirmedCaseCount: record.relatedEntries.filter((entry) =>
+      meetingEntries: record.meetingEntries.filter((entry) => !entry.superseded)
+        .sort((a, b) => b.updatedAt - a.updatedAt || a.path.localeCompare(b.path, 'zh-Hant')),
+      confirmedCaseCount: record.relatedEntries.filter((entry) =>
           entry.path.startsWith('cases/') && entry.status === '已確認' && entry.nodeId === nodeId).length,
       ...profileHighlights(record.profile, record.stats),
     };
@@ -193,6 +195,7 @@ export class VaultSnapshot {
       attributes: publicAttributes(parsed.attributes),
       body: parsed.body,
       review: parsed.review,
+      ...(parsed.transcript ? { transcript: parsed.transcript } : {}),
       supersessionChain,
       caseReferences: this.links.caseReferences(parsed),
     };

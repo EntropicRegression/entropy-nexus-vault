@@ -1,8 +1,9 @@
 import { calculateHeat } from '../../shared/heat';
 import type { HeatRecall } from '../../shared/heat';
 import { shelfOf } from '../../shared/shelves';
-import type { MemoryEntry, MemoryKind, MemoryScope } from '../../shared/types';
+import type { MeetingTranscript, MemoryEntry, MemoryKind, MemoryScope } from '../../shared/types';
 import { field, parseFrontMatter } from './frontmatter';
+import { meetingInfo, parseMeetingTranscript } from './meeting';
 import type { FrontMatter } from './frontmatter';
 import { vaultFolders } from './scan';
 import type { VaultFile } from './scan';
@@ -14,6 +15,7 @@ const kinds = new Map<string, MemoryKind>([
   ['case', 'case'], ['判例', 'case'], ['解法紀錄', 'case'], ['解法', 'case'],
   ['knowledge', 'knowledge'], ['專案知識', 'knowledge'], ['知識', 'knowledge'],
   ['preference', 'preference'], ['使用者偏好', 'preference'], ['偏好', 'preference'],
+  ['meeting', 'meeting'], ['會議紀錄', 'meeting'],
 ]);
 
 export interface ParsedEntry {
@@ -22,6 +24,8 @@ export interface ParsedEntry {
   markdown: string;
   body: string;
   review: string;
+  /** Meeting transcripts only. */
+  transcript?: MeetingTranscript;
   mtime: number;
   size: number;
 }
@@ -109,14 +113,16 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
   const folder = parts[0] as keyof typeof vaultFolders;
   const filename = (parts.at(-1) ?? '').replace(/\.md$/i, '');
   const kind = kinds.get(field(attributes, '種類', 'kind', 'type').toLowerCase()) ?? vaultFolders[folder];
-  const folderProject = (folder === 'cases' || folder === 'knowledge') && parts.length > 2 ? parts[1] : '';
+  const folderProject = (folder === 'cases' || folder === 'knowledge' || folder === 'meetings') && parts.length > 2 ? parts[1] : '';
   const projectName = field(attributes, '專案', 'project', 'projectName') || folderProject;
   const projectId = field(attributes, '專案ID', '專案id', 'project-id', 'projectId') || projectName;
   const scope = entryScope(field(attributes, '範圍', 'scope'), kind, projectId);
   const subtypeText = field(attributes, '子類', 'subtype');
   const subtype = /^decision$/i.test(subtypeText) ? '決策' : /^bookmark$/i.test(subtypeText) ? '書籤' : subtypeText;
   const nodeId = field(attributes, '節點ID', '節點id', 'node-id', 'nodeId');
-  const nodeLabel = field(attributes, '節點', '承辦節點', 'nodeLabel', 'nodeName', 'node');
+  const isMeeting = kind === 'meeting';
+  const transcript = isMeeting ? parseMeetingTranscript(markdown) : undefined;
+  const nodeLabel = isMeeting ? field(attributes, '主持人', 'host') : field(attributes, '節點', '承辦節點', 'nodeLabel', 'nodeName', 'node');
   const participantNodeIds = field(attributes, '參與節點ID', 'participantNodeIds')
     .split(/[,，、]/).map((part) => part.trim()).filter(Boolean);
   const status = field(attributes, '狀態', 'status');
@@ -127,8 +133,8 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
       mtime,
       size,
       writable: hasWritableHeader(text),
-      title: field(attributes, '標題', '案由', 'title', 'name') || headings.find((heading) => heading.level === 1)?.title || filename,
-      summary: /^摘要[:：][ \t]*(.+)$/m.exec(body)?.[1].trim() || (kind === 'case' ? '' : firstBodyParagraph(body)),
+      title: field(attributes, ...(isMeeting ? ['主題', 'topic'] : []), '標題', '案由', 'title', 'name') || headings.find((heading) => heading.level === 1)?.title || filename,
+      summary: isMeeting ? field(attributes, '摘要', 'summary') : /^摘要[:：][ \t]*(.+)$/m.exec(body)?.[1].trim() || (kind === 'case' ? '' : firstBodyParagraph(body)),
       kind,
       shelf: shelfOf({ kind, subtype }),
       scope,
@@ -146,11 +152,13 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
       heat: calculateHeat(recall, now),
       superseded: false,
       previousCount: 0,
+      ...(transcript ? { meeting: meetingInfo(attributes, transcript.conclusion !== null, filename) } : {}),
     },
     attributes,
     markdown,
     body,
     review,
+    ...(transcript ? { transcript } : {}),
     mtime,
     size,
   };

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { Fragment, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { DeskMode, MemoryEntry, MemoryEntryDetail, NodeCrystal } from '../../shared/types';
 import { canSetStatus, primaryStatus } from '../../shared/vault-actions';
@@ -25,7 +25,8 @@ function inline(text: string, related: ReadonlyMap<string, string>, open: OpenEn
 }
 
 /** Render repository Markdown as text/components without allowing HTML, remote loads or arbitrary links. */
-export function Markdown({ body, related, onOpen }: { body: string; related: ReadonlyMap<string, string>; onOpen: OpenEntry }) {
+/** lineBreaks: keep each quoted line on its own line (meeting transcripts); elsewhere quoted lines join like a paragraph. */
+export function Markdown({ body, related, onOpen, lineBreaks = false }: { body: string; related: ReadonlyMap<string, string>; onOpen: OpenEntry; lineBreaks?: boolean }) {
   const lines = body.split(/\r?\n/);
   const blocks: ReactNode[] = [];
   let index = 0;
@@ -60,7 +61,9 @@ export function Markdown({ body, related, onOpen }: { body: string; related: Rea
     if (first.startsWith('>')) {
       const quote = [first.replace(/^>\s?/, '')];
       while (index < lines.length && /^\s*>/.test(lines[index])) quote.push(lines[index++].trim().replace(/^>\s?/, ''));
-      blocks.push(<blockquote key={key}>{inline(quote.join(' '), related, onOpen)}</blockquote>);
+      blocks.push(<blockquote key={key}>{lineBreaks
+        ? quote.map((line, i) => <Fragment key={i}>{i > 0 && <br />}{inline(line, related, onOpen)}</Fragment>)
+        : inline(quote.join(' '), related, onOpen)}</blockquote>);
       continue;
     }
     const paragraph = [first];
@@ -123,12 +126,12 @@ export function ReadingDesk(props: Props) {
               <StatusMark status={entry.status} /><HeatSlot heat={entry.heat} />
               {entry.nodeIds.map((id) => {
                 const node = nodes.get(id);
-                const label = (entry.nodeId === id ? '承辦：' : '參與：') + nodeName(entry, id, nodes);
+                const label = (entry.nodeId === id ? (entry.shelf === 'meeting' ? '主持：' : '承辦：') : '參與：') + nodeName(entry, id, nodes);
                 return node && onNode
                   ? <button key={id} type="button" className={styles.inlineLink} onClick={() => onNode(node)}>{label}</button>
                   : <span key={id}>{label}</span>;
               })}
-              {!entry.nodeId && entry.nodeLabel && <span>承辦：{entry.nodeLabel}</span>}
+              {!entry.nodeId && entry.nodeLabel && <span>{entry.shelf === 'meeting' ? '主持：' : '承辦：'}{entry.nodeLabel}</span>}
             </div>
             <h2 tabIndex={-1} ref={title}>{entry.title}</h2>
           </>}
@@ -148,7 +151,7 @@ export function ReadingDesk(props: Props) {
         <div className={styles.sheetBody}>
           <div className={styles.document}>
             {entry.summary && <div className={styles.conclusion}><strong>結論摘要</strong><p>{entry.summary}</p></div>}
-            <Markdown body={entry.body.replace(/^摘要[:：].*(?:\r?\n|$)/m, '')} related={related} onOpen={onOpen} />
+            <Markdown body={entry.body.replace(/^摘要[:：].*(?:\r?\n|$)/m, '')} related={related} onOpen={onOpen} lineBreaks={entry.shelf === 'meeting'} />
             {entry.review && <section className={styles.review}>
               <h3>回顧</h3>
               <Markdown body={entry.review} related={related} onOpen={onOpen} />

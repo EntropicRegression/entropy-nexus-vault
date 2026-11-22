@@ -58,6 +58,8 @@ export interface CrystalRecord {
    * node or whose 參與節點ID lists it. Only these structured fields count; free text such as 來源節點 is not used.
    */
   archiveEntries: MemoryEntry[];
+  /** Meetings (節點ID = host, 參與節點ID = participant) the node took part in; all statuses (DESIGN.md §5.13). */
+  meetingEntries: MemoryEntry[];
 }
 
 export function profileHighlights(profile: ParsedEntry | undefined, stats: CrystalStats | null) {
@@ -122,6 +124,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
   const idByPath = new Map<string, string>();
   const casesByNode = new Map<string, MemoryEntry[]>();
   const archiveByNode = new Map<string, MemoryEntry[]>();
+  const meetingByNode = new Map<string, MemoryEntry[]>();
   for (const parsed of entries) {
     const { entry } = parsed;
     if (entry.shelf === 'archive') {
@@ -129,6 +132,13 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
         const related = archiveByNode.get(id) ?? [];
         related.push(entry);
         archiveByNode.set(id, related);
+      }
+    }
+    if (entry.kind === 'meeting') {
+      for (const id of new Set([entry.nodeId, ...entry.participantNodeIds].filter(Boolean))) {
+        const related = meetingByNode.get(id) ?? [];
+        related.push(entry);
+        meetingByNode.set(id, related);
       }
     }
     if (entry.kind === 'case') {
@@ -216,6 +226,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       archives: archives.map(({ parsed, archivedAt }) => ({ path: parsed.entry.path, archivedAt })),
       relatedEntries,
       archiveEntries: archiveByNode.get(nodeId) ?? [],
+      meetingEntries: meetingByNode.get(nodeId) ?? [],
     });
     for (const [key, name] of projects) {
       const project = projectMembers.get(key) ?? { name, members: [] };

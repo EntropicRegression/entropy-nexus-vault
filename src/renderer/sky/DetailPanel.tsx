@@ -2,6 +2,7 @@ import type { MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/t
 import { CrystalPortrait, crystalBadge } from './Crystal';
 import { GlowBadge } from './GlowBadge';
 import { localDate } from './local-date';
+import { dateLabel } from '../library/catalog';
 import { NodePortraitControl } from '../brand/NodePortraitControl';
 import styles from './Sky.module.css';
 
@@ -113,6 +114,24 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
             </li>;
           })}</ul>
           : <p className={styles.statsTotal} data-archive-empty="">典藏書架上還沒有這個節點撰寫或參與的卷宗。</p>}
+      </section>}
+      {detail && <section className={styles.detailSection} data-meeting-entries="">
+        <h3>參與的會議</h3>
+        {detail.meetingEntries?.length
+          ? <ul>{detail.meetingEntries.map((entry) => {
+            // 主持 = the meeting entry's 節點ID is this node; 參與 = it is among the participants.
+            const role = entry.nodeId === detail.nodeId ? '主持' : '參與';
+            const label = '會議 · ' + dateLabel(entry.updatedAt) + ' · ' + (entry.meeting?.topic || entry.title);
+            const tag = entry.status === '未確認' ? '待核閱' : entry.status === '退回' ? '已退回' : '';
+            const content = <span><span className={styles.archiveRole}>{role}</span><span className={styles.srOnly}> · </span>{label}
+              {tag && <><span className={styles.srOnly}> · </span><span className={styles.archiveRole} data-meeting-status="">{tag}</span></>}</span>;
+            return <li key={entry.path}>{onOpenEntry
+              ? <button type="button" className={styles.linkCard} data-meeting-entry={role} onClick={() => onOpenEntry(entry)}>
+                {content}<span className={styles.toLibrary}>前往會議書架 →</span></button>
+              : <span className={styles.linkCard}>{content}</span>}
+            </li>;
+          })}</ul>
+          : <p className={styles.statsTotal} data-meeting-empty="">還沒有這個節點主持或參與的會議紀錄。</p>}
       </section>}
       {Boolean(detail?.archives.length) && <section className={styles.detailSection}>
         <h3>歷次封存</h3>

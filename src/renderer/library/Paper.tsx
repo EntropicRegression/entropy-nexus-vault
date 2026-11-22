@@ -29,7 +29,8 @@ export function HeatSlot({ heat }: { heat: HeatInfo }) {
 }
 
 export function nodeName(entry: MemoryEntry, id: string, nodes: ReadonlyMap<string, NodeCrystal>): string {
-  return nodes.get(id)?.name || (entry.nodeId === id ? entry.nodeLabel : '') || id;
+  return nodes.get(id)?.name || (entry.nodeId === id ? entry.nodeLabel : '')
+    || entry.meeting?.participants.find((participant) => participant.nodeId === id)?.name || id;
 }
 
 function Seal({ id, entry, nodes, onNode }: AvatarProps & { id: string }) {
@@ -37,7 +38,7 @@ function Seal({ id, entry, nodes, onNode }: AvatarProps & { id: string }) {
   // Avatar → brand default (cropped round by .seal) → the name's first character.
   const { current, generation, fail } = usePortraitChain(node, 'avatar');
   const name = nodeName(entry, id, nodes);
-  const label = (entry.nodeId === id ? '承辦：' : '參與：') + name;
+  const label = (entry.nodeId === id ? (entry.shelf === 'meeting' ? '主持：' : '承辦：') : '參與：') + name;
   const initial = Array.from(name.trim())[0]?.toUpperCase() || '？';
   const content = current
     ? <img key={current.url + '#' + generation} src={current.url} alt="" loading="lazy" width="20" height="20"

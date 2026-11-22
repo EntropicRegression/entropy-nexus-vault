@@ -2,6 +2,8 @@
 import { beforeYamlComment } from './frontmatter';
 
 const byteString = (value: string) => Buffer.from(value, 'utf8').toString('latin1');
+/** Trim spaces and tabs only: String#trim also strips U+00A0, which here is the last byte of characters like 因 (e5 9b a0). */
+const trimKey = (value: string) => value.replace(/^[ 	]+|[ 	]+$/g, '');
 const chineseStatus = byteString('狀態');
 const bom = byteString('\uFEFF');
 const separator = new RegExp('^(.+?)(:|' + byteString('：') + ')([\\t ]*)(.*)$');
@@ -45,12 +47,12 @@ function statusHeader(bytes: string) {
       } else {
         const match = raw.match(separator);
         if (!match) return null;
-        const key = Buffer.from(match[1].trim(), 'latin1').toString('utf8');
+        const key = Buffer.from(trimKey(match[1]), 'latin1').toString('utf8');
         if (!/^(?:[\p{L}\p{N}_][\p{L}\p{N}_. -]*|"[^"]+"|'[^']+')$/u.test(key)) return null;
         const property = { match, offset, next: offset + row.length, ending: newline };
         hasProperty = true;
         if (knownKeys.has(key) && beforeYamlComment(match[4]).trim()) hasKnownValue = true;
-        if (match[1].trim() === chineseStatus) preferred = property;
+        if (trimKey(match[1]) === chineseStatus) preferred = property;
         if (key === 'status') alias = property;
       }
     }
@@ -67,7 +69,7 @@ export function hasWritableHeader(text: string): boolean {
 }
 
 function statusValue(bytes: string, target: HeaderLine, end: number): string | null {
-  const value = beforeYamlComment(target.match[4]).trimEnd();
+  const value = beforeYamlComment(target.match[4]).replace(/[ \t]+$/, '');
   const continuation = bytes.slice(target.next, end).match(/^(?:[ \t]*(?:#[^\r\n]*)?\r?\n)*[ \t]+(?![ \t]*#)\S/);
   return /^(?:[|>{]|\[)/.test(value) || continuation ? null : value;
 }

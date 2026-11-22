@@ -1,8 +1,8 @@
 import type { MemoryEntry } from '../../shared/types';
 import type { Shelf } from '../../shared/shelves';
 
-export const shelfNames: Record<Shelf, string> = { case: '判例', decision: '決策', bookmark: '書籤', archive: '典藏' };
-export const tabs = ['all', 'case', 'decision', 'bookmark', 'archive', 'pending'] as const;
+export const shelfNames: Record<Shelf, string> = { case: '判例', decision: '決策', bookmark: '書籤', archive: '典藏', meeting: '會議' };
+export const tabs = ['all', 'case', 'decision', 'bookmark', 'archive', 'meeting', 'pending'] as const;
 export type CatalogTab = (typeof tabs)[number];
 export const tabNames: Record<CatalogTab, string> = { ...shelfNames, all: '全部', pending: '待處理' };
 export function projectDisplayName(entry: Pick<MemoryEntry, 'projectName' | 'projectId'>): string {
@@ -42,3 +42,6 @@ export function deskNoteLabel(entry: MemoryEntry): string {
   if (isOpenBookmark(entry)) return '未完書籤';
   return '待核閱' + (entry.shelf === 'archive' ? (entry.kind === 'preference' ? '偏好' : '知識') : categoryLabel(entry));
 }
+
+/** Meeting transcripts (M6a) are counted apart from the other pending notes. */
+export const meetingEndTag = (entry: MemoryEntry): string => entry.meeting?.endReason === '中止' || entry.meeting?.endReason === '逾時' ? entry.meeting.endReason : '';

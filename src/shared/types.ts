@@ -5,7 +5,8 @@ import type { Shelf } from './shelves';
 
 export type { HeatInfo, HeatLevel } from './heat';
 
-export type MemoryKind = 'node' | 'case' | 'knowledge' | 'preference';
+/** meeting: a console meeting transcript (meetings/<專案>/<日期>-<主題>.md; 記憶設計討論 第五輪, DESIGN.md §5.13). */
+export type MemoryKind = 'node' | 'case' | 'knowledge' | 'preference' | 'meeting';
 export type MemoryScope = '全域' | '專案';
 export type VaultStatusUpdate = '已確認' | '退回' | '已完成';
 export type FrontMatterValue = string | string[];
@@ -70,6 +71,47 @@ export interface MemoryEntry extends FileVersion {
   heat: HeatInfo;
   superseded: boolean;
   previousCount: number;
+  /** Meeting transcripts only (kind 'meeting'): header facts for the card, the desk and the profile panel. */
+  meeting?: MeetingInfo;
+}
+
+/** One participant of a meeting. name is '' when 參與者 and 參與節點ID differ in length (never paired by position then). */
+export interface MeetingParticipant {
+  nodeId: string;
+  name: string;
+}
+
+/** Header of a meeting transcript (記憶設計討論 第五輪 §2). Times are epoch milliseconds (the file stores ISO UTC). */
+export interface MeetingInfo {
+  topic: string;
+  rounds: number | null;
+  startedAt: number | null;
+  endedAt: number | null;
+  /** 主持人 (display only); the host's ID is MemoryEntry.nodeId. */
+  hostName: string;
+  participants: MeetingParticipant[];
+  endReason: '完成' | '中止' | '逾時' | null;
+  /** Whether the transcript has a `## 結論` section (the host wrote a closing statement). */
+  hasConclusion: boolean;
+  /** 產出: vault-relative paths of the linked decision drafts (from [[...]]), e.g. knowledge/專案/決策.md. */
+  outputs: string[];
+}
+
+/** One speech: the `### 名稱 · 節點ID` heading and its text with the outer `> ` layer removed. nodeId null for `· -`. */
+export interface MeetingSpeech {
+  name: string;
+  nodeId: string | null;
+  text: string;
+}
+
+/**
+ * The transcript body parsed by its fixed structure (記憶設計討論 第五輪 §3): only headings outside the `> ` quote
+ * blocks count. problems lists structure the parser could not follow (shown as a notice; the raw body is still shown).
+ */
+export interface MeetingTranscript {
+  conclusion: string | null;
+  rounds: { round: number; speeches: MeetingSpeech[] }[];
+  problems: string[];
 }
 
 export interface SupersessionLink {
@@ -86,6 +128,8 @@ export interface MemoryEntryDetail extends MemoryEntry {
   review: string;
   supersessionChain: SupersessionLink[];
   caseReferences: string[];
+  /** Meeting transcripts only. */
+  transcript?: MeetingTranscript;
 }
 
 export interface CrystalProject {
@@ -204,6 +248,11 @@ export interface NodeCrystalDetail extends NodeCrystal {
    * Optional for older view fixtures.
    */
   archiveEntries?: MemoryEntry[];
+  /**
+   * Meetings this node hosted (節點ID) or took part in (參與節點ID); newest first (DESIGN.md §5.13). Like the
+   * shelves, every status is listed (the panel marks 未確認/已退回). Optional for older view fixtures.
+   */
+  meetingEntries?: MemoryEntry[];
   confirmedCaseCount: number;
   specialty: string;
   workflow: string;
