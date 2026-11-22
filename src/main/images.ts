@@ -144,14 +144,43 @@ export async function serveNodeImage(request: Request, getContext: () => Promise
   }
 }
 
+/**
+ * vault-image://manual/<node ID>?v=N: the picture the user assigned to a node (DESIGN.md §6.5.2). The URL carries only
+ * the node ID; the main process looks it up in its own index and serves only that copied file from the app's
+ * node-portraits folder (no other path can be reached). ?v=N only changes the cache key.
+ */
+async function serveManualImage(request: Request, nodeIdText: string,
+  readManualPortrait: (nodeId: string) => Promise<{ folder: string; file: string } | null>): Promise<Response> {
+  let nodeId: string;
+  try {
+    nodeId = decodeURIComponent(nodeIdText);
+  } catch {
+    return notFound();
+  }
+  if (!validNodeId(nodeId)) return notFound();
+  const entry = await readManualPortrait(nodeId);
+  if (!entry) return notFound();
+  const image = await verifiedImage(entry.folder, entry.file);
+  return (image && await readCandidate(image)) || notFound();
+}
+
 export async function serveVaultImage(
   request: Request,
-  { readVaultContext, readBrandPortraitFolder }: {
+  { readVaultContext, readBrandPortraitFolder, readManualPortrait }: {
     readVaultContext: () => Promise<VaultImageContext>;
     readBrandPortraitFolder: () => Promise<string | null>;
+    readManualPortrait?: (nodeId: string) => Promise<{ folder: string; file: string } | null>;
   },
 ): Promise<Response> {
   if (request.method !== 'GET') return notFound();
+  const manual = /^vault-image:\/\/manual\/([^/?#]+)(?:\?v=[1-9][0-9]*)?$/.exec(request.url);
+  if (manual) {
+    try {
+      return readManualPortrait ? await serveManualImage(request, manual[1], readManualPortrait) : notFound();
+    } catch {
+      return notFound();
+    }
+  }
   // Match the whole URL. The optional version changes the image cache key and never enters filesystem resolution.
   const brand = /^vault-image:\/\/brand\/(claude|codex|gemini)\/(active|dormant)(?:\?v=[1-9][0-9]*)?$/.exec(request.url);
   if (!brand) return serveNodeImage(request, readVaultContext);

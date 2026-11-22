@@ -13,6 +13,7 @@ import type {
   RequestWakeResult,
   NodeCrystalDetail,
   NodeHit,
+  NodePortraitResult,
   GalaxyMap,
   AwardWriteResult,
   RecycledEntry,
@@ -38,8 +39,15 @@ export interface BrandPortraitApi {
   clearBrandPortraitFolder(): Promise<BrandPortraitSettings>;
 }
 
+/** Pictures the user assigns to single nodes (DESIGN.md §6.5.2). */
+export interface NodePortraitApi {
+  /** Opens the system file dialog in the main process; null when the user cancels. */
+  chooseNodePortrait(nodeId: string): Promise<NodePortraitResult | null>;
+  clearNodePortrait(nodeId: string): Promise<NodePortraitResult>;
+}
+
 // The M5d preload always provides these methods. Older consumers/test bridges can still use the base API.
-export interface VaultApi extends Partial<NodeProfileApi>, Partial<BrandPortraitApi> {
+export interface VaultApi extends Partial<NodeProfileApi>, Partial<BrandPortraitApi>, Partial<NodePortraitApi> {
   getVaultInfo(): Promise<VaultInfo>;
   chooseVault(): Promise<VaultInfo | null>;
   getSettings(): Promise<ViewSettings>;
@@ -67,8 +75,8 @@ export interface VaultApi extends Partial<NodeProfileApi>, Partial<BrandPortrait
   onVaultChanged(callback: (paths: string[]) => void): () => void;
 }
 
-export type VaultRequests = Omit<VaultApi, keyof NodeProfileApi | keyof BrandPortraitApi | 'onVaultChanged'> &
-  NodeProfileApi & BrandPortraitApi;
+export type VaultRequests = Omit<VaultApi, keyof NodeProfileApi | keyof BrandPortraitApi | keyof NodePortraitApi | 'onVaultChanged'> &
+  NodeProfileApi & BrandPortraitApi & NodePortraitApi;
 
 export const vaultChannels = {
   getVaultInfo: 'vault:get-info',
@@ -78,6 +86,8 @@ export const vaultChannels = {
   getBrandPortraitSettings: 'vault:get-brand-portrait-settings',
   chooseBrandPortraitFolder: 'vault:choose-brand-portrait-folder',
   clearBrandPortraitFolder: 'vault:clear-brand-portrait-folder',
+  chooseNodePortrait: 'vault:choose-node-portrait',
+  clearNodePortrait: 'vault:clear-node-portrait',
   listEntries: 'vault:list-entries',
   readEntry: 'vault:read-entry',
   search: 'vault:search',

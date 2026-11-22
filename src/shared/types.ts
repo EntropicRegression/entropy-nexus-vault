@@ -117,6 +117,11 @@ export interface NodeCrystal {
   brand?: CrystalBrand;
   avatarUrl?: string | null;
   portraitUrl?: string | null;
+  /**
+   * The picture the user assigned to this node in the vault app (vault-image://manual/<id>?v=N), or null. Stored only
+   * in the app's userData; it comes first in the picture order (DESIGN.md §6.5.2).
+   */
+  customPortraitUrl?: string | null;
   /** Glow tier from the richness score, or rainbow when the user granted one (DESIGN.md §6.9). */
   glow?: GlowTier;
 }
@@ -132,9 +137,19 @@ export interface NodeHit {
   status: NodeCrystal['status'];
   matchedIn: '名稱' | '立繪角色' | '特長' | '側寫';
   avatarUrl?: string | null;
+  /** Same as NodeCrystal.customPortraitUrl. */
+  customPortraitUrl?: string | null;
   /** Supplied by the main process, with the same rules as NodeCrystal.brand. */
   brand?: CrystalBrand;
 }
+
+/**
+ * Result of assigning (chooseNodePortrait) or clearing (clearNodePortrait) a node's own picture. The chosen file's
+ * path never reaches the renderer; only the new image URL (or null after clearing) does.
+ */
+export type NodePortraitResult =
+  | { ok: true; customPortraitUrl: string | null }
+  | { ok: false; reason: 'invalid-node' | 'unsupported' | 'too-large' | 'not-image' | 'io' };
 
 export type CrystalLink =
   | { kind: 'lineage'; from: string; to: string }

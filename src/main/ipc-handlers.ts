@@ -4,9 +4,10 @@ import { app, dialog, ipcMain, shell } from 'electron';
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
 import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
-import type { GalaxyMap, VaultInfo, VaultWriteResult } from '../shared/types';
+import type { GalaxyMap, NodePortraitResult, VaultInfo, VaultWriteResult } from '../shared/types';
 import { appUrl } from './app-assets';
 import { avatarUrl, portraitUrl } from './images';
+import { NodePortraitStore, validPortraitNodeId } from './node-portraits';
 import { brandPortraitSettings, readBrandPortraitPath, readVaultPath, readViewSettings, saveBrandPortraitPath, saveVaultPath,
   saveViewSettings } from './settings';
 import { VaultReader } from './vault';
@@ -55,6 +56,11 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
     : join(app.getAppPath(), 'fixtures', 'memory-vault');
   const readBrandPortraitFolder = () => readBrandPortraitPath(settingsFile);
+  // Pictures the user assigned to nodes: copies in userData/node-portraits, never in the memory vault (DESIGN.md §6.5.2).
+  const nodePortraits = new NodePortraitStore(app.getPath('userData'));
+  void nodePortraits.sweep().catch(() => {});
+  const manualUrl = (nodeId: string, revision: number | undefined) =>
+    revision ? 'vault-image://manual/' + encodeURIComponent(nodeId) + '?v=' + revision : null;
   let activeVault: { path: string; reader: VaultReader; writer: VaultWriter } | undefined;
 
   async function getActiveVault() {
@@ -125,9 +131,23 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
 
   const avatarCache = new WeakMap<object, Map<string, Promise<string | null>>>();
 
-  async function crystalImages(context: Awaited<ReturnType<typeof readVaultContext>>, nodeId: string) {
+  async function crystalImages(context: Awaited<ReturnType<typeof readVaultContext>>, nodeId: string, revisions?: Map<string, number>) {
+    const custom = revisions ?? await nodePortraits.revisions(opaqueKey('v', context.root));
     const [avatar, portrait] = await Promise.all([avatarUrl(context, nodeId), portraitUrl(context, nodeId)]);
-    return { avatarUrl: avatar, portraitUrl: portrait };
+    return { avatarUrl: avatar, portraitUrl: portrait, customPortraitUrl: manualUrl(nodeId, custom.get(nodeId)) };
+  }
+
+  /** The image protocol's view of the assigned pictures: only files the index lists, for the active vault. */
+  async function readManualPortrait(nodeId: string) {
+    const context = await readVaultContext();
+    const entry = await nodePortraits.lookup(opaqueKey('v', context.root), nodeId);
+    return entry && context.snapshot.hasNode(nodeId) ? { folder: nodePortraits.folder, file: entry.file } : null;
+  }
+
+  /** Assign or clear: the node must be on the current star map. */
+  async function portraitTarget(nodeId: unknown) {
+    const context = await readVaultContext();
+    return validPortraitNodeId(nodeId) && context.snapshot.hasNode(nodeId) ? { context, nodeId, vault: opaqueKey('v', context.root) } : null;
   }
 
   async function getInfo(path: string): Promise<VaultInfo> {
@@ -178,6 +198,27 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       return saveBrandPortraitPath(settingsFile, folder);
     },
     clearBrandPortraitFolder: () => saveBrandPortraitPath(settingsFile, null),
+    chooseNodePortrait: async (_event, nodeId): Promise<NodePortraitResult | null> => {
+      const target = await portraitTarget(nodeId);
+      if (!target) return { ok: false, reason: 'invalid-node' };
+      const parent = getWindow();
+      if (!parent) return null;
+      const { canceled, filePaths } = await dialog.showOpenDialog(parent, {
+        title: '指定節點圖片',
+        properties: ['openFile'],
+        filters: [{ name: '圖片(PNG、WebP、JPEG,20 MB 以內)', extensions: ['png', 'webp', 'jpg', 'jpeg'] }],
+      });
+      const [chosen] = filePaths;
+      if (canceled || !chosen) return null;
+      if (!isAbsolute(chosen)) return { ok: false, reason: 'io' };
+      const result = await nodePortraits.assign(target.vault, target.nodeId, chosen);
+      return result.ok ? { ok: true, customPortraitUrl: manualUrl(target.nodeId, result.revision) } : result;
+    },
+    clearNodePortrait: async (_event, nodeId): Promise<NodePortraitResult> => {
+      const target = await portraitTarget(nodeId);
+      if (!target) return { ok: false, reason: 'invalid-node' };
+      return await nodePortraits.clear(target.vault, target.nodeId) ? { ok: true, customPortraitUrl: null } : { ok: false, reason: 'io' };
+    },
     listEntries: async (_event, filter) => (await readVault()).listEntries(filter),
     readEntry: async (_event, path) => (await readVault()).readEntry(path),
     search: async (_event, query, filter) => (await readVault()).search(query, filter),
@@ -187,10 +228,11 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       let avatars = avatarCache.get(context.snapshot);
       if (!avatars) avatarCache.set(context.snapshot, avatars = new Map());
       const cache = avatars;
+      const custom = await nodePortraits.revisions(opaqueKey('v', context.root));
       return Promise.all(context.snapshot.searchNodes(query).slice(0, 50).map(async (hit) => {
         let url = cache.get(hit.nodeId);
         if (!url) cache.set(hit.nodeId, url = avatarUrl(context, hit.nodeId));
-        return { ...hit, avatarUrl: await url };
+        return { ...hit, avatarUrl: await url, customPortraitUrl: manualUrl(hit.nodeId, custom.get(hit.nodeId)) };
       }));
     },
     listCrystals: async () => {
@@ -198,9 +240,10 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       const { crystals, links } = context.snapshot.listCrystals();
       const positions = await crystalLayout.positions(opaqueKey('v', context.root), crystals.map(({ nodeId }) => nodeId));
       const { richness, awards } = await glowState(context);
+      const custom = await nodePortraits.revisions(opaqueKey('v', context.root));
       return {
         crystals: await Promise.all(crystals.map(async (crystal) => ({
-          ...crystal, position: positions.get(crystal.nodeId)!, ...await crystalImages(context, crystal.nodeId),
+          ...crystal, position: positions.get(crystal.nodeId)!, ...await crystalImages(context, crystal.nodeId, custom),
           glow: glowOf(richness.get(crystal.nodeId) ?? { tier: 'white' }, awards.awards.get(crystal.nodeId)),
         }))),
         links,
@@ -264,5 +307,5 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   }
 
   for (const method of Object.keys(handlers) as Array<keyof VaultRequests>) register(method);
-  return { readVaultContext, readBrandPortraitFolder };
+  return { readVaultContext, readBrandPortraitFolder, readManualPortrait };
 }
