@@ -4,10 +4,10 @@ import { shelves } from '../../shared/shelves';
 import type { Shelf } from '../../shared/shelves';
 import type { DeskMode, FileVersion, MemoryEntry, MemoryEntryDetail, NodeCrystal, NodeHit } from '../../shared/types';
 import { primaryStatus } from '../../shared/vault-actions';
-import { dateLabel, deskNoteLabel, entryIdentifier, isOpenBookmark, isPending, meetingEndTag, projectDisplayName, shelfNames, tabNames, tabs } from './catalog';
+import { dateLabel, deskNoteLabel, entryIdentifier, isOpenBookmark, isPending, projectDisplayName, shelfNames, tabNames, tabs } from './catalog';
 import type { CatalogTab } from './catalog';
 import { NodeMatches } from './NodeMatches';
-import { AvatarSeals, HeatSlot, PreviousVersion, StatusMark } from './Paper';
+import { AvatarSeals, EndBadge, HeatSlot, PreviousVersion, StatusMark } from './Paper';
 import { ReadingDesk } from './ReadingDesk';
 import { useDelayed } from './use-delayed';
 import { legacyWriteMessage, useVaultWrites } from './use-vault-writes';
@@ -93,7 +93,7 @@ function DraftBoard({ notes, feedback, onOpen, onWrite, onReload }: {
           data-foil={processed && state?.phase === 'saved' ? '' : undefined}>
         <div className={styles.noteMeta}><strong>{deskNoteLabel(entry)}</strong><span>{entryIdentifier(entry)}</span></div>
         <button type="button" className={styles.noteTitle} onClick={(event) => onOpen(entry.path, event.currentTarget)}>{entry.title}</button>
-        <p className={styles.noteSummary}>{meetingSummary(entry)}</p>
+        <p className={styles.noteSummary} data-empty={noConclusion(entry) || undefined}>{meetingSummary(entry)}</p>
         <div className={styles.noteActions}>
           <button type="button" className={styles.paperButton} onClick={(event) => onOpen(entry.path, event.currentTarget)}>看詳情</button>
           <button type="button" className={styles.primaryButton} aria-disabled={locked} data-write-action={status || undefined}
@@ -127,9 +127,9 @@ interface CardProps {
 }
 
 /** Meetings without a closing statement (no `## 結論`) say so on the card and the desk note (DESIGN.md §5.13). */
+const noConclusion = (entry: MemoryEntry) => entry.shelf === 'meeting' && !!entry.meeting && !entry.meeting.hasConclusion;
 function meetingSummary(entry: MemoryEntry): string {
-  if (entry.shelf !== 'meeting') return entry.summary;
-  return entry.meeting && !entry.meeting.hasConclusion ? '(主持人未寫結論)' : entry.summary;
+  return noConclusion(entry) ? '(主持人未寫結論)' : entry.summary;
 }
 
 const Plaque = memo(function Plaque({ entry, active, selected, stackOpen, revision, nodes, onOpen, onToggleStack, onFocus, onNode }: CardProps) {
@@ -142,13 +142,13 @@ const Plaque = memo(function Plaque({ entry, active, selected, stackOpen, revisi
         <span>{entryIdentifier(entry)} · <StatusMark status={entry.status} /></span>
         {entry.shelf === 'case' && <time>{dateLabel(entry.updatedAt)}</time>}
         {entry.shelf === 'meeting' && entry.meeting && <span className={styles.meetingMeta}>
-          {entry.meeting.rounds !== null && `${entry.meeting.rounds} 輪`}{meetingEndTag(entry) && <b className={styles.meetingTag}><span className={styles.srOnly}> · </span>{meetingEndTag(entry)}</b>}
+          {entry.meeting.rounds !== null && `${entry.meeting.rounds} 輪`}<EndBadge reason={entry.meeting.endReason} />
         </span>}
       </div>
       <h3><button type="button" className={styles.plaqueTitle} data-entry-title="" tabIndex={active ? 0 : -1}
         onFocus={() => onFocus(entry.path)}
         onClick={(event) => onOpen(entry.path, event.currentTarget)}>{entry.title}</button></h3>
-      <p className={styles.plaqueSummary}>{meetingSummary(entry)}</p>
+      <p className={styles.plaqueSummary} data-empty={noConclusion(entry) || undefined}>{meetingSummary(entry)}</p>
       <div className={styles.plaqueFooter}>
         <HeatSlot heat={entry.heat} />
         <div className={styles.plaqueActions}>

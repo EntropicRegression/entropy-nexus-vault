@@ -1,6 +1,6 @@
 import { usePortraitChain } from '../brand/brand-portrait';
 import { HEAT_LABELS, HEAT_LEVELS } from '../../shared/heat';
-import type { HeatInfo, MemoryEntry, NodeCrystal, SupersessionLink } from '../../shared/types';
+import type { HeatInfo, MeetingInfo, MemoryEntry, NodeCrystal, SupersessionLink } from '../../shared/types';
 import { dateLabel } from './catalog';
 import styles from './Library.module.css';
 
@@ -46,8 +46,8 @@ function Seal({ id, entry, nodes, onNode }: AvatarProps & { id: string }) {
     : initial;
   return <>
     {node && onNode
-      ? <button type="button" className={styles.seal} tabIndex={-1} aria-label={label} onClick={() => onNode(node)}>{content}</button>
-      : <span className={styles.seal} data-unavailable={!node} aria-label={label}>{content}</span>}
+      ? <button type="button" className={styles.seal} data-host={entry.nodeId === id || undefined} tabIndex={-1} aria-label={label} onClick={() => onNode(node)}>{content}</button>
+      : <span className={styles.seal} data-host={entry.nodeId === id || undefined} data-unavailable={!node} aria-label={label}>{content}</span>}
     <span className={styles.sealTip} aria-hidden="true">{label}</span>
   </>;
 }
@@ -56,6 +56,15 @@ interface AvatarProps {
   entry: MemoryEntry;
   nodes: ReadonlyMap<string, NodeCrystal>;
   onNode?: (node: NodeCrystal) => void;
+}
+
+const endIcons = { 完成: '✓', 中止: '■', 逾時: '⧗' } as const;
+
+/** Meeting end reason (DESIGN.md §5.13): icon + word + border style; the icon is decorative, the word is read out. */
+export function EndBadge({ reason }: { reason: MeetingInfo['endReason'] }) {
+  if (!reason) return null;
+  return <b className={styles.endBadge} data-end={reason}><span className={styles.srOnly}> · </span>
+    <span aria-hidden="true">{endIcons[reason]}</span>{reason}</b>;
 }
 
 export function AvatarSeals(props: AvatarProps) {

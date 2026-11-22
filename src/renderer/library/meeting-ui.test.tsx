@@ -126,7 +126,7 @@ describe('閱讀桌引用與印章名稱', () => {
     const r = createRoot(host);
     const body = '> 第一行\n> 第二行';
     await act(async () => { r.render(<Markdown body={body} related={new Map()} onOpen={() => {}} />); });
-    expect(host.querySelector('blockquote')!.innerHTML).toBe('第一行 第二行');
+    expect(host.querySelector('blockquote')!.innerHTML).toBe('<p>第一行 第二行</p>');
     await act(async () => { r.render(<Markdown body={body} related={new Map()} onOpen={() => {}} lineBreaks />); });
     expect(host.querySelectorAll('blockquote br')).toHaveLength(1);
     act(() => r.unmount());

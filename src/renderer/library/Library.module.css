@@ -284,29 +284,36 @@
   opacity: .85;
 }
 .plaqueFace[data-shelf='meeting'] {
-  margin-top: 7px;
-  height: calc(100% - 7px);
-  padding-top: 19px;
+  margin-top: 12px;
+  height: calc(100% - 12px);
+  padding-top: 21px;
   background:
-    linear-gradient(90deg, transparent, rgba(107,74,46,.45) 12%, rgba(107,74,46,.45) 88%, transparent) 0 11px / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, rgba(107,74,46,.45) 0 4px, transparent 4px 7px) 10px 11px / calc(100% - 20px) 1px no-repeat,
     var(--paper-tex) 0 0 / 64px 64px, var(--card-paper);
 }
-/* Top-edge ring binding: five gold rings straddling the top edge (one radial-gradient layer) plus a fine seam. */
+/* Top-edge ring binding (Hagemi M6 稿): five raised gold coils from a same-origin SVG file, straddling the top edge;
+   the dashed seam is the first background layer above. No data: URL (CSP), no blur, nothing animated. */
 .plaqueFace[data-shelf='meeting']::before {
   content: '';
   position: absolute;
   left: 50%;
-  top: -7px;
-  width: 110px;
-  height: 12px;
+  top: -12px;
+  width: 156px;
+  height: 20px;
   transform: translateX(-50%);
-  background:
-    radial-gradient(circle at 50% 50%, transparent 0 2.5px, var(--gold-warm) 3px 4.5px, transparent 5px) 0 0 / 22px 12px repeat-x;
+  background: url('../../../assets/ui/meeting-coil.svg') 0 0 / 156px 20px no-repeat;
   pointer-events: none;
 }
 .plaqueFace[data-shelf='meeting'] h3 { margin-top: 8px; }
 .meetingMeta { display: inline-flex; align-items: center; gap: 6px; }
-.meetingTag { padding: 0 5px; border: 1px solid var(--wood-warm); font-weight: 400; font-size: 11px; }
+/* End reason: icon + text + border style (完成 solid green, 中止 solid ember, 逾時 dashed wood) — never colour alone. */
+.endBadge { display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; border: 1px solid; border-radius: 2px; font-weight: 700; font-size: 10.5px; line-height: 1.5; }
+.endBadge[data-end='完成'] { color: #1f5b3f; border-color: #1f5b3f; background: rgba(31,91,63,.08); }
+.endBadge[data-end='中止'] { color: var(--ember); border-color: var(--ember); background: rgba(140,58,39,.10); }
+.endBadge[data-end='逾時'] { color: var(--wood-warm); border-color: var(--wood-warm); border-style: dashed; background: rgba(107,74,46,.10); }
+.plaqueSummary[data-empty], .noteSummary[data-empty] { font-style: italic; color: #7c6955; }
+.plaqueSummary[data-empty] { padding: 2px 8px; border-left: 2px solid rgba(107,74,46,.3); background: rgba(107,74,46,.07); }
+.plaqueFace[data-shelf='meeting'] .seal[data-host] { box-shadow: 0 0 0 1.5px #b57f23; }
 .plaqueMeta { font-size: 12px; color: var(--ink-paper-muted); flex-wrap: wrap; letter-spacing: .03em; }
 .plaqueMeta > span { overflow-wrap: anywhere; }
 .statusMark, .heatSlot, .gems { display: inline-flex; align-items: center; gap: 4px; }
@@ -512,3 +519,50 @@
   .note { padding: 10px 12px; }
   .note p { display: none; }
 }
+
+/* M6b meeting reading view (DESIGN.md §5.14; Hagemi M6 sketch). Static: no transitions, no blur. */
+blockquote > :first-child { margin-top: 0; }
+blockquote > :last-child { margin-bottom: 0; }
+.meetingView { font-size: 14px; line-height: 1.75; }
+.meetingRoster, .meetingOutputs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12.5px; color: var(--ink-paper-muted); }
+.rosterLabel { color: var(--ink-paper-muted); }
+.attendee { display: inline-flex; align-items: center; padding: 1px 8px; border: 1px solid rgba(107,74,46,.35); border-radius: 999px; background: rgba(43,33,24,.06); color: var(--ink-paper); font: inherit; font-size: 12px; line-height: 1.6; }
+button.attendee { cursor: pointer; }
+button.attendee:hover { border-color: var(--wood-warm); }
+.attendee[data-host] { border: 1.5px solid #b57f23; background: rgba(217,164,65,.2); font-weight: 700; }
+.outputChip { display: inline-block; padding: 1px 9px; border: 1px solid rgba(217,164,65,.65); background: rgba(217,164,65,.14); color: var(--wood-warm); font: inherit; font-size: 12px; font-weight: 700; }
+button.outputChip { cursor: pointer; }
+.outputChip[data-meeting-output='missing'] { font-weight: 400; border-style: dashed; color: var(--ink-paper-muted); }
+.meetingConclusion { margin: 4px 0 18px; padding: 10px 14px; background: rgba(217,164,65,.13); border: 1px solid rgba(217,164,65,.55); border-left: 4px solid #b57f23; }
+.meetingConclusion h3 { margin: 0 0 4px; font-size: 13.5px; letter-spacing: .06em; color: #7a5218; }
+.meetingConclusion p { margin: 0 0 6px; }
+.meetingConclusion p:last-child { margin-bottom: 0; }
+.meetingView p[data-empty] { font-style: italic; color: var(--ink-paper-muted); margin: 0; }
+.meetingProblems { margin: 0 0 16px; padding: 8px 12px; border: 1px dashed var(--ember); color: var(--ink-paper); font-size: 13px; }
+.meetingProblems p { margin: 0 0 4px; font-weight: 700; color: var(--ember); }
+.meetingProblems ul { margin: 0 0 8px; padding-left: 18px; color: var(--ink-paper-muted); }
+.meetingTools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.speakerFilter { display: flex; flex-wrap: wrap; gap: 4px; }
+.speakerFilter button { padding: 1px 8px; border: 1px solid rgba(107,74,46,.35); background: transparent; color: var(--ink-paper-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.speakerFilter button[aria-pressed='true'] { border-color: var(--wood-warm); background: rgba(107,74,46,.14); color: var(--ink-paper); font-weight: 700; }
+.foldTools { display: flex; gap: 6px; }
+.meetingRound { margin-bottom: 14px; }
+.meetingRound > summary { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 12px; margin-bottom: 10px; cursor: pointer; background: rgba(107,74,46,.12); border-left: 3px solid var(--wood-warm); font-weight: 700; color: var(--ink-paper); }
+.foldMark::before { content: '▾'; display: inline-block; width: 1.1em; color: var(--wood-warm); }
+.meetingRound:not([open]) .foldMark::before { content: '▸'; }
+.meetingRaw { margin: 0; padding: 10px 12px; max-height: 60vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--paper-1); font-size: 12.5px; line-height: 1.6; }
+.meetingRound > summary small { font-size: 11.5px; font-weight: 400; color: var(--ink-paper-muted); }
+.speech { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px; margin-bottom: 12px; align-items: start; }
+.deskSidebar .speech { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.speakerSeal { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 7px; background: rgba(255,251,242,.55); border: 1px solid rgba(107,74,46,.25); border-radius: 2px; }
+.speakerSeal > div { display: flex; flex-direction: column; min-width: 0; }
+.speakerIcon { width: 24px; height: 24px; flex: none; }
+.speakerName { padding: 0; border: 0; background: none; color: var(--ink-paper); font: inherit; font-size: 12.5px; font-weight: 700; line-height: 1.3; text-align: left; overflow-wrap: anywhere; }
+button.speakerName { cursor: pointer; text-decoration: underline transparent; }
+button.speakerName:hover { text-decoration-color: currentColor; }
+.speakerId { font-family: var(--font-mono, Consolas, monospace); font-size: 10.5px; color: var(--ink-paper-muted); overflow-wrap: anywhere; }
+.speechBody { min-width: 0; padding: 7px 12px; border-left: 3px solid rgba(140,58,39,.5); background: rgba(255,250,240,.48); }
+.speechBody > :first-child { margin-top: 0; }
+.speechBody > :last-child { margin-bottom: 0; }
+.speechBody pre { white-space: pre; }
+.quietLine { margin: 0 0 10px; font-size: 13px; color: var(--ink-paper-muted); }

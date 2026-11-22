@@ -96,3 +96,10 @@ describe('逐字稿的異常結構(審查補測)', () => {
   });
 });
 
+describe('主控台 dd820f4 格式', () => {
+  it('引號內的全形逗號與頓號不切分;沒加引號的全形逗號仍會切分(主控台已一律加引號)', () => {
+    const info = meetingInfo(header(['參與節點ID: ["a", "b", "c"]', '參與者: ["甲，副手", "乙、二號", "丙"]']), false, 'x');
+    expect(info.participants).toEqual([{ nodeId: 'a', name: '甲，副手' }, { nodeId: 'b', name: '乙、二號' }, { nodeId: 'c', name: '丙' }]);
+    expect(meetingInfo(header(['參與節點ID: [a, b]', '參與者: [甲，副手, 乙]']), false, 'x').participants.map((p) => p.name)).toEqual(['', '']);
+  });
+});

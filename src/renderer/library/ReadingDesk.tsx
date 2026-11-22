@@ -1,5 +1,4 @@
-import { Fragment, useLayoutEffect, useRef } from 'react';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { DeskMode, MemoryEntry, MemoryEntryDetail, NodeCrystal } from '../../shared/types';
 import { canSetStatus, primaryStatus } from '../../shared/vault-actions';
 import { categoryLabel, dateLabel, entryIdentifier, isProjectIdAttribute, projectDisplayName } from './catalog';
@@ -7,71 +6,13 @@ import { HeatSlot, nodeName, PreviousVersion, StatusMark } from './Paper';
 import type { Feedback, WriteRequest } from './use-vault-writes';
 import { legacyWriteMessage } from './use-vault-writes';
 import { WriteFeedback } from './WriteFeedback';
+import { Markdown } from './Markdown';
+import { MeetingView } from './MeetingView';
 import styles from './Library.module.css';
 
+export { Markdown } from './Markdown';
+
 type OpenEntry = (path: string) => void;
-
-function inline(text: string, related: ReadonlyMap<string, string>, open: OpenEntry): ReactNode[] {
-  return text.split(/(\[\[\d{4}-\d{4}(?:\|[^\]]+)?\]\]|\*\*[^*]+\*\*|\x60[^\x60]+\x60)/g).map((part, i) => {
-    if (part.startsWith('[[') && part.endsWith(']]')) {
-      const [id, label = id] = part.slice(2, -2).split('|');
-      const path = related.get(id);
-      return path ? <button type="button" className={styles.inlineLink} key={i} onClick={() => open(path)}>{label}</button> : part;
-    }
-    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
-    if (/^\x60[^\x60]+\x60$/.test(part)) return <code key={i}>{part.slice(1, -1)}</code>;
-    return part;
-  });
-}
-
-/** Render repository Markdown as text/components without allowing HTML, remote loads or arbitrary links. */
-/** lineBreaks: keep each quoted line on its own line (meeting transcripts); elsewhere quoted lines join like a paragraph. */
-export function Markdown({ body, related, onOpen, lineBreaks = false }: { body: string; related: ReadonlyMap<string, string>; onOpen: OpenEntry; lineBreaks?: boolean }) {
-  const lines = body.split(/\r?\n/);
-  const blocks: ReactNode[] = [];
-  let index = 0;
-  const boundary = /^\s*(?:#{1,6}\s|\x60{3,}|~{3,}|[-*+]\s+|\d+\.\s+|>\s?)/;
-  while (index < lines.length) {
-    const first = lines[index].trim();
-    const key = index++;
-    if (!first) continue;
-    const fence = /^(\x60{3,}|~{3,})/.exec(first);
-    if (fence) {
-      const code: string[] = [];
-      while (index < lines.length && !lines[index].trim().startsWith(fence[1])) code.push(lines[index++]);
-      if (index < lines.length) index++;
-      blocks.push(<pre key={key}><code>{code.join('\n')}</code></pre>);
-      continue;
-    }
-    const heading = /^(#{1,6})\s+(.+)$/.exec(first);
-    if (heading) {
-      const Heading = heading[1].length <= 2 ? 'h3' : 'h4';
-      blocks.push(<Heading key={key}>{inline(heading[2], related, onOpen)}</Heading>);
-      continue;
-    }
-    const marker = /^(?:[-*+]|\d+\.)\s+/.exec(first);
-    if (marker) {
-      const pattern = /^\d/.test(marker[0]) ? /^\s*\d+\.\s+/ : /^\s*[-*+]\s+/;
-      const List = /^\d/.test(marker[0]) ? 'ol' : 'ul';
-      const items = [first.replace(pattern, '')];
-      while (index < lines.length && pattern.test(lines[index])) items.push(lines[index++].replace(pattern, ''));
-      blocks.push(<List key={key}>{items.map((item, i) => <li key={i}>{inline(item, related, onOpen)}</li>)}</List>);
-      continue;
-    }
-    if (first.startsWith('>')) {
-      const quote = [first.replace(/^>\s?/, '')];
-      while (index < lines.length && /^\s*>/.test(lines[index])) quote.push(lines[index++].trim().replace(/^>\s?/, ''));
-      blocks.push(<blockquote key={key}>{lineBreaks
-        ? quote.map((line, i) => <Fragment key={i}>{i > 0 && <br />}{inline(line, related, onOpen)}</Fragment>)
-        : inline(quote.join(' '), related, onOpen)}</blockquote>);
-      continue;
-    }
-    const paragraph = [first];
-    while (index < lines.length && lines[index].trim() && !boundary.test(lines[index])) paragraph.push(lines[index++].trim());
-    blocks.push(<p key={key}>{inline(paragraph.join(' '), related, onOpen)}</p>);
-  }
-  return <>{blocks}</>;
-}
 
 interface Props {
   deskMode: DeskMode;
@@ -92,6 +33,18 @@ interface Props {
   onReload: (request: WriteRequest) => void;
 }
 
+/**
+ * 來源會議 on a decision draft (記憶設計討論 第五輪 §2, 2026-11-22): `"[[meetings/<專案>/<檔名>.md]]"`. Only a vault-relative
+ * path under meetings/ is accepted; anything else is ignored.
+ */
+export function sourceMeetingPath(attributes: MemoryEntryDetail['attributes']): string | null {
+  const value = attributes.find(([key]) => key === '來源會議')?.[1];
+  const text = Array.isArray(value) ? value[0] ?? '' : value ?? '';
+  const target = /\[\[([^\[\]|]+)(?:\|[^\]]*)?\]\]/.exec(text)?.[1].trim().replace(/\\/g, '/');
+  if (!target || !/^meetings\/[^/]+\/[^/]+$/.test(target) || target.split('/').some((part) => part === '..')) return null;
+  return /\.md$/i.test(target) ? target : target + '.md';
+}
+
 export function ReadingDesk(props: Props) {
   const { deskMode, selectedPath, entry, loading, checking, showLoading, error, entries, nodes, onOpen, onClose, onToggleMode, onNode, writeState, onWrite, onReload } = props;
   const title = useRef<HTMLHeadingElement>(null);
@@ -105,6 +58,7 @@ export function ReadingDesk(props: Props) {
   const name = entry && projectDisplayName(entry);
   const attributes = entry?.attributes.filter(([key]) => !isProjectIdAttribute(key)) ?? [];
   const primary = entry && primaryStatus(entry);
+  const sourceMeeting = entry && entry.shelf === 'decision' ? sourceMeetingPath(entry.attributes) : null;
   const blocked = error || checking || writeState?.phase === 'pending' ||
     (writeState?.phase === 'failure' && ['conflict', 'missing', 'legacy'].includes(writeState.reason));
   for (const path of entry?.caseReferences ?? []) {
@@ -150,8 +104,12 @@ export function ReadingDesk(props: Props) {
       {entry && <>
         <div className={styles.sheetBody}>
           <div className={styles.document}>
-            {entry.summary && <div className={styles.conclusion}><strong>結論摘要</strong><p>{entry.summary}</p></div>}
-            <Markdown body={entry.body.replace(/^摘要[:：].*(?:\r?\n|$)/m, '')} related={related} onOpen={onOpen} lineBreaks={entry.shelf === 'meeting'} />
+            {entry.transcript
+              ? <MeetingView key={entry.path} entry={entry} entries={entries} nodes={nodes} related={related} onOpen={onOpen} onNode={onNode} />
+              : <>
+                {entry.summary && <div className={styles.conclusion}><strong>結論摘要</strong><p>{entry.summary}</p></div>}
+                <Markdown body={entry.body.replace(/^摘要[:：].*(?:\r?\n|$)/m, '')} related={related} onOpen={onOpen} lineBreaks={entry.shelf === 'meeting'} />
+              </>}
             {entry.review && <section className={styles.review}>
               <h3>回顧</h3>
               <Markdown body={entry.review} related={related} onOpen={onOpen} />
@@ -167,6 +125,12 @@ export function ReadingDesk(props: Props) {
                 </li>)}
               </ol>
             </section>
+            {sourceMeeting && <section data-source-meeting="">
+              <h3>來源會議</h3>
+              {entries.has(sourceMeeting)
+                ? <button type="button" className={styles.paperButton} onClick={() => onOpen(sourceMeeting)}>{entries.get(sourceMeeting)!.title} →</button>
+                : <p>{sourceMeeting.split('/').at(-1)?.replace(/\.md$/i, '')}(找不到這份會議紀錄)</p>}
+            </section>}
             {entry.caseReferences.length > 0 && <section>
               <h3>關聯卷宗</h3>
               <ul className={styles.relatedList}>

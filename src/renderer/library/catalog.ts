@@ -42,6 +42,3 @@ export function deskNoteLabel(entry: MemoryEntry): string {
   if (isOpenBookmark(entry)) return '未完書籤';
   return '待核閱' + (entry.shelf === 'archive' ? (entry.kind === 'preference' ? '偏好' : '知識') : categoryLabel(entry));
 }
-
-/** Meeting transcripts (M6a) are counted apart from the other pending notes. */
-export const meetingEndTag = (entry: MemoryEntry): string => entry.meeting?.endReason === '中止' || entry.meeting?.endReason === '逾時' ? entry.meeting.endReason : '';
