@@ -22,6 +22,10 @@ const sensitiveKeys = new Set([
 // so folder names with spaces are covered.
 const localPath = /(?<![a-z0-9_])(?:file:(?:[/\\]|%2f|%5c)+|[a-z]:[\\/]|\\\\)[^\r\n\x60"'<>()[\]（）「」『』【】、，。；：]*|(?<![\p{L}\p{N}_.%/\\])(?:\.{1,2}[\\/])*(?:users|home)[\\/](?=[^\\/\s])[^\r\n\x60"'<>()[\]（）「」『』【】、，。；：]*|(?<![\p{L}\p{N}_.~:/\\])\/(?:\/)?[\p{L}\p{N}_.~-][^\r\n\x60"'<>()[\]（）「」『』【】、，。；：]*/giu;
 
+export function replaceLocalPaths(text: string, replacement: (path: string) => string): string {
+  return text.replace(localPath, replacement);
+}
+
 export function isPrivateVaultField(key: string): boolean {
   return sensitiveKeys.has(key.normalize('NFKC').toLowerCase().replace(/[\s_-]/g, ''));
 }
@@ -45,7 +49,7 @@ export function publicAttributes(attributes: ReadonlyMap<string, FrontMatterValu
 
 /** Final IPC boundary for vault DTOs, including future profile or archive fields. */
 export function redactForRenderer<T>(value: T): T {
-  if (typeof value === 'string') return value.replace(localPath, '[本機路徑已隱藏]') as T;
+  if (typeof value === 'string') return replaceLocalPaths(value, () => '[本機路徑已隱藏]') as T;
   if (Array.isArray(value)) return value.map(redactForRenderer) as T;
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).filter(([key, item]) =>

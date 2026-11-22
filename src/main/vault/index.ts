@@ -1,11 +1,12 @@
 import { join } from 'node:path';
 import { heatDecayAt } from '../../shared/heat';
-import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit } from '../../shared/types';
+import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit, ReadableNodeProfile } from '../../shared/types';
 import type { GalaxyInput } from '../../shared/galaxies';
 import { buildCrystals, profileHighlights } from './crystals';
 import { entryFromFile } from './entry';
 import type { ParsedEntry } from './entry';
 import { field } from './frontmatter';
+import { profileSections } from './profile-content';
 import { inRecycle, VaultLinks } from './links';
 import { memoryPath, sameVaultVersion, scanVault, vaultVersion } from './scan';
 import type { VaultVersion } from './scan';
@@ -69,11 +70,11 @@ export class VaultSnapshot {
   private nodeSearchIndex: { hit: Omit<NodeHit, 'matchedIn'>; fields: [NodeHit['matchedIn'], string][] }[] | undefined;
 
   private searchIndex() {
-    this.nodeSearchIndex ??= [...this.crystals.records.values()].map(({ crystal, profile, stats }) => ({
+    this.nodeSearchIndex ??= [...this.crystals.records.values()].map(({ crystal, profile }) => ({
       hit: { nodeId: crystal.nodeId, name: crystal.name, role: crystal.role, status: crystal.status },
       fields: ([
         ['名稱', crystal.name], ['立繪角色', crystal.role ?? ''],
-        ['特長', profileHighlights(profile, stats).specialty], ['側寫', profile?.body ?? ''],
+        ['特長', crystal.specialty ?? ''], ['側寫', profile?.body ?? ''],
       ] as [NodeHit['matchedIn'], string][]).map(([label, text]) => [label, text.toLowerCase()]),
     }));
     return this.nodeSearchIndex;
@@ -140,6 +141,28 @@ export class VaultSnapshot {
 
   hasArchivedNode(nodeId: string): boolean {
     return Boolean(this.crystals.records.get(nodeId)?.archives.length);
+  }
+
+  nodeProfilePath(nodeId: string): string | undefined {
+    return this.crystals.records.get(nodeId)?.profile?.entry.path;
+  }
+
+  readNodeProfile(nodeId: string): ReadableNodeProfile | null {
+    const record = this.crystals.records.get(nodeId);
+    if (!record?.profile) return null;
+    const { path } = record.profile.entry;
+    const archive = record.archives.find((item) => item.path === path);
+    const { body, review, appendices } = profileSections(record.profile.markdown);
+    return {
+      nodeId, body, review, consoleAppendices: appendices, consoleAppendixCount: appendices.length,
+      source: { path, kind: archive ? 'archived' : 'live', archivedAt: archive?.archivedAt ?? null },
+    };
+  }
+
+  wakeNode(nodeId: string) {
+    const crystal = this.crystals.records.get(nodeId)?.crystal;
+    const sessionId = this.sidecars.stats?.nodes.get(nodeId)?.sessionId ?? null;
+    return crystal ? { status: crystal.status, canWake: crystal.canWake, nodeName: crystal.name, sessionId } : null;
   }
 
   async readCrystal(nodeId: string): Promise<NodeCrystalDetail | null> {

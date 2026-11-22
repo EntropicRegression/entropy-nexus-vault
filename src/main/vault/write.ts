@@ -1,13 +1,16 @@
 ﻿import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import type { Stats } from 'node:fs';
 import { chmod, link, lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import { dirname, join, posix, relative } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { canSetStatus } from '../../shared/vault-actions';
 import type { FileVersion, RecycledEntry, VaultRecycleResult, VaultStatusUpdate, VaultWriteFailure, VaultWriteResult } from '../../shared/types';
+import type { ProfileEditResult, ProfileEditVersion, ProfileSaveResult } from '../../shared/types';
 import { entryFromFile } from './entry';
 import { memoryPath, sameVaultVersion } from './scan';
 import { editStatusLine } from './status-line';
+import { buildProfileBytes, editPlaceholders, profilePath, restorePlaceholders, splitProfileBytes } from './profile-content';
 
 const recyclePrefix = '_回收/';
 const renameDelays = [25, 50, 100, 200];
@@ -28,6 +31,27 @@ function fileVersion(stat: Stats): FileVersion {
 function validExpected(expected: unknown): expected is FileVersion {
   return expected !== null && typeof expected === 'object' && 'mtime' in expected && 'size' in expected &&
     Number.isFinite(expected.mtime) && typeof expected.size === 'number' && Number.isSafeInteger(expected.size) && expected.size >= 0;
+}
+
+function profileVersion(stat: Stats, editToken: string): ProfileEditVersion {
+  const identity = createHash('sha256').update([stat.dev, stat.ino, stat.ctimeMs, stat.mode].join(':')).digest('hex');
+  return { ...fileVersion(stat), identity, editToken };
+}
+
+function validProfileVersion(value: unknown): value is ProfileEditVersion {
+  return validExpected(value) && 'identity' in value && typeof value.identity === 'string' && /^[a-f0-9]{64}$/.test(value.identity) &&
+    'editToken' in value && typeof value.editToken === 'string' && /^[a-f0-9-]{36}$/.test(value.editToken);
+}
+
+function removalsFromOptions(options: unknown): number[] | null {
+  if (options === undefined) return [];
+  if (!options || typeof options !== 'object' || Array.isArray(options)) return null;
+  if (!('acknowledgedRemovals' in options) || options.acknowledgedRemovals === undefined) return [];
+  const removals = options.acknowledgedRemovals;
+  if (!Array.isArray(removals)) return null;
+  const unique = new Set(removals);
+  return unique.size === removals.length && [...unique].every((value) => Number.isSafeInteger(value) && value > 0)
+    ? removals : null;
 }
 
 async function statPath(path: string): Promise<Stats | null> {
@@ -144,6 +168,16 @@ async function prepareSource(rootPath: string, key: string, expected: FileVersio
   return 'ok' in stat ? stat : { root, key, path, expected, stat };
 }
 
+interface ProfileDraft {
+  key: string;
+  paths: Map<string, string>;
+  appendixSize: number;
+  stat: Stats;
+  version: ProfileEditVersion;
+}
+
+type FindProfile = (nodeId: string) => Promise<string | undefined>;
+
 async function lastCheck(source: MoveSource): Promise<VaultWriteFailure | null> {
   if (await safePath(source.root, source.key) !== source.path) return failed('conflict');
   const result = await checkedVersion(source.path, source.expected, source.stat);
@@ -153,6 +187,7 @@ async function lastCheck(source: MoveSource): Promise<VaultWriteFailure | null> 
 export class VaultWriter {
   private tail: Promise<unknown> = Promise.resolve();
   private readonly recycleOrigins = new Map<string, string>();
+  private readonly profileDrafts = new Map<string, ProfileDraft>();
 
   constructor(private readonly root: string, private readonly onWrite: () => void = () => {}) {}
 
@@ -171,7 +206,73 @@ export class VaultWriter {
       if (!edited) return failed('legacy');
       if (!(source.stat.mode & 0o222)) return failed('readonly');
 
-      return this.replaceStatus(source, edited);
+      const result = await this.replaceFile(source, edited);
+      return 'ok' in result ? result : { ok: true, ...fileVersion(result) };
+    });
+  }
+
+  readProfileForEdit(nodeId: unknown, findProfile: FindProfile): Promise<ProfileEditResult> {
+    return this.run<ProfileEditResult>(async () => {
+      if (typeof nodeId !== 'string' || !nodeId) return { ok: false, reason: 'invalid-input' };
+      const key = profilePath(await findProfile(nodeId));
+      if (!key) return failed('missing');
+      const root = await realpath(this.root);
+      const path = await safePath(root, key);
+      const stat = path && await statPath(path);
+      if (!path || !stat || !stat.isFile()) return failed('missing');
+      const bytes = await readStable(path, stat);
+      if (!bytes || !sameVaultVersion(stat, await statPath(path))) return failed('conflict');
+      const parts = splitProfileBytes(bytes);
+      if (!parts) return failed('legacy');
+      if ((parts.nodeId || 'legacy:' + key) !== nodeId) return failed('conflict');
+      if (parts.ambiguous) return { ok: false, reason: 'appendix-marker' };
+      if (!parts.utf8) return { ok: false, reason: 'encoding' };
+
+      const version = profileVersion(stat, randomUUID());
+      const { body, paths } = editPlaceholders(parts.user.toString('utf8').replace(/\r\n/g, '\n'));
+      this.profileDrafts.set(nodeId, { key, paths, appendixSize: parts.appendix.length, stat, version });
+      const isArchive = key.split('/').length === 3;
+      return { ok: true, body, version, isArchive,
+        archiveNotice: isArchive ? '這份是封存檔，修改會在日後接回時帶進新節點。' : null };
+    });
+  }
+
+  saveProfileBody(nodeId: unknown, edit: unknown, expected: unknown, findProfile: FindProfile, options?: unknown): Promise<ProfileSaveResult> {
+    return this.run<ProfileSaveResult>(async () => {
+      const removals = removalsFromOptions(options);
+      if (typeof nodeId !== 'string' || typeof edit !== 'string' || !validProfileVersion(expected) || !removals) {
+        return { ok: false, reason: 'invalid-input' };
+      }
+      if (/\p{Surrogate}/u.test(edit)) return { ok: false, reason: 'encoding' };
+      const draft = this.profileDrafts.get(nodeId);
+      if (!draft || expected.editToken !== draft.version.editToken) return { ok: false, reason: 'edit-session' };
+      const stillCurrent = async () => profilePath(await findProfile(nodeId)) === draft.key;
+      if (!await stillCurrent()) return failed('conflict');
+      if (expected.mtime !== draft.version.mtime || expected.size !== draft.version.size || expected.identity !== draft.version.identity) {
+        return failed('conflict');
+      }
+      const source = await prepareSource(this.root, draft.key, expected);
+      if ('ok' in source) return source;
+      if (!sameVaultVersion(draft.stat, source.stat)) return failed('conflict', fileVersion(source.stat));
+      const original = await readStable(source.path, source.stat);
+      if (!original) return failed('conflict');
+      const parts = splitProfileBytes(original, draft.appendixSize);
+      if (!parts) return failed('legacy');
+      if ((parts.nodeId || 'legacy:' + draft.key) !== nodeId) return failed('conflict');
+      if (parts.ambiguous) return { ok: false, reason: 'appendix-marker' };
+      if (!parts.utf8) return { ok: false, reason: 'encoding' };
+      if (!(source.stat.mode & 0o222)) return failed('readonly');
+      const restored = restorePlaceholders(edit, draft.paths, removals);
+      if (!restored.ok) return restored;
+      const bytes = buildProfileBytes(parts, restored.body);
+      if (!bytes) return { ok: false, reason: 'appendix-marker' };
+      const result = await this.replaceFile(source, bytes, stillCurrent);
+      if ('ok' in result) return result;
+
+      const version = profileVersion(result, expected.editToken);
+      for (const token of restored.removedTokens) draft.paths.delete(token);
+      this.profileDrafts.set(nodeId, { ...draft, stat: result, version });
+      return { ok: true, version };
     });
   }
 
@@ -226,17 +327,17 @@ export class VaultWriter {
     }
   }
 
-  private run<T extends VaultWriteResult>(operation: () => Promise<T>): Promise<T | VaultWriteFailure> {
+  private run<T extends { ok: boolean }>(operation: () => Promise<T>): Promise<T | VaultWriteFailure> {
     const next = this.tail.then(operation).catch((error: unknown) => failed(hasCode(error, 'ENOENT', 'ENOTDIR') ? 'missing' : 'io'));
     this.tail = next;
     return next;
   }
 
-  private async replaceStatus(source: MoveSource, bytes: Buffer): Promise<VaultWriteResult> {
+  private async replaceFile(source: MoveSource, bytes: Buffer, stillCurrent?: () => Promise<boolean>): Promise<Stats | VaultWriteFailure> {
     const temporary = join(dirname(source.path), '.vault-write-' + randomUUID() + '.tmp');
     const staged = await open(temporary, 'wx', (source.stat.mode & 0o777) | 0o200);
     let identity: Stats | undefined;
-    let result: VaultWriteResult;
+    let result: Stats | VaultWriteFailure;
     try {
       try {
         identity = await staged.stat();
@@ -246,24 +347,33 @@ export class VaultWriter {
       } finally {
         await staged.close();
       }
-      result = await this.commitStatus(source, temporary, identity);
+      result = await this.commitFile(source, temporary, identity, stillCurrent);
     } catch {
       result = failed('io');
     }
-    if (!result.ok) {
-      const cleaned = identity ? await removeOwnedFile(temporary, identity, true) : await statPath(temporary).then((file) => !file, () => false);
+    if ('ok' in result) {
+      let cleaned = identity ? await removeOwnedFile(temporary, identity, true) : await statPath(temporary).then((file) => !file, () => false);
+      if (!cleaned && identity && stillCurrent) {
+        for (const wait of renameDelays) {
+          await delay(wait);
+          cleaned = await removeOwnedFile(temporary, identity, true);
+          if (cleaned) break;
+        }
+      }
       if (!cleaned) return { ...result, residualPath: relative(source.root, temporary).replace(/\\/g, '/') };
     }
     return result;
   }
 
-  private async commitStatus(source: MoveSource, temporary: string, staged: Stats): Promise<VaultWriteResult> {
+  private async commitFile(source: MoveSource, temporary: string, staged: Stats,
+    stillCurrent?: () => Promise<boolean>): Promise<Stats | VaultWriteFailure> {
     for (let attempt = 0; ; attempt++) {
+      if (stillCurrent && !await stillCurrent()) return failed('conflict');
       const invalid = await lastCheck(source);
       if (invalid) return invalid;
       try {
-        // There is no shared lock: the console can append between this check and rename.
-        // Conversely its own check and replace can race this app's status change.
+        // No shared lock: a console rename after lastCheck and before ours can lose a just-appended section.
+        // Conversely its own check and replace can race this app's write.
         await rename(temporary, source.path);
       } catch (error) {
         if (!hasCode(error, 'EPERM', 'EBUSY', 'EACCES') || attempt >= renameDelays.length) return failed('io');
@@ -273,7 +383,7 @@ export class VaultWriter {
       this.onWrite();
       const published = await statPath(source.path);
       return sameFile(staged, published) && published.size === staged.size
-        ? { ok: true, ...fileVersion(published) }
+        ? published
         : failed('conflict', published?.isFile() ? fileVersion(published) : undefined);
     }
   }

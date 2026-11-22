@@ -53,7 +53,7 @@ export function markdownHeadings(lines: string[]): MarkdownHeading[] {
   return headings;
 }
 
-function splitReview(lines: string[], headings: MarkdownHeading[]) {
+export function splitReview(lines: string[], headings = markdownHeadings(lines)) {
   const body: string[] = [];
   const reviews: string[] = [];
   let start = 0;

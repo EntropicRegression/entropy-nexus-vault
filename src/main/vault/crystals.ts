@@ -6,11 +6,14 @@ import { field } from './frontmatter';
 import { lineageReference } from './links';
 import type { VaultLinks } from './links';
 import type { VaultStatsSnapshot } from './sidecars';
+import { profileOutline, profilePath } from './profile-content';
 
 interface Archive {
   parsed: ParsedEntry;
   archivedAt: string;
   timestamp: number;
+  dateInPath: string;
+  sequence: number;
 }
 
 interface NodeFiles {
@@ -29,13 +32,10 @@ export interface CrystalRecord {
 }
 
 export function profileHighlights(profile: ParsedEntry | undefined, stats: CrystalStats | null) {
-  const lines = profile?.markdown.split(/\r?\n/) ?? [];
+  const { userLines: lines, headings } = profileOutline(profile?.markdown ?? '');
   const sections = markdownHeadings(lines).filter(({ level }) => level <= 2);
-  const isAppendix = (title: string) => /^主控台補充(?:\s*[（(].*[）)])?$/.test(title);
-  const firstAppendix = sections.findIndex(({ level, title }) => level === 2 && isAppendix(title));
   function section(title: string) {
-    const index = sections.findIndex((heading, offset) =>
-      heading.level === 2 && heading.title === title && (firstAppendix === -1 || offset < firstAppendix));
+    const index = sections.findIndex((heading) => heading.level === 2 && heading.title === title);
     if (index < 0) return '';
     return lines.slice(sections[index].line + 1, sections[index + 1]?.line ?? lines.length).join('\n').trim();
   }
@@ -47,15 +47,17 @@ export function profileHighlights(profile: ParsedEntry | undefined, stats: Cryst
   return {
     specialty, workflow: section('解決問題的流程'), review: section('回顧'),
     notRejectedRate,
-    consoleAppendixCount: sections.filter(({ level, title }) => level === 2 && isAppendix(title)).length,
+    consoleAppendixCount: headings.length,
   };
 }
 
 function archiveInfo(parsed: ParsedEntry): Archive {
   const written = field(parsed.attributes, '封存時間', 'archivedAt');
-  const fileDate = /-(\d{4}-\d{2}-\d{2})(?:-\d+)?\.md$/i.exec(parsed.entry.path)?.[1];
+  const file = /-(\d{4}-\d{2}-\d{2})(?:-(\d+))?\.md$/i.exec(parsed.entry.path);
+  const fileDate = file?.[1];
   const archivedAt = memoryTimestamp(written) === undefined ? fileDate ?? new Date(parsed.entry.updatedAt).toISOString() : written;
-  return { parsed, archivedAt, timestamp: memoryTimestamp(archivedAt) ?? parsed.entry.updatedAt };
+  return { parsed, archivedAt, timestamp: memoryTimestamp(archivedAt) ?? parsed.entry.updatedAt,
+    dateInPath: fileDate ?? '', sequence: Number(file?.[2] ?? 1) };
 }
 
 const countFields = {
@@ -98,11 +100,11 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
         related.push(entry);
         casesByNode.set(id, related);
       }
-    } else if (entry.kind === 'node') {
+    } else if (entry.kind === 'node' && profilePath(entry.path)) {
       // 舊檔缺少節點 ID 時保留獨立水晶，避免把同名的不同節點合併。
       const id = entry.nodeId || 'legacy:' + entry.path;
       const node = files.get(id) ?? { profiles: [], archives: [] };
-      if (entry.status === '封存' || /^nodes\/封存\//i.test(entry.path)) {
+      if (/^nodes\/封存\//i.test(entry.path)) {
         node.archives.push(archiveInfo(parsed));
       } else {
         node.profiles.push(parsed);
@@ -119,12 +121,13 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
     const statsNode = snapshot?.nodes.get(nodeId);
     const node = files.get(nodeId);
     const archives = node?.archives.sort((a, b) => b.timestamp - a.timestamp ||
+      b.dateInPath.localeCompare(a.dateInPath) || b.sequence - a.sequence ||
       b.parsed.entry.path.localeCompare(a.parsed.entry.path, 'zh-Hant', { numeric: true })) ?? [];
     const latestArchive = archives[0]?.parsed;
     const liveProfile = node?.profiles.sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)[0];
     // Without console statistics a live profile could be on the board or long deleted; do not claim it is dormant.
     const status = statsNode?.status ?? (liveProfile ? '未知' : '封存');
-    const profile = status === '封存' ? latestArchive ?? liveProfile : liveProfile ?? latestArchive;
+    const profile = liveProfile ?? latestArchive;
     const relatedEntries = casesByNode.get(nodeId) ?? [];
     const projects = new Map<string, string>();
     for (const { key, name } of statsNode?.projects ?? []) if (key && !projects.has(key)) projects.set(key, name);
@@ -134,18 +137,19 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
     const projectNames = [...new Set([...projects.values()].filter(Boolean))];
     const fileName = profile && field(profile.attributes, '節點', '名稱', 'name');
     const fileRole = profile && field(profile.attributes, '角色', 'role');
+    const stats = statsNode?.stats ?? archiveStats(latestArchive);
     const crystal: NodeCrystal = {
       nodeId,
       status,
       name: statsNode?.name || fileName || profile?.entry.title || nodeId,
       role: statsNode?.role ?? (fileRole && fileRole !== '(無)' ? fileRole : null),
       canWake: statsNode?.canWake ?? false,
+      specialty: profileHighlights(profile, stats).specialty,
       cliRecordExists: statsNode?.cliRecordExists,
       projectNames,
       glow: 'white',
     };
 
-    const stats = statsNode?.stats ?? archiveStats(latestArchive);
     const confirmed = relatedEntries.filter((entry) => entry.kind === 'case' && entry.status === '已確認');
     const handled = confirmed.filter((entry) => entry.nodeId === nodeId);
     // Projects from the stats (專案ID keys, or names for old data); archived nodes without them fall back to the
