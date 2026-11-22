@@ -16,8 +16,11 @@ export interface VaultStatsNode {
   status: NodeCrystal['status'];
   stats: CrystalStats;
   projectNames: string[];
-  /** Opaque project keys aligned with projectNames: from 專案ID when present, otherwise from the name. */
-  projects: { key: string; name: string }[];
+  /**
+   * Opaque project keys aligned with projectNames: from 專案ID when present, otherwise from the name. recentTasks is
+   * 專案任務數 (tasks in the last 90 days), null when the file has no such list.
+   */
+  projects: { key: string; name: string; recentTasks: number | null }[];
   avatarPath: string | null;
   portraitPath: string | null;
   backend: string | null;
@@ -37,6 +40,10 @@ export interface VaultStatsSnapshot {
   activity: ActivityLink[];
   /** 專案表 by opaque project key (console 2026-11-22); null for older files without it. */
   projectTypes: ReadonlyMap<string, ProjectType> | null;
+  /** 專案表 names by opaque project key (display only). */
+  projectNames: ReadonlyMap<string, string>;
+  /** 協作不含總管 / 同席不含總管 (last 30 days, chief already removed by the console); empty in older files. */
+  galaxyActivity: { delegations: { from: string; to: string; count: number }[]; meetings: { nodeIds: string[]; count: number }[] };
 }
 
 export interface SidecarSnapshot {
@@ -89,6 +96,8 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
   // 專案ID (console 2026-11-22) runs parallel to 專案; older files omit it, and a mismatched list is ignored.
   const projectIds = isStringList(value.專案ID) && isStringList(projectNames) && value.專案ID.length === projectNames.length
     ? value.專案ID : null;
+  const recent = Array.isArray(value.專案任務數) && value.專案任務數.every(isCount) && isStringList(projectNames) &&
+    value.專案任務數.length === projectNames.length ? value.專案任務數 as number[] : null;
   if (typeof name !== 'string' || (status !== '線上' && status !== '休眠' && status !== '封存') ||
       !isCount(tasks) || !isCount(completed) || !(completionRate === null || isRate(completionRate)) ||
       !isCount(accepted) || !isCount(rejected) || !isCount(cases) || !isStringList(projectNames)) return undefined;
@@ -99,7 +108,7 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
     stats: { tasks, completed, completionRate, accepted, rejected, cases },
     projectNames,
     projects: projectNames.map((name, index) => ({
-      key: opaqueKey('p', (projectIds && projectIds[index]) || name), name,
+      key: opaqueKey('p', (projectIds && projectIds[index]) || name), name, recentTasks: recent ? recent[index] : null,
     })),
     avatarPath: stringValue(value.頭像路徑),
     portraitPath: stringValue(value.立繪路徑),
@@ -137,14 +146,23 @@ function decodeStats(value: unknown): VaultStatsSnapshot | undefined {
   }
   const activity = decodeActivity(value.協作, value.同席);
   let projectTypes: Map<string, ProjectType> | null = null;
+  const tableNames = new Map<string, string>();
   if (isRecord(value.專案表)) {
     projectTypes = new Map();
     for (const [id, project] of Object.entries(value.專案表)) {
       if (!id.trim() || !isRecord(project) || (project.類型 !== 'git' && project.類型 !== '資料夾')) continue;
-      projectTypes.set(opaqueKey('p', id), project.類型);
+      const key = opaqueKey('p', id);
+      projectTypes.set(key, project.類型);
+      tableNames.set(key, stringValue(project.名稱) ?? '未命名專案');
     }
   }
-  return { updatedAt: value.更新時間, portraitsDir: value.圖像目錄, nodes, activity, projectTypes };
+  const noChief = decodeActivity(Array.isArray(value.協作不含總管) ? value.協作不含總管 : [],
+    Array.isArray(value.同席不含總管) ? value.同席不含總管 : []);
+  const galaxyActivity = {
+    delegations: noChief.flatMap((link) => link.kind === 'delegate' ? [{ from: link.from, to: link.to, count: link.count }] : []),
+    meetings: noChief.flatMap((link) => link.kind === 'meeting' ? [{ nodeIds: link.nodeIds, count: link.count }] : []),
+  };
+  return { updatedAt: value.更新時間, portraitsDir: value.圖像目錄, nodes, activity, projectTypes, projectNames: tableNames, galaxyActivity };
 }
 
 async function readSidecar<T>(path: string, decode: (value: unknown) => T | undefined, previous: T) {

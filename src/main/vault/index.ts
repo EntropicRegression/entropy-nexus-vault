@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { heatDecayAt } from '../../shared/heat';
 import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit } from '../../shared/types';
+import type { GalaxyInput } from '../../shared/galaxies';
 import { buildCrystals, profileHighlights } from './crystals';
 import { entryFromFile } from './entry';
 import type { ParsedEntry } from './entry';
@@ -100,6 +101,32 @@ export class VaultSnapshot {
       crystals: [...this.crystals.records.values()].map(({ crystal }) => crystal),
       links: this.crystals.links,
     };
+  }
+
+  /**
+   * Input for the project galaxies (DESIGN.md §6.10), or null when the stats have no 專案表 (the flat star map stays).
+   * Every crystal of listCrystals() is a node here, so the two views always cover the same nodes.
+   */
+  galaxyInput(promoted: ReadonlySet<string>): GalaxyInput | null {
+    const stats = this.sidecars.stats;
+    if (!stats?.projectTypes) return null;
+    const projects = new Map([...stats.projectTypes].map(([key, type]) =>
+      [key, { key, type, name: stats.projectNames.get(key) ?? '未命名專案' }]));
+    const nodes = [...this.crystals.records].map(([nodeId, record]) => {
+      const statsNode = stats.nodes.get(nodeId);
+      return {
+        nodeId,
+        chief: statsNode?.chief ?? false,
+        projects: (statsNode?.projects ?? []).map(({ key, recentTasks }) => ({ key, recentTasks })),
+        // Handled cases decide the home only as a fallback; unconfirmed ones count, rejected ones do not (a rejected
+        // case may even name the wrong project; M5e-a review B1).
+        handledCaseProjects: record.relatedEntries
+          .filter((entry) => entry.kind === 'case' && entry.nodeId === nodeId && !entry.superseded && entry.projectId &&
+            entry.status !== '退回')
+          .map((entry) => entry.projectId),
+      };
+    });
+    return { projects, promoted, nodes, ...stats.galaxyActivity };
   }
 
   /** Richness inputs per node, without the userData peaks (docs/架構.md §9.2). */
