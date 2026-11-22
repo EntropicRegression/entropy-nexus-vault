@@ -503,8 +503,15 @@ describe('專案星系(M5e-a,DESIGN.md §6.10)', () => {
     await writeFile(join(root, statsFilename), JSON.stringify(stats));
     const snapshot = await new VaultReader(root, now).read();
     expect(snapshot.galaxyInput(new Set())).toBeNull();
-    expect(snapshot.listCrystals().crystals.map(({ nodeId }) => nodeId)).toEqual(before.crystals.map(({ nodeId }) => nodeId));
-    expect(snapshot.listCrystals().links).toEqual(before.links);
+    const after = snapshot.listCrystals();
+    expect(after.crystals.map(({ nodeId, projectNames }) => ({ nodeId, projectNames })))
+      .toEqual(before.crystals.map(({ nodeId, projectNames }) => ({ nodeId, projectNames })));
+    expect(after.links).toEqual(before.links);
+    expect(after.crystals.find(({ nodeId }) => nodeId === id(1))?.projects).toEqual([
+      { key: key('d:/synthetic/work/app'), name: 'app' },
+      { key: key('d:/synthetic/shared-lib'), name: '共用庫' },
+    ]);
+    expect(after.crystals.find(({ nodeId }) => nodeId === id(4))?.projects).toEqual([{ name: '舊專案' }]);
   });
 
   it('主控台去識別樣本(buildVaultStats 實際輸出,fixtures/console-sample)的分群與連線', async () => {

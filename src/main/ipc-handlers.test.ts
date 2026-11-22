@@ -7,6 +7,7 @@ import { appUrl } from './app-assets';
 import { isVaultFrameUrl, registerVaultIpc } from './ipc-handlers';
 import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
 import { serveNodeImage } from './images';
+import { opaqueKey } from './vault/privacy';
 import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
 
@@ -311,6 +312,51 @@ describe('主程序 IPC 來源驗證', () => {
     const arranged = await invoke('arrangeGalaxies');
     expect(arranged.enabled && arranged.groups.length).toBe(map.groups.length);
     expect(JSON.stringify(arranged)).not.toMatch(/synthetic|[a-z]:[\/]/i);
+  });
+
+  it('水晶 IPC 保留與主星系同名的單人專案代號，舊資料只留名稱，整份回傳遮蔽路徑', async () => {
+    electron.userData = await mkdtemp(join(tmpdir(), 'nexus-crystal-project-ipc-'));
+    const vault = join(electron.userData, 'galaxy');
+    await cp(resolve('fixtures/console-stats'), vault, { recursive: true });
+    await saveVaultPath(join(electron.userData, 'settings.dev.json'), vault);
+    const statsPath = join(vault, '.nexus-stats.json');
+    const stats = JSON.parse(await readFile(statsPath, 'utf8'));
+    const nodeId = '0b6f1c2e-0000-4000-8000-000000000006';
+    const legacyId = '0b6f1c2e-0000-4000-8000-000000000004';
+    const homeId = 'd:/synthetic/work/app';
+    const soloId = 'C:\\Users\\SyntheticSolo\\workspace\\app';
+    const legacyPath = '/Users/SyntheticLegacy/old-project';
+    stats.節點[nodeId].專案.push('工作區舊名稱');
+    stats.節點[nodeId].專案ID.push(soloId);
+    stats.節點[nodeId].專案任務數.push(1);
+    stats.專案表[soloId] = { 名稱: 'app', 類型: '資料夾' };
+    stats.節點[legacyId].專案.push(legacyPath);
+    await writeFile(statsPath, JSON.stringify(stats));
+
+    const sender = {};
+    registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
+    const event = { sender, senderFrame: { url: appUrl, parent: null } };
+    function invoke<M extends keyof VaultRequests>(method: M, ...args: Parameters<VaultRequests[M]>): ReturnType<VaultRequests[M]> {
+      return electron.handle.mock.calls.find(([channel]) => channel === vaultChannels[method])![1](event, ...args) as ReturnType<VaultRequests[M]>;
+    }
+    const map = await invoke('listGalaxies');
+    const list = await invoke('listCrystals');
+    const detail = await invoke('readCrystal', nodeId);
+    const homeKey = opaqueKey('p', homeId);
+    const soloKey = opaqueKey('p', soloId);
+    expect(map.enabled && map.membership[nodeId].group).toBe(homeKey);
+    expect(soloKey).not.toBe(homeKey);
+    expect(list.links.some((link) => link.kind === 'project' && link.projectKey === soloKey)).toBe(false);
+    const projects = list.crystals.find((crystal) => crystal.nodeId === nodeId)?.projects;
+    expect(projects?.filter(({ name }) => name === 'app')).toEqual([
+      { key: homeKey, name: 'app', kind: 'git' },
+      { key: soloKey, name: 'app', kind: '資料夾' },
+    ]);
+    expect(detail?.projects).toEqual(projects);
+    expect(list.crystals.find((crystal) => crystal.nodeId === legacyId)?.projects).toEqual([
+      { name: '舊專案' }, { name: '[本機路徑已隱藏]' },
+    ]);
+    expect(JSON.stringify({ map, list, detail })).not.toMatch(/[a-z]:[\\/]|\/Users\/|SyntheticSolo|SyntheticLegacy|專案ID/i);
   });
 
   it('沒有專案表時星系關閉', async () => {

@@ -20,7 +20,7 @@ export interface VaultStatsNode {
    * Opaque project keys aligned with projectNames: from 專案ID when present, otherwise from the name. recentTasks is
    * 專案任務數 (tasks in the last 90 days), null when the file has no such list.
    */
-  projects: { key: string; name: string; recentTasks: number | null }[];
+  projects: { key: string; name: string; hasProjectId: boolean; recentTasks: number | null }[];
   avatarPath: string | null;
   portraitPath: string | null;
   backend: string | null;
@@ -107,9 +107,10 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
     status,
     stats: { tasks, completed, completionRate, accepted, rejected, cases },
     projectNames,
-    projects: projectNames.map((name, index) => ({
-      key: opaqueKey('p', (projectIds && projectIds[index]) || name), name, recentTasks: recent ? recent[index] : null,
-    })),
+    projects: projectNames.map((name, index) => {
+      const id = projectIds?.[index];
+      return { key: opaqueKey('p', id || name), name, hasProjectId: Boolean(id?.trim()), recentTasks: recent?.[index] ?? null };
+    }),
     avatarPath: stringValue(value.頭像路徑),
     portraitPath: stringValue(value.立繪路徑),
     backend: stringValue(value.session.後台),

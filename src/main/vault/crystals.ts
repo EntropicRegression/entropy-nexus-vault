@@ -1,11 +1,11 @@
 import type { RichnessInput } from '../../shared/glow';
-import type { CrystalLink, CrystalStats, MemoryEntry, NodeCrystal } from '../../shared/types';
+import type { CrystalLink, CrystalProject, CrystalStats, MemoryEntry, NodeCrystal } from '../../shared/types';
 import { markdownHeadings, memoryTimestamp } from './entry';
 import type { ParsedEntry } from './entry';
 import { field } from './frontmatter';
 import { lineageReference } from './links';
 import type { VaultLinks } from './links';
-import type { VaultStatsSnapshot } from './sidecars';
+import type { VaultStatsNode, VaultStatsSnapshot } from './sidecars';
 import { profileOutline, profilePath } from './profile-content';
 
 interface Archive {
@@ -19,6 +19,20 @@ interface Archive {
 interface NodeFiles {
   profiles: ParsedEntry[];
   archives: Archive[];
+}
+
+function crystalProjects(projects: VaultStatsNode['projects'], snapshot: VaultStatsSnapshot | null): CrystalProject[] {
+  const byIdentity = new Map<string, CrystalProject>();
+  for (const project of projects) {
+    const key = project.hasProjectId ? project.key : undefined;
+    const name = (key && snapshot?.projectNames.get(key)) || project.name;
+    const kind = key ? snapshot?.projectTypes?.get(key) : undefined;
+    const identity = key ?? `name:${name}`;
+    if (name && !byIdentity.has(identity)) {
+      byIdentity.set(identity, { name, ...(key ? { key } : {}), ...(kind ? { kind } : {}) });
+    }
+  }
+  return [...byIdentity.values()];
 }
 
 export interface CrystalRecord {
@@ -147,6 +161,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       specialty: profileHighlights(profile, stats).specialty,
       cliRecordExists: statsNode?.cliRecordExists,
       projectNames,
+      projects: crystalProjects(statsNode?.projects ?? [], snapshot),
       glow: 'white',
     };
 

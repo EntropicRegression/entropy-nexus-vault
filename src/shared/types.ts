@@ -1,3 +1,4 @@
+import type { ProjectType } from './galaxies';
 import type { HeatInfo } from './heat';
 import type { Point3 } from './projection';
 import type { Shelf } from './shelves';
@@ -83,6 +84,13 @@ export interface MemoryEntryDetail extends MemoryEntry {
   caseReferences: string[];
 }
 
+export interface CrystalProject {
+  /** Opaque project identifier. Older statistics may only have the display name. */
+  key?: string;
+  name: string;
+  kind?: ProjectType;
+}
+
 export interface NodeCrystal {
   nodeId: string;
   name: string;
@@ -95,6 +103,7 @@ export interface NodeCrystal {
   specialty?: string;
   cliRecordExists?: boolean;
   projectNames: string[];
+  projects?: CrystalProject[];
   avatarUrl?: string | null;
   portraitUrl?: string | null;
   /** Glow tier from the richness score, or rainbow when the user granted one (DESIGN.md §6.9). */
