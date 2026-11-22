@@ -37,6 +37,30 @@ describe('質感精修(M5f,DESIGN.md §10.1)', () => {
     expect(blurred).toEqual(['.skyScene .detailPanel', '.hud']);
   });
 
+  it('「其餘一律靜止」的兩個例外:彩虹光暈慢轉、星圖外環軌道;兩者在低動態與系統減少動態(data-quiet)都靜止', () => {
+    expect(sky).toMatch(/\.crystalAura::before \{[^}]*animation: rainbowSpin 10s linear infinite;/);
+    expect(sky).toMatch(/\.ringOuter \{[^}]*animation: orbit1 /);
+    expect(sky).toContain(".skyScene[data-quiet='true'] .ring, .skyScene[data-quiet='true'] .crystalShape { animation: none; }");
+    expect(sky).toContain(".skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; }");
+    // Nothing else in the sky sheet runs an endless animation.
+    const endless = [...sky.matchAll(/animation:\s*(\w+)[^;]*infinite/g)].map((match) => match[1]);
+    expect(new Set(endless)).toEqual(new Set(['orbit1', 'orbit2', 'orbit3', 'orbit4', 'rainbowSpin']));
+  });
+
+  it('決策卡的 filter 只能是靜態 drop-shadow:不得含 blur(),也不得有動畫或過場改變它', () => {
+    const rules = [...library.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter((match) => /\bfilter:/.test(match[2]) && !/backdrop-filter/.test(match[2]));
+    const decision = rules.filter((match) => match[1].includes("data-shelf='decision'"));
+    expect(decision).toHaveLength(1);
+    const value = /(?:^|;)\s*filter:\s*([^;]+)/.exec(decision[0][2])![1].trim();
+    expect(value).toMatch(/^(drop-shadow\([^()]*(\([^()]*\)[^()]*)*\)\s*)+$/);
+    expect(value).not.toMatch(/blur\(/);
+    // Nothing animates or transitions the filter, and no keyframes touch it.
+    expect(library).not.toMatch(/transition:[^;]*\bfilter\b/);
+    expect(library).not.toMatch(/@keyframes[^{]*\{(?:[^{}]*\{[^}]*\})*[^}]*\bfilter:/);
+    // Every other filter in the library sheet is a static saturate/none, not a blur.
+    for (const match of rules) expect(match[2]).not.toMatch(/(?<!backdrop-)filter:\s*[^;]*blur\(/);
+  });
+
   it('水晶:黃銅雙圈座、七級光暈的大小與強度逐級遞增', () => {
     expect(sky).toMatch(/\.skyScene \.crystalPedestal \{[^}]*border: 1\.5px solid var\(--brass\);[^}]*rgba\(217,164,65,0\.55\)/);
     const tiers = ['white', 'green', 'blue', 'violet', 'gold', 'red'].map((tier) => {

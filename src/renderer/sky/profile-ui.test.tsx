@@ -277,24 +277,23 @@ describe('閱讀全文、編輯側寫、喚醒(M5d-b)', () => {
     }
   });
 
-  it('正文出現 ⟦ ⟧ 括號:指出是哪一段並建議改用【】(後端也會拒絕);殘缺的 ⟦路徑 片段仍擋下', async () => {
+  it('正文出現 ⟦注意⟧ 這類一般括號可以照常存檔;殘缺的 ⟦路徑 片段仍擋下', async () => {
     localStorage.setItem(saveNoticeKey, '1');
     await startEditing();
     const save = () => q<HTMLButtonElement>('[data-profile-save]')!;
-    await type(body + '\n⟦注意⟧ 與單獨的 ⟧');
-    const warning = q('[data-warning="reserved"]')!;
-    expect([...warning.querySelectorAll('code')].map((code) => code.textContent)).toEqual(['⟦注意⟧', '⟧']);
-    expect(warning.textContent).toContain('【】');
-    expect(q('[data-warning="damaged"]')).toBeNull();
-    expect(save().disabled).toBe(true);
     await type(body.replace('⟦路徑2⟧', '⟦路徑2'));
     expect(q('[data-warning="damaged"]')).not.toBeNull();
-    expect(q('[data-warning="reserved"]')).toBeNull();
     expect(save().disabled).toBe(true);
-    await type(body + '\n改用【注意】就可以。');
+    await type(body.replace('⟦路徑2⟧', '⟦路徑x⟧'));
+    expect(q('[data-warning="damaged"]')).not.toBeNull();
+    expect(save().disabled).toBe(true);
+    const text = body + '\n⟦注意⟧ 與單獨的 ⟧ 和 ⟦ 都是一般文字。';
+    await type(text);
     expect(q('[data-warning]')).toBeNull();
+    expect(q('[data-warning="reserved"]')).toBeNull();
+    expect(save().disabled).toBe(false);
     await act(async () => save().click());
-    expect(vault.saveProfileBody).toHaveBeenCalledTimes(1);
+    expect(vault.saveProfileBody).toHaveBeenCalledWith('live', text, version, undefined);
   });
 
   it('確認刪除後寫入失敗:重試沿用確認不再問;改了正文就重新問;衝突後確認失效', async () => {
@@ -384,14 +383,15 @@ describe('封存日期', () => {
 describe('佔位符檢查(純函式)', () => {
   it('缺少、重複、未知、殘缺', () => {
     const original = 'a ⟦路徑1⟧ b ⟦路徑2⟧';
-    expect(checkPlaceholders(original, original)).toEqual({ missing: [], duplicate: [], unknown: [], damaged: false, reserved: [] });
+    expect(checkPlaceholders(original, original)).toEqual({ missing: [], duplicate: [], unknown: [], damaged: false });
     expect(checkPlaceholders(original, 'a ⟦路徑1⟧ b')).toMatchObject({ missing: [2] });
     expect(checkPlaceholders(original, original + '⟦路徑1⟧')).toMatchObject({ duplicate: [1] });
     expect(checkPlaceholders(original, 'a ⟦路徑1⟧ b ⟦路徑3⟧')).toMatchObject({ missing: [2], unknown: [3] });
     expect(checkPlaceholders(original, 'a ⟦路徑1⟧ b ⟦路徑⟧ ⟦路徑2⟧').damaged).toBe(true);
     expect(checkPlaceholders(original, original + ' ⟦路徑2').damaged).toBe(true);
-    // Other white-bracket text is not a damaged placeholder, but it is listed (the main process reserves it).
-    expect(checkPlaceholders(original, original + ' ⟦注意⟧ ⟧ ⟦')).toMatchObject({ damaged: false, reserved: ['⟦注意⟧', '⟧', '⟦'] });
+    expect(checkPlaceholders(original, original + ' ⟦路徑x⟧').damaged).toBe(true);
+    // Other white-bracket text is ordinary text (the main process reserves only fragments starting with ⟦路徑).
+    expect(checkPlaceholders(original, original + ' ⟦注意⟧ ⟧ ⟦')).toEqual({ missing: [], duplicate: [], unknown: [], damaged: false });
     expect(splitPlaceholders('x⟦路徑1⟧y')).toEqual([{ text: 'x' }, { text: '⟦路徑1⟧', number: 1 }, { text: 'y' }]);
   });
 });

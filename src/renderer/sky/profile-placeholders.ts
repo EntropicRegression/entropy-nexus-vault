@@ -12,18 +12,15 @@ export interface PlaceholderCheck {
   duplicate: number[];
   /** Numbers that were not in the original (typed or altered); saving is refused. */
   unknown: number[];
-  /** A damaged path token such as ⟦路徑⟧ or ⟦路徑2 (without its closing bracket); saving is refused. */
-  damaged: boolean;
   /**
-   * Other text using the reserved brackets (⟦注意⟧, a lone ⟧, …), listed so the user can find it. The main process
-   * reserves every ⟦…⟧ fragment (profile-content.ts reservedToken) and refuses new ones, so saving is refused here
-   * too rather than failing after the click.
+   * A damaged path token such as ⟦路徑⟧, ⟦路徑2 (no closing bracket) or ⟦路徑x⟧; saving is refused. Only fragments that
+   * start with ⟦路徑 count: other text in white brackets (⟦注意⟧, a lone ⟧) is ordinary text (docs/架構.md §10.4).
    */
-  reserved: string[];
+  damaged: boolean;
 }
 
-/** Same fragments the main process reserves: ⟦… up to ⟧, the next ⟦ or the line end, and a lone ⟧. */
-const reservedFragment = /⟦[^⟦⟧\r\n]*(?:⟧|(?=⟦)|$)|⟧/gm;
+/** Same fragments the main process reserves (profile-content.ts reservedToken): from ⟦路徑 to the nearest ⟧, the next ⟦ or the line end. */
+const reservedFragment = /⟦路徑[^⟦⟧\r\n]*(?:⟧|(?=⟦)|$)/gm;
 const wellFormed = /^⟦路徑\d+⟧$/;
 
 export function placeholderNumbers(text: string): number[] {
@@ -39,13 +36,12 @@ export function checkPlaceholders(original: string, current: string): Placeholde
     missing: [...known].filter((number) => !seen.has(number)).sort((a, b) => a - b),
     duplicate: [...seen].filter(([number, count]) => count > 1 && known.has(number)).map(([number]) => number).sort((a, b) => a - b),
     unknown: [...seen.keys()].filter((number) => !known.has(number)).sort((a, b) => a - b),
-    damaged: fragments.some((text) => text.startsWith('⟦路徑')),
-    reserved: [...new Set(fragments.filter((text) => !text.startsWith('⟦路徑')))],
+    damaged: fragments.length > 0,
   };
 }
 
 export function blocksSaving(check: PlaceholderCheck): boolean {
-  return check.duplicate.length > 0 || check.unknown.length > 0 || check.damaged || check.reserved.length > 0;
+  return check.duplicate.length > 0 || check.unknown.length > 0 || check.damaged;
 }
 
 /** Splits text into plain parts and placeholder tokens (for the highlight layer behind the editor). */

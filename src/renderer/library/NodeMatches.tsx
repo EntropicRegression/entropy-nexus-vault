@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import type { NodeHit } from '../../shared/types';
+import { usePortraitChain } from '../brand/brand-portrait';
 import styles from './Library.module.css';
 
 const shown = 6;
 
 function Chip({ hit, onNode }: { hit: NodeHit; onNode: (nodeId: string) => void }) {
-  const [failed, setFailed] = useState<string>();
-  const source = hit.avatarUrl && failed !== hit.avatarUrl ? hit.avatarUrl : null;
+  // Same order as the seals on cards: the node's avatar → its brand default (when a folder is set) → first character.
+  const { current, generation, fail } = usePortraitChain(hit, 'avatar');
   const initial = Array.from(hit.name.trim())[0]?.toUpperCase() || '？';
   return <button type="button" className={styles.nodeChip} data-node-hit={hit.nodeId}
     title={'符合：' + hit.matchedIn} onClick={() => onNode(hit.nodeId)}>
     <span className={styles.seal} aria-hidden="true">
-      {source ? <img src={source} alt="" width="20" height="20" onError={() => setFailed(source)} /> : initial}
+      {current ? <img key={current.url + '#' + generation} src={current.url} alt="" width="20" height="20"
+        data-portrait-source={current.source} onError={() => fail(current.url)} /> : initial}
     </span>
     <span className={styles.nodeChipName}>{hit.name}</span>
     <span className={styles.nodeChipStatus}>{hit.status}</span>

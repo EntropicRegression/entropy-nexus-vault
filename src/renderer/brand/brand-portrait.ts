@@ -74,10 +74,14 @@ export async function clearBrandPortraitFolder(): Promise<void> {
   }
 }
 
-/** vault-image://brand/<vendor>/<state>, only when a folder is set and the node's vendor is known. */
-export function brandPortraitUrl(brand: CrystalBrand | undefined, settings: BrandPortraitSettings | null): string | null {
+/**
+ * vault-image://brand/<vendor>/<state>?v=N, only when a folder is set and the node's vendor is known. N is the folder
+ * generation + 1 (a positive integer, docs/架構.md §4.2): the main process ignores it, but a new N makes Chromium request
+ * the image again after the folder is chosen anew, instead of reusing the image it already decoded for that URL.
+ */
+export function brandPortraitUrl(brand: CrystalBrand | undefined, settings: BrandPortraitSettings | null, generation = 0): string | null {
   if (!settings?.configured || !brand?.vendor) return null;
-  return 'vault-image://brand/' + brand.vendor + '/' + brand.mode;
+  return 'vault-image://brand/' + brand.vendor + '/' + brand.mode + '?v=' + (Math.max(0, Math.floor(generation)) + 1);
 }
 
 export type PortraitSource = 'portrait' | 'avatar' | 'brand';
@@ -88,9 +92,9 @@ interface PortraitNode { portraitUrl?: string | null; avatarUrl?: string | null;
  * Seals downstairs are small and round, so they start at the avatar.
  */
 export function portraitSources(node: PortraitNode | undefined, settings: BrandPortraitSettings | null,
-  from: 'portrait' | 'avatar' = 'portrait'): { url: string; source: PortraitSource }[] {
+  from: 'portrait' | 'avatar' = 'portrait', generation = 0): { url: string; source: PortraitSource }[] {
   if (!node) return [];
-  const brand = brandPortraitUrl(node.brand, settings);
+  const brand = brandPortraitUrl(node.brand, settings, generation);
   const list: { url: string | null | undefined; source: PortraitSource }[] = [
     ...(from === 'portrait' ? [{ url: node.portraitUrl, source: 'portrait' as const }] : []),
     { url: node.avatarUrl, source: 'avatar' },
@@ -110,7 +114,7 @@ export function portraitSources(node: PortraitNode | undefined, settings: BrandP
  */
 export function usePortraitChain(node: PortraitNode | undefined, from: 'portrait' | 'avatar' = 'portrait') {
   const { settings, generation } = useBrandPortraits();
-  const sources = portraitSources(node, settings, from);
+  const sources = portraitSources(node, settings, from, generation);
   const [failed, setFailed] = useState<{ generation: number; urls: string[] }>({ generation, urls: [] });
   const failedNow = failed.generation === generation ? failed.urls : [];
   useEffect(() => { setFailed((current) => current.generation === generation ? current : { generation, urls: [] }); }, [generation]);

@@ -267,7 +267,6 @@ export function ProfileOverlay({ nodeId, name, onClose, onSaved }: {
           <div className={styles.warnings} role="status">
             {check.unknown.length > 0 && <p data-warning="unknown">出現未知的佔位符編號:{check.unknown.map((n) => '#' + n).join('、')},請改回或刪除。</p>}
             {check.damaged && <p data-warning="damaged">有不完整的路徑佔位符(例如少了 ⟧),請用「復原到游標處」放回完整的標籤,或整段刪除。</p>}
-            {check.reserved.length > 0 && <p data-warning="reserved">⟦ ⟧ 這組括號保留給路徑佔位符,正文裡新加的會被拒絕存檔;請改用【】或「」:{check.reserved.map((text) => <code key={text}>{text}</code>)}</p>}
             {check.duplicate.length > 0 && <p data-warning="duplicate">佔位符重複:{check.duplicate.map((n) => '#' + n).join('、')},請刪掉多出的那個。</p>}
             {specialtyGone && <p data-warning="specialty">刪掉了「## 特長」標題,履歷欄將沒有特長句(仍可儲存)。</p>}
             {secrets > 0 && <p data-warning="secret">內容裡有看起來像金鑰、權杖或密碼的字串,請確認是否要存進側寫。</p>}
