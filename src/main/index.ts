@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, protocol } from 'electron';
 import { appScheme, appUrl, imageScheme, serveAppAsset } from './app-assets';
 import { registerVaultIpc } from './ipc-handlers';
-import { serveNodeImage } from './images';
+import { serveVaultImage } from './images';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: appScheme, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
@@ -41,8 +41,8 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   const rendererDir = join(__dirname, '../renderer');
   protocol.handle(appScheme, (request) => serveAppAsset(request, rendererDir));
-  const readVaultContext = registerVaultIpc(() => mainWindow);
-  protocol.handle(imageScheme, (request) => serveNodeImage(request, readVaultContext));
+  const imageSources = registerVaultIpc(() => mainWindow);
+  protocol.handle(imageScheme, (request) => serveVaultImage(request, imageSources));
 
   createWindow();
   app.on('activate', () => {

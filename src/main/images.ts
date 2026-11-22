@@ -50,6 +50,13 @@ async function verifiedImage(root: string, path: string) {
   }
 }
 
+async function* imageVariants(root: string, stem: string) {
+  for (const ext of Object.keys(types)) {
+    const image = await verifiedImage(root, stem + ext);
+    if (image) yield image;
+  }
+}
+
 async function* nodeImageCandidates({ root, snapshot }: VaultImageContext, nodeId: string, kind: ImageKind) {
   if (!validNodeId(nodeId)) return;
   const stats = snapshot.sidecars.stats;
@@ -63,11 +70,7 @@ async function* nodeImageCandidates({ root, snapshot }: VaultImageContext, nodeI
     if (image) yield image;
   }
 
-  if (!archive) return;
-  for (const ext of Object.keys(types)) {
-    const image = await verifiedImage(archive, join(archive, kind + ext));
-    if (image) yield image;
-  }
+  if (archive) yield* imageVariants(archive, join(archive, kind));
 }
 
 async function imageUrl(context: VaultImageContext, nodeId: string, kind: ImageKind): Promise<string | null> {
@@ -117,8 +120,11 @@ async function readCandidate(image: ImageCandidate): Promise<Response | null> {
   }
 }
 
+function notFound(): Response {
+  return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+}
+
 export async function serveNodeImage(request: Request, getContext: () => Promise<VaultImageContext>): Promise<Response> {
-  const notFound = () => new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   if (request.method !== 'GET') return notFound();
   try {
     const url = new URL(request.url);
@@ -136,4 +142,29 @@ export async function serveNodeImage(request: Request, getContext: () => Promise
   } catch {
     return notFound();
   }
+}
+
+export async function serveVaultImage(
+  request: Request,
+  { readVaultContext, readBrandPortraitFolder }: {
+    readVaultContext: () => Promise<VaultImageContext>;
+    readBrandPortraitFolder: () => Promise<string | null>;
+  },
+): Promise<Response> {
+  if (request.method !== 'GET') return notFound();
+  // Match the entire URL so the brand route accepts no extra segments, encoded identifiers, query or credentials.
+  const brand = /^vault-image:\/\/brand\/(claude|codex|gemini)\/(active|dormant)$/.exec(request.url);
+  if (!brand) return serveNodeImage(request, readVaultContext);
+  try {
+    const folder = await readBrandPortraitFolder();
+    if (!folder || !isAbsolute(folder)) return notFound();
+    const [, vendor, state] = brand;
+    for await (const candidate of imageVariants(folder, join(folder, vendor, state))) {
+      const response = await readCandidate(candidate);
+      if (response) return response;
+    }
+  } catch {
+    return notFound();
+  }
+  return notFound();
 }

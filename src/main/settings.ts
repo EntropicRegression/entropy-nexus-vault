@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
-import type { ViewSettings } from '../shared/types';
+import type { BrandPortraitSettings, ViewSettings } from '../shared/types';
 
 const writes = new Map<string, Promise<unknown>>();
 
@@ -18,6 +18,15 @@ async function readSettings(settingsFile: string): Promise<Record<string, unknow
 export async function readVaultPath(settingsFile: string, defaultPath: string): Promise<string> {
   const { vaultPath } = await readSettings(settingsFile);
   return typeof vaultPath === 'string' && isAbsolute(vaultPath) ? vaultPath : defaultPath;
+}
+
+export async function readBrandPortraitPath(settingsFile: string): Promise<string | null> {
+  const { brandPortraitPath } = await readSettings(settingsFile);
+  return typeof brandPortraitPath === 'string' && isAbsolute(brandPortraitPath) ? brandPortraitPath : null;
+}
+
+export function brandPortraitSettings(path: string | null): BrandPortraitSettings {
+  return path === null ? { configured: false, label: null } : { configured: true, label: '自訂立繪資料夾' };
 }
 
 function viewSettings(settings: Record<string, unknown>): ViewSettings {
@@ -55,6 +64,12 @@ async function updateSettings(settingsFile: string, patch: Record<string, unknow
 
 export async function saveVaultPath(settingsFile: string, vaultPath: string): Promise<void> {
   await updateSettings(settingsFile, { vaultPath });
+}
+
+export async function saveBrandPortraitPath(settingsFile: string, path: string | null): Promise<BrandPortraitSettings> {
+  if (path !== null && !isAbsolute(path)) throw new Error('廠牌預設立繪資料夾的路徑無效');
+  await updateSettings(settingsFile, { brandPortraitPath: path });
+  return brandPortraitSettings(path);
 }
 
 export async function saveViewSettings(settingsFile: string, input: unknown): Promise<ViewSettings> {

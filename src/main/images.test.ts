@@ -2,7 +2,7 @@ import { copyFile, mkdir, mkdtemp, open, readFile, rm, symlink, truncate, writeF
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { avatarUrl, serveNodeImage } from './images';
+import { avatarUrl, serveNodeImage, serveVaultImage } from './images';
 import { VaultReader } from './vault';
 import { statsFilename } from './vault/sidecars';
 
@@ -14,6 +14,89 @@ const source = resolve('fixtures/memory-vault', statsFilename);
 vi.mock('node:fs/promises', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs/promises')>();
   return { ...fs, open: vi.fn(fs.open) };
+});
+
+describe('廠牌預設立繪協定', () => {
+  let directory: string;
+  let folder: string;
+  let localSetting: string | null;
+  const readVaultContext = vi.fn(() => { throw new Error('廠牌立繪不讀記憶庫'); });
+  const readBrandPortraitFolder = vi.fn(async () => localSetting);
+  const active = 'vault-image://brand/claude/active';
+  const fetchImage = (request: Request) => serveVaultImage(request, { readVaultContext, readBrandPortraitFolder });
+
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'nexus-brand-image-'));
+    folder = join(directory, 'chosen');
+    localSetting = folder;
+    await mkdir(join(folder, 'claude'), { recursive: true });
+  });
+
+  afterEach(async () => {
+    expect(readVaultContext).not.toHaveBeenCalled();
+    readBrandPortraitFolder.mockClear();
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it('依廠牌與狀態提供中性 PNG，未設定、清除及缺檔皆回 404', async () => {
+    for (const vendor of ['claude', 'codex', 'gemini']) {
+      await mkdir(join(folder, vendor), { recursive: true });
+      for (const state of ['active', 'dormant']) {
+        const request = new Request('vault-image://brand/' + vendor + '/' + state);
+        expect((await fetchImage(request)).status).toBe(404);
+        await writeFile(join(folder, vendor, state + '.png'), png);
+        const response = await fetchImage(request);
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toBe('image/png');
+        expect(response.headers.get('cache-control')).toBe('no-store');
+        expect(response.headers.has('access-control-allow-origin')).toBe(false);
+        expect(Buffer.from(await response.arrayBuffer())).toEqual(png);
+      }
+    }
+    localSetting = null;
+    expect((await fetchImage(new Request(active))).status).toBe(404);
+    localSetting = 'relative';
+    expect((await fetchImage(new Request(active))).status).toBe(404);
+  });
+
+  it('拒絕白名單以外的網址與殘留穿越片段，且不讀設定檔', async () => {
+    await writeFile(join(folder, 'claude', 'active.png'), png);
+    const invalid = [
+      'vault-image://brand/git/active', 'vault-image://brand/claude/sleeping', 'vault-image://brand/Claude/active',
+      'vault-image://brand/%63laude/active', 'vault-image://brand/claude%2f..%2fclaude/active',
+      'vault-image://brand/claude/..%5cactive', 'vault-image://brand/claude/%2e%2e/%2e%2e/outside/active',
+      'vault-image://brand/claude/active.png', 'vault-image://brand:80/claude/active',
+      'https://brand/claude/active',
+      active + '?file=anything', active + '?', active + '#', active + '/',
+    ];
+    for (const url of invalid) expect((await fetchImage(new Request(url))).status, url).toBe(404);
+    // Request normalizes dot segments. If the protocol transport preserves the original URL, it is rejected too.
+    for (const rawUrl of ['vault-image://brand/claude/../claude/active', 'vault-image://user@brand/claude/active']) {
+      const raw = new Request(active);
+      vi.spyOn(raw, 'url', 'get').mockReturnValue(rawUrl);
+      expect((await fetchImage(raw)).status).toBe(404);
+    }
+    expect((await fetchImage(new Request(active, { method: 'HEAD' }))).status).toBe(404);
+    expect(readBrandPortraitFolder).not.toHaveBeenCalled();
+  });
+
+  it('拒絕簽章不符、超限、非一般檔案與跳到設定目錄外的符號連結', async () => {
+    const file = join(folder, 'claude', 'active.png');
+    await writeFile(file, 'not an image');
+    await writeFile(join(folder, 'claude', 'active.webp'), png);
+    expect((await fetchImage(new Request(active))).status).toBe(404);
+    await writeFile(file, png);
+    await truncate(file, 20 * 1024 * 1024 + 1);
+    expect((await fetchImage(new Request(active))).status).toBe(404);
+    await mkdir(join(folder, 'claude', 'dormant.png'));
+    expect((await fetchImage(new Request(active.replace('active', 'dormant')))).status).toBe(404);
+
+    const outside = join(directory, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'active.png'), png);
+    await symlink(outside, join(folder, 'codex'), 'junction');
+    expect((await fetchImage(new Request(active.replace('claude', 'codex')))).status).toBe(404);
+  });
 });
 
 describe('本機節點圖像協定', () => {
