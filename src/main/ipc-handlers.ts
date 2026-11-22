@@ -1,5 +1,5 @@
-import { stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { realpath, stat } from 'node:fs/promises';
+import { dirname, isAbsolute, join } from 'node:path';
 import { app, dialog, ipcMain, shell } from 'electron';
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
 import { vaultChannels } from '../shared/ipc';
@@ -7,7 +7,8 @@ import type { VaultRequests } from '../shared/ipc';
 import type { GalaxyMap, VaultInfo, VaultWriteResult } from '../shared/types';
 import { appUrl } from './app-assets';
 import { avatarUrl, portraitUrl } from './images';
-import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
+import { brandPortraitSettings, readBrandPortraitPath, readVaultPath, readViewSettings, saveBrandPortraitPath, saveVaultPath,
+  saveViewSettings } from './settings';
 import { VaultReader } from './vault';
 import { VaultWriter } from './vault/write';
 import { opaqueKey, redactForRenderer } from './vault/privacy';
@@ -53,6 +54,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   const galaxyLayout = new GalaxyLayoutStore(join(app.getPath('userData'), 'galaxy-layout.json'));
   const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
     : join(app.getAppPath(), 'fixtures', 'memory-vault');
+  const readBrandPortraitFolder = () => readBrandPortraitPath(settingsFile);
   let activeVault: { path: string; reader: VaultReader; writer: VaultWriter } | undefined;
 
   async function getActiveVault() {
@@ -159,6 +161,23 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     },
     getSettings: () => readViewSettings(settingsFile),
     setSettings: (_event, patch) => saveViewSettings(settingsFile, patch),
+    getBrandPortraitSettings: async () => brandPortraitSettings(await readBrandPortraitFolder()),
+    chooseBrandPortraitFolder: async () => {
+      const parent = getWindow();
+      if (!parent) return null;
+      const { canceled, filePaths } = await dialog.showOpenDialog(parent, {
+        title: '選擇廠牌預設立繪資料夾',
+        defaultPath: (await readBrandPortraitFolder()) ?? undefined,
+        properties: ['openDirectory'],
+      });
+      const [chosenPath] = filePaths;
+      if (canceled || !chosenPath) return null;
+      if (!isAbsolute(chosenPath)) throw new Error('廠牌預設立繪資料夾無效');
+      const folder = await realpath(chosenPath);
+      if (dirname(folder) === folder || !(await stat(folder)).isDirectory()) throw new Error('廠牌預設立繪資料夾無效');
+      return saveBrandPortraitPath(settingsFile, folder);
+    },
+    clearBrandPortraitFolder: () => saveBrandPortraitPath(settingsFile, null),
     listEntries: async (_event, filter) => (await readVault()).listEntries(filter),
     readEntry: async (_event, path) => (await readVault()).readEntry(path),
     search: async (_event, query, filter) => (await readVault()).search(query, filter),
@@ -245,5 +264,5 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   }
 
   for (const method of Object.keys(handlers) as Array<keyof VaultRequests>) register(method);
-  return readVaultContext;
+  return { readVaultContext, readBrandPortraitFolder };
 }

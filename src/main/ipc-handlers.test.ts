@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +6,7 @@ import type { BrowserWindow } from 'electron';
 import { appUrl } from './app-assets';
 import { isVaultFrameUrl, registerVaultIpc } from './ipc-handlers';
 import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
-import { serveNodeImage } from './images';
+import { serveVaultImage } from './images';
 import { opaqueKey } from './vault/privacy';
 import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
@@ -16,6 +16,8 @@ const electron = vi.hoisted(() => ({
   handle: vi.fn<(channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) => void>(),
   registered: vi.fn((_url: string) => ''),
   openExternal: vi.fn(async (_url: string) => {}),
+  showOpenDialog: vi.fn(async (_parent: unknown, _options: unknown): Promise<{ canceled: boolean; filePaths: string[] }> =>
+    ({ canceled: true, filePaths: [] })),
 }));
 
 vi.mock('electron', () => ({
@@ -25,7 +27,7 @@ vi.mock('electron', () => ({
     getPath: () => electron.userData,
     getApplicationNameForProtocol: electron.registered,
   },
-  dialog: {},
+  dialog: { showOpenDialog: electron.showOpenDialog },
   ipcMain: { handle: electron.handle },
   shell: { openExternal: electron.openExternal },
 }));
@@ -34,6 +36,7 @@ afterEach(async () => {
   electron.handle.mockClear();
   electron.registered.mockReset();
   electron.openExternal.mockReset();
+  electron.showOpenDialog.mockReset();
   if (electron.userData) {
     await rm(electron.userData, { recursive: true, force: true });
     electron.userData = '';
@@ -373,6 +376,73 @@ describe('主程序 IPC 來源驗證', () => {
     expect(await call(vaultChannels.arrangeGalaxies)).toEqual({ enabled: false });
   });
 
+  it('立繪資料夾由對話框設定，IPC 只回代稱，節點自己的立繪/頭像維持優先', async () => {
+    electron.userData = await mkdtemp(join(tmpdir(), 'nexus-brand-ipc-'));
+    const vault = join(electron.userData, 'sky');
+    const chosen = join(electron.userData, 'SyntheticAccount', 'private-art');
+    const brandFolder = join(chosen, 'claude');
+    await cp(resolve('fixtures/sky-vault'), vault, { recursive: true });
+    await mkdir(brandFolder, { recursive: true });
+    const settings = join(electron.userData, 'settings.dev.json');
+    await saveVaultPath(settings, vault);
+    const own = join(vault, 'nodes', '封存', '_圖像', 'fixture-sky-iris');
+    await copyFile(join(own, 'avatar.png'), join(brandFolder, 'active.png'));
+    await copyFile(join(own, 'avatar.png'), join(brandFolder, 'dormant.png'));
+    const statsFile = join(vault, '.nexus-stats.json');
+    const stats = JSON.parse(await readFile(statsFile, 'utf8'));
+    stats.節點['fixture-sky-iris'].session.後台 = 'claude';
+    stats.節點['fixture-sky-quill'].session.後台 = 'claude';
+    await writeFile(statsFile, JSON.stringify(stats));
+
+    const sender = {};
+    const sources = registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
+    const event = { sender, senderFrame: { url: appUrl, parent: null } };
+    function invoke<M extends keyof VaultRequests>(method: M, ...args: Parameters<VaultRequests[M]>): ReturnType<VaultRequests[M]> {
+      return electron.handle.mock.calls.find(([channel]) => channel === vaultChannels[method])![1](event, ...args) as ReturnType<VaultRequests[M]>;
+    }
+    const disabled = { configured: false, label: null };
+    const brandImage = new Request('vault-image://brand/claude/dormant');
+    expect(await invoke('getBrandPortraitSettings')).toEqual(disabled);
+    const forgedPatch = { reducedMotion: true, brandPortraitPath: chosen };
+    expect(await invoke('setSettings', forgedPatch)).toEqual({ deskMode: 'A', reducedMotion: true });
+    expect((await serveVaultImage(brandImage, sources)).status).toBe(404);
+    electron.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [chosen] });
+    const selection = await invoke('chooseBrandPortraitFolder');
+    expect(selection).toEqual({ configured: true, label: '自訂立繪資料夾' });
+    expect(electron.showOpenDialog).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ properties: ['openDirectory'] }));
+    expect(JSON.parse(await readFile(settings, 'utf8')).brandPortraitPath).toBe(await realpath(chosen));
+    electron.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
+    expect(await invoke('chooseBrandPortraitFolder')).toBeNull();
+    const current = await invoke('getBrandPortraitSettings');
+    expect(current).toEqual(selection);
+
+    const list = await invoke('listCrystals');
+    const detail = await invoke('readCrystal', 'fixture-sky-iris');
+    const iris = {
+      portraitUrl: 'vault-image://node/fixture-sky-iris/portrait',
+      avatarUrl: 'vault-image://node/fixture-sky-iris/avatar',
+      brand: { vendor: 'claude', mode: 'dormant' },
+    };
+    expect(list.crystals.find(({ nodeId }) => nodeId === 'fixture-sky-iris')).toMatchObject(iris);
+    expect(detail).toMatchObject(iris);
+    expect(list.crystals.find(({ nodeId }) => nodeId === 'fixture-sky-quill')).toMatchObject({
+      portraitUrl: null, avatarUrl: null, brand: { vendor: 'claude', mode: 'active' },
+    });
+    const ownResponse = await serveVaultImage(new Request(iris.portraitUrl), sources);
+    const brandResponse = await serveVaultImage(brandImage, sources);
+    expect(ownResponse.status).toBe(200);
+    expect(brandResponse.status).toBe(200);
+    expect(Buffer.from(await ownResponse.arrayBuffer())).toEqual(await readFile(join(own, 'portrait.png')));
+    expect(Buffer.from(await brandResponse.arrayBuffer())).toEqual(await readFile(join(own, 'avatar.png')));
+    expect((await serveVaultImage(new Request('vault-image://brand/claude/active'), sources)).status).toBe(200);
+    const cleared = await invoke('clearBrandPortraitFolder');
+    expect(cleared).toEqual(disabled);
+    expect(await invoke('getBrandPortraitSettings')).toEqual(disabled);
+    expect((await serveVaultImage(brandImage, sources)).status).toBe(404);
+    expect(JSON.stringify({ selection, current, list, detail, cleared }))
+      .not.toMatch(/(?<![a-z0-9-])[a-z]:[\\/]|\/Users\/|SyntheticAccount|private-art|brandPortraitPath/i);
+  });
+
   it('星圖合成庫提供四種徽章、關係、履歷及白名單內的實際合成立繪', async () => {
     electron.userData = await mkdtemp(join(tmpdir(), 'nexus-sky-ipc-'));
     const vault = join(electron.userData, 'sky');
@@ -406,7 +476,7 @@ describe('主程序 IPC 來源驗證', () => {
     expect(iris.position).toHaveLength(3);
     expect(iris.position.every(Number.isFinite)).toBe(true);
     expect(map.crystals.filter(({ portraitUrl }) => portraitUrl === null)).toHaveLength(3);
-    const image = await serveNodeImage(new Request(iris.portraitUrl!), context);
+    const image = await serveVaultImage(new Request(iris.portraitUrl!), context);
     expect(image.status).toBe(200);
     expect(image.headers.get('content-type')).toBe('image/png');
     const png = Buffer.from(await image.arrayBuffer());

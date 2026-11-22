@@ -1,5 +1,6 @@
 import type {
   CrystalList,
+  BrandPortraitSettings,
   EntryFilter,
   FileVersion,
   MemoryEntry,
@@ -31,8 +32,14 @@ export interface NodeProfileApi {
   requestWake(nodeId: string): Promise<RequestWakeResult>;
 }
 
+export interface BrandPortraitApi {
+  getBrandPortraitSettings(): Promise<BrandPortraitSettings>;
+  chooseBrandPortraitFolder(): Promise<BrandPortraitSettings | null>;
+  clearBrandPortraitFolder(): Promise<BrandPortraitSettings>;
+}
+
 // The M5d preload always provides these methods. Older consumers/test bridges can still use the base API.
-export interface VaultApi extends Partial<NodeProfileApi> {
+export interface VaultApi extends Partial<NodeProfileApi>, Partial<BrandPortraitApi> {
   getVaultInfo(): Promise<VaultInfo>;
   chooseVault(): Promise<VaultInfo | null>;
   getSettings(): Promise<ViewSettings>;
@@ -60,13 +67,17 @@ export interface VaultApi extends Partial<NodeProfileApi> {
   onVaultChanged(callback: (paths: string[]) => void): () => void;
 }
 
-export type VaultRequests = Omit<VaultApi, keyof NodeProfileApi | 'onVaultChanged'> & NodeProfileApi;
+export type VaultRequests = Omit<VaultApi, keyof NodeProfileApi | keyof BrandPortraitApi | 'onVaultChanged'> &
+  NodeProfileApi & BrandPortraitApi;
 
 export const vaultChannels = {
   getVaultInfo: 'vault:get-info',
   chooseVault: 'vault:choose',
   getSettings: 'vault:get-settings',
   setSettings: 'vault:set-settings',
+  getBrandPortraitSettings: 'vault:get-brand-portrait-settings',
+  chooseBrandPortraitFolder: 'vault:choose-brand-portrait-folder',
+  clearBrandPortraitFolder: 'vault:clear-brand-portrait-folder',
   listEntries: 'vault:list-entries',
   readEntry: 'vault:read-entry',
   search: 'vault:search',

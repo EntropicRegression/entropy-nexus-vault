@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import { vaultChannels } from '../shared/ipc';
-import type { NodeProfileApi, VaultApi, VaultRequests } from '../shared/ipc';
+import type { VaultApi, VaultRequests } from '../shared/ipc';
 
 function invoke<Method extends keyof VaultRequests>(
   method: Method,
@@ -10,11 +10,14 @@ function invoke<Method extends keyof VaultRequests>(
   return ipcRenderer.invoke(vaultChannels[method], ...args) as ReturnType<VaultRequests[Method]>;
 }
 
-const vault: VaultApi & NodeProfileApi = {
+const vault: VaultRequests & Pick<VaultApi, 'onVaultChanged'> = {
   getVaultInfo: () => invoke('getVaultInfo'),
   chooseVault: () => invoke('chooseVault'),
   getSettings: () => invoke('getSettings'),
   setSettings: (patch) => invoke('setSettings', patch),
+  getBrandPortraitSettings: () => invoke('getBrandPortraitSettings'),
+  chooseBrandPortraitFolder: () => invoke('chooseBrandPortraitFolder'),
+  clearBrandPortraitFolder: () => invoke('clearBrandPortraitFolder'),
   listEntries: (filter) => invoke('listEntries', filter),
   readEntry: (path) => invoke('readEntry', path),
   search: (query, filter) => invoke('search', query, filter),

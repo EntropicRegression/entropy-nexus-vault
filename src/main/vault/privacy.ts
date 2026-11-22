@@ -13,7 +13,7 @@ export function opaqueKey(namespace: 'p' | 'v', value: string): string {
 const sensitiveKeys = new Set([
   '專案id', 'projectid', '工作目錄', '工作資料夾', '工作路徑', 'cwd', 'workdir', 'workingdir', 'workingdirectory',
   '圖像目錄', '頭像', '立繪', '頭像路徑', '立繪路徑', '絕對路徑', 'portraitsdir', 'portraitpath', 'avatarpath',
-  'projectpath', 'projectdir', 'projectroot', 'rootpath', 'vaultpath', 'reporoot',
+  'projectpath', 'projectdir', 'projectroot', 'rootpath', 'vaultpath', 'reporoot', 'brandportraitpath',
 ]);
 
 // Paths that reveal the machine or the user are hidden: drive paths, UNC shares, file: URLs, POSIX absolute paths,

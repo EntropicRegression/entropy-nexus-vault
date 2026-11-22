@@ -16,6 +16,10 @@ export interface ViewSettings {
   reducedMotion: boolean;
 }
 
+export type BrandPortraitSettings =
+  | { configured: false; label: null }
+  | { configured: true; label: string };
+
 export interface VaultInfo {
   key: string;
   /** Display alias; filesystem paths stay in the main process. */
@@ -91,6 +95,11 @@ export interface CrystalProject {
   kind?: ProjectType;
 }
 
+export interface CrystalBrand {
+  vendor: 'claude' | 'codex' | 'gemini' | null;
+  mode: 'active' | 'dormant';
+}
+
 export interface NodeCrystal {
   nodeId: string;
   name: string;
@@ -104,6 +113,8 @@ export interface NodeCrystal {
   cliRecordExists?: boolean;
   projectNames: string[];
   projects?: CrystalProject[];
+  /** Supplied by the main process; older view fixtures may omit it. */
+  brand?: CrystalBrand;
   avatarUrl?: string | null;
   portraitUrl?: string | null;
   /** Glow tier from the richness score, or rainbow when the user granted one (DESIGN.md §6.9). */

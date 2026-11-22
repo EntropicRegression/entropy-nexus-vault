@@ -350,6 +350,38 @@ describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
     expect(JSON.stringify(snapshot.listCrystals())).not.toMatch(/synthetic|[a-z]:\//i);
   });
 
+  it('由 console session.後台 與節點狀態判斷廠牌及立繪模式', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nexus-brand-mapping-'));
+    scratchDirs.push(root);
+    await cp(consoleStats, root, { recursive: true });
+    const file = join(root, statsFilename);
+    const stats = JSON.parse(await readFile(file, 'utf8'));
+    const combinations = [
+      { backend: 'claude', raw: '線上', status: '線上', vendor: 'claude', mode: 'active' },
+      { backend: 'codex', raw: '忙碌', status: '線上', vendor: 'codex', mode: 'active' },
+      { backend: 'antigravity', raw: '休眠', status: '休眠', vendor: 'gemini', mode: 'dormant' },
+      { backend: 'Claude Code', raw: '封存', status: '封存', vendor: 'claude', mode: 'dormant' },
+      { backend: 'Codex', raw: '終止', status: '封存', vendor: 'codex', mode: 'dormant' },
+      { backend: 'Antigravity', raw: '已終止', status: '封存', vendor: 'gemini', mode: 'dormant' },
+      { backend: 'unrecognized', raw: '現役', status: '線上', vendor: null, mode: 'active' },
+      { backend: null, raw: '休眠', status: '休眠', vendor: null, mode: 'dormant' },
+    ];
+    for (const [index, { backend, raw }] of combinations.entries()) {
+      const node = stats.節點[id(index + 1)];
+      node.狀態 = raw;
+      node.session.後台 = backend;
+    }
+    delete stats.節點[id(9)].session.後台;
+    await writeFile(file, JSON.stringify(stats));
+    const snapshot = await new VaultReader(root, now).read();
+    const { crystals } = snapshot.listCrystals();
+    for (const [index, { status, vendor, mode }] of combinations.entries()) {
+      expect(crystals.find(({ nodeId }) => nodeId === id(index + 1))).toMatchObject({ status, brand: { vendor, mode } });
+    }
+    expect(crystals.find(({ nodeId }) => nodeId === id(9))?.brand?.vendor).toBeNull();
+    expect(await snapshot.readCrystal(id(3))).toMatchObject({ brand: { vendor: 'gemini', mode: 'dormant' } });
+  });
+
   it('經歷計分的輸入:完成/退回取統計(驗收數不用);有專案表時跨專案只算 git(M5c 審查 B4)', async () => {
     const snapshot = await new VaultReader(consoleStats, now).read();
     const inputs = snapshot.richnessInputs();

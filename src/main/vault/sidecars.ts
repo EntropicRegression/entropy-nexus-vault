@@ -87,18 +87,32 @@ function decodeHeat(value: unknown): ReadonlyMap<string, HeatRecall> | undefined
   return heat;
 }
 
+function statsNodeStatus(value: unknown): VaultStatsNode['status'] | undefined {
+  switch (value) {
+    case '線上':
+    case '現役':
+    case '忙碌': return '線上';
+    case '休眠': return '休眠';
+    case '封存':
+    case '終止':
+    case '已終止': return '封存';
+    default: return undefined;
+  }
+}
+
 function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
   if (!isRecord(value) || !isRecord(value.session)) return undefined;
   const {
-    名稱: name, 狀態: status, 任務數: tasks, 完成數: completed, 完成率: completionRate,
+    名稱: name, 任務數: tasks, 完成數: completed, 完成率: completionRate,
     驗收數: accepted, 退回數: rejected, 判例數: cases, 專案: projectNames,
   } = value;
+  const status = statsNodeStatus(value.狀態);
   // 專案ID (console 2026-11-22) runs parallel to 專案; older files omit it, and a mismatched list is ignored.
   const projectIds = isStringList(value.專案ID) && isStringList(projectNames) && value.專案ID.length === projectNames.length
     ? value.專案ID : null;
   const recent = Array.isArray(value.專案任務數) && value.專案任務數.every(isCount) && isStringList(projectNames) &&
     value.專案任務數.length === projectNames.length ? value.專案任務數 as number[] : null;
-  if (typeof name !== 'string' || (status !== '線上' && status !== '休眠' && status !== '封存') ||
+  if (typeof name !== 'string' || !status ||
       !isCount(tasks) || !isCount(completed) || !(completionRate === null || isRate(completionRate)) ||
       !isCount(accepted) || !isCount(rejected) || !isCount(cases) || !isStringList(projectNames)) return undefined;
   return {

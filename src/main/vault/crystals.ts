@@ -1,5 +1,5 @@
 import type { RichnessInput } from '../../shared/glow';
-import type { CrystalLink, CrystalProject, CrystalStats, MemoryEntry, NodeCrystal } from '../../shared/types';
+import type { CrystalBrand, CrystalLink, CrystalProject, CrystalStats, MemoryEntry, NodeCrystal } from '../../shared/types';
 import { markdownHeadings, memoryTimestamp } from './entry';
 import type { ParsedEntry } from './entry';
 import { field } from './frontmatter';
@@ -19,6 +19,16 @@ interface Archive {
 interface NodeFiles {
   profiles: ParsedEntry[];
   archives: Archive[];
+}
+
+function portraitVendor(backend: string | null | undefined): CrystalBrand['vendor'] {
+  switch (backend?.trim().toLowerCase()) {
+    case 'claude':
+    case 'claude code': return 'claude';
+    case 'codex': return 'codex';
+    case 'antigravity': return 'gemini';
+    default: return null;
+  }
 }
 
 function crystalProjects(projects: VaultStatsNode['projects'], snapshot: VaultStatsSnapshot | null): CrystalProject[] {
@@ -162,6 +172,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       cliRecordExists: statsNode?.cliRecordExists,
       projectNames,
       projects: crystalProjects(statsNode?.projects ?? [], snapshot),
+      brand: { vendor: portraitVendor(statsNode?.backend), mode: status === '線上' ? 'active' : 'dormant' },
       glow: 'white',
     };
 
