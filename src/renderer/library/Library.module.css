@@ -19,7 +19,7 @@
   scrollbar-width: thin;
 }
 
-.grain, .srOnly {
+.srOnly {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -32,9 +32,9 @@
 .board {
   flex: none;
   padding: 14px 18px 16px;
-  background: linear-gradient(180deg, rgba(44,30,20,.92), rgba(28,20,15,.94));
-  border: 1px solid rgba(217,164,65,.42);
-  box-shadow: 0 8px 24px rgba(8,10,24,.5);
+  background: var(--velvet);
+  border: 1px solid rgba(217,164,65,.38);
+  box-shadow: var(--velvet-inset), 0 6px 18px rgba(4,7,19,.45);
 }
 
 .boardHeader { display: flex; align-items: baseline; gap: 14px; margin-bottom: 9px; }
@@ -46,7 +46,7 @@
   grid-template-columns: repeat(4,minmax(185px,1fr));
   grid-auto-flow: column;
   grid-auto-columns: minmax(185px,1fr);
-  gap: 10px;
+  gap: 16px;
   padding: 6px 3px 8px;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -57,22 +57,30 @@
   position: relative;
   min-width: 0;
   padding: 14px 14px 12px;
-  background: var(--paper-2);
+  background: var(--paper-tex) 0 0 / 64px 64px, var(--paper-2);
   color: var(--ink-paper);
   border: 1px solid rgba(107,74,46,.55);
-  box-shadow: 0 4px 12px rgba(0,0,0,.38);
+  box-shadow: var(--paper-edge), var(--paper-drop);
+  overflow: hidden;
+  transition: transform var(--hover-dur) ease-out, border-color var(--hover-dur) ease-out;
 }
-.note::before {
+.note:hover { transform: translateY(-2px); border-color: var(--gold-warm); }
+/* 4px inset foil frame (the one frame on the card). */
+.note::after { content: ''; position: absolute; inset: 4px; border: 1px solid var(--foil-frame); pointer-events: none; }
+/* 確認 succeeded: one 420ms gold-leaf sweep, then still (0ms under low motion). */
+.note[data-foil]::before {
   content: '';
   position: absolute;
-  width: 8px;
-  height: 8px;
-  left: calc(50% - 4px);
-  top: 2px;
-  border-radius: 50%;
-  box-shadow: 0 1px 2px #4b3423;
-  background: radial-gradient(circle at 35% 30%, #e6d9be, #9c7a49 60%, #4b3423);
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 45%;
+  background: linear-gradient(105deg, transparent 0%, rgba(255,247,224,.48) 50%, transparent 100%);
+  pointer-events: none;
+  animation: foil-sweep var(--foil-dur) ease-out forwards;
 }
+@keyframes foil-sweep { from { left: -60%; } to { left: 130%; } }
 .noteMeta, .noteActions, .plaqueMeta, .plaqueFooter, .plaqueActions {
   display: flex;
   justify-content: space-between;
@@ -82,7 +90,7 @@
 .noteMeta { color: var(--ink-paper-muted); font-size: 11px; white-space: nowrap; }
 .noteMeta strong { border-bottom: 1px solid rgba(107,74,46,.35); }
 .noteMeta span { overflow: hidden; text-overflow: ellipsis; }
-.noteTitle { font-size: 14.5px; font-weight: 700; line-height: 1.45; margin-top: 4px; }
+.noteTitle { font-size: 14.5px; font-weight: 700; line-height: 1.45; margin-top: 4px; text-shadow: var(--emboss); }
 .noteTitle, .plaqueTitle, .textButton, .inlineLink {
   color: inherit;
   text-align: left;
@@ -170,7 +178,14 @@
 .nodeMore { padding: 2px 9px; }
 .nodeChip:focus-visible, .nodeMore:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
 .shelves { flex: none; padding: 0 4px 12px; }
-.shelf { position: relative; margin-bottom: 20px; }
+.shelf {
+  position: relative;
+  margin-bottom: 24px;
+  padding: 14px 18px 20px;
+  background: var(--velvet);
+  border: 1px solid rgba(107,74,46,.45);
+  box-shadow: var(--velvet-inset);
+}
 .shelf h2 {
   position: relative;
   display: flex;
@@ -188,10 +203,7 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 16px 20px;
-  padding-bottom: 8px;
-  border-bottom: 4px solid var(--wood-dark);
-  box-shadow: 0 5px 5px -2px rgba(0,0,0,.57);
+  gap: 24px;
 }
 .more {
   display: block;
@@ -207,7 +219,6 @@
 .plaque {
   position: relative;
   min-width: 0;
-  filter: drop-shadow(0 4px 6px rgba(8,10,24,.42));
   color-scheme: light;
   color: var(--ink-paper);
   font-variant-numeric: oldstyle-nums;
@@ -227,20 +238,18 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--card-paper);
+  background: var(--paper-tex) 0 0 / 64px 64px, var(--card-paper);
   padding: 15px 16px 13px 18px;
   border: 1px solid rgba(107,74,46,.55);
+  box-shadow: var(--paper-edge), var(--paper-drop);
+  transition: transform var(--hover-dur) ease-out, border-color var(--hover-dur) ease-out;
 }
-.plaqueFace::after {
-  position: absolute;
-  z-index: -1;
-  content: '';
-  inset: 0;
-  filter: url(#paperGrain);
-  opacity: .04;
-  pointer-events: none;
-}
-.plaque:hover .plaqueFace { border-color: var(--gold-warm); }
+/* 4px inset foil frame: the card's single frame. */
+.plaqueFace::after { position: absolute; content: ''; inset: 4px; border: 1px solid var(--foil-frame); pointer-events: none; }
+.plaque:hover .plaqueFace { transform: translateY(-2px); border-color: var(--gold-warm); }
+/* The folded corner is a clip-path, which would cut off box-shadows: its paper edge is drawn as a static drop-shadow. */
+.plaque:has(> [data-shelf='decision']) { filter: drop-shadow(0 2px 0 #9d8362) drop-shadow(0 6px 6px rgba(4,7,19,.36)); }
+.plaqueFace[data-shelf='decision'] { box-shadow: inset 0 1px 0 rgba(255,247,224,.6); }
 .plaqueFace[data-shelf='case'] { padding-left: 24px; border-left: 3px solid var(--wood-warm); }
 .plaqueFace[data-shelf='case']::before {
   content: '';
@@ -262,7 +271,7 @@
   opacity: .78;
   clip-path: polygon(0 0,100% 0,100% 100%,50% 75%,0 100%);
 }
-.plaqueFace[data-shelf='archive'] { box-shadow: inset 0 0 0 5px var(--card-paper), inset 0 0 0 6px rgba(107,74,46,.35); }
+.plaqueFace[data-shelf='archive'] { border-top: 3px double var(--wood-warm); border-bottom: 3px double var(--wood-warm); }
 .plaqueFace[data-shelf='archive']::before {
   content: '';
   position: absolute;
@@ -274,7 +283,7 @@
   border: 1px solid var(--wood-warm);
   opacity: .85;
 }
-.plaqueMeta { font-size: 12px; color: var(--ink-paper-muted); flex-wrap: wrap; }
+.plaqueMeta { font-size: 12px; color: var(--ink-paper-muted); flex-wrap: wrap; letter-spacing: .03em; }
 .plaqueMeta > span { overflow-wrap: anywhere; }
 .statusMark, .heatSlot, .gems { display: inline-flex; align-items: center; gap: 4px; }
 .statusMark { white-space: nowrap; }
@@ -284,7 +293,7 @@
 .gems { gap: 2px; }
 .gems svg { fill: transparent; stroke: var(--gem-off); }
 .gems svg[data-lit='true'] { fill: var(--gem-on); stroke: var(--gem-on-stroke); }
-.plaqueFace h3 { margin: 6px 0 4px; font-size: 15.5px; font-weight: 700; line-height: 1.48; }
+.plaqueFace h3 { margin: 6px 0 4px; font-size: 15.5px; font-weight: 700; line-height: 1.48; text-shadow: var(--emboss); }
 .plaqueTitle, .plaqueSummary {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -377,9 +386,9 @@
   max-height: 100%;
   overflow: auto;
   color: var(--ink-paper);
-  background: var(--paper-2);
+  background: var(--paper-tex) 0 0 / 64px 64px, var(--paper-2);
   border: 1.5px solid var(--wood-warm);
-  box-shadow: 0 24px 56px rgba(0,0,0,.82);
+  box-shadow: inset 0 1px 0 rgba(255,247,224,.6), 0 18px 36px rgba(0,0,0,.66);
   scrollbar-width: thin;
   scrollbar-color: var(--wood-warm) var(--paper-1);
   font-variant-numeric: oldstyle-nums;
@@ -395,7 +404,7 @@
 }
 .sheetHeader { border-bottom: 1px solid rgba(107,74,46,.3); }
 .sheetHeading { min-width: 0; }
-.sheetHeading h2 { margin: 5px 0 0; font-size: 20px; line-height: 1.45; overflow-wrap: anywhere; }
+.sheetHeading h2 { margin: 5px 0 0; font-size: 20px; line-height: 1.45; overflow-wrap: anywhere; text-shadow: var(--emboss); }
 .sheetHeading h2:focus-visible { outline: 1.5px solid var(--amber-bright); outline-offset: 2px; }
 .sheetMeta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--ink-paper-muted); }
 .sheetHeaderActions, .writeControls { display: flex; gap: 6px; white-space: nowrap; }
@@ -406,7 +415,7 @@
 .deskSidebar .sheetBody { padding-inline: 16px; gap: 20px; }
 .sheetBody h3, .sheetBody summary { margin: 0 0 8px; letter-spacing: .14em; font-size: 12.5px; font-weight: 700; }
 .sheetBody p { margin: 0 0 12px; }
-.document { max-width: 38em; min-width: 0; font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; }
+.document { max-width: 38em; min-width: 0; font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; padding-left: 16px; border-left: 1px solid rgba(107,74,46,.28); }
 .document h4 { margin: 0 0 8px; }
 .document pre { overflow-x: auto; background: var(--paper-1); padding: 8px; }
 .document blockquote { padding-left: 10px; margin-left: 0; border-left: 2px solid var(--gold-warm); }

@@ -661,6 +661,8 @@ describe('典藏室', () => {
     await act(async () => button('標為完成', board).click());
     expect(setStatus).toHaveBeenCalledWith(bookmark.path, '已完成', { mtime: 100, size: 200 });
     expect(board.textContent).toContain('未完書籤 0');
+    // Confirmed in this session: the note gets its single gold-leaf sweep (M5f); not on a fresh load.
+    expect(board.querySelector('article[data-processed="true"]')!.hasAttribute('data-foil')).toBe(true);
     await act(async () => button(baseEntry.title, card(baseEntry)).click());
     const paper = container.querySelector('[aria-label="閱讀桌"]')!;
     await act(async () => button('移入回收', paper).click());

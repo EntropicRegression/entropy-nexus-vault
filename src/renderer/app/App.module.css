@@ -8,10 +8,13 @@
   font: 500 13px/1.5 var(--font-serif);
   --paper-fade: 240ms;
   --stamp-duration: 260ms;
+  /* Premium finish: hover lift and the single foil sweep on a confirmed note (DESIGN.md §10.1). */
+  --hover-dur: 180ms;
+  --foil-dur: 420ms;
 }
 
-.shell[data-reduced-motion='true'] { --paper-fade: 0ms; --stamp-duration: 0ms; }
-@media (prefers-reduced-motion: reduce) { .shell { --paper-fade: 0ms; --stamp-duration: 0ms; } }
+.shell[data-reduced-motion='true'] { --paper-fade: 0ms; --stamp-duration: 0ms; --hover-dur: 0ms; --foil-dur: 0ms; }
+@media (prefers-reduced-motion: reduce) { .shell { --paper-fade: 0ms; --stamp-duration: 0ms; --hover-dur: 0ms; --foil-dur: 0ms; } }
 
 .topBar {
   position: absolute;

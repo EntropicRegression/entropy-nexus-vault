@@ -86,7 +86,9 @@ function DraftBoard({ notes, feedback, onOpen, onWrite, onReload }: {
         const processed = entry.status === '已確認' || entry.status === '已完成';
         const locked = !entry.writable || !status || state?.phase === 'pending' ||
           (state?.phase === 'failure' && ['conflict', 'missing', 'legacy'].includes(state.reason));
-        return <article key={entry.path} className={styles.note} data-processed={processed}>
+        // data-foil: confirmed in this session (not on reload) — one gold-leaf sweep (DESIGN.md §10.1).
+        return <article key={entry.path} className={styles.note} data-processed={processed}
+          data-foil={processed && state?.phase === 'saved' ? '' : undefined}>
         <div className={styles.noteMeta}><strong>{deskNoteLabel(entry)}</strong><span>{entryIdentifier(entry)}</span></div>
         <button type="button" className={styles.noteTitle} onClick={(event) => onOpen(entry.path, event.currentTarget)}>{entry.title}</button>
         <p className={styles.noteSummary}>{entry.summary}</p>
@@ -423,10 +425,6 @@ export function Library({ query, deskMode, onToggleMode, onNode, openRequest, on
   }
 
   return <div className={styles.library} data-side={Boolean(selected && deskMode === 'B')}>
-    <svg className={styles.grain} aria-hidden="true" width="0" height="0">
-      <filter id="paperGrain"><feTurbulence type="fractalNoise" baseFrequency=".84" numOctaves="3" stitchTiles="stitch" />
-        <feColorMatrix type="saturate" values="0" /></filter>
-    </svg>
     <div className={styles.libraryWorkspace} data-library-workspace="">
     <div className={styles.libraryPanel} ref={scroller} aria-label="藏書架" onKeyDown={moveCard} inert={selected !== null && deskMode === 'A'}>
       {allEntries && <DraftBoard notes={notes} onOpen={openEntry} feedback={writes.feedback} onWrite={writes.run} onReload={reloadFromFailure} />}
