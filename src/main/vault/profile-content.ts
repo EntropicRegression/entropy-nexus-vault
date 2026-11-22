@@ -7,7 +7,7 @@ import { memoryPath } from './scan';
 
 const consoleTitle = /^主控台補充[（(](\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2})[）)]$/;
 const literalConsoleHeading = /^## 主控台補充\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}\)$/;
-const reservedToken = /⟦[^⟦⟧\r\n]*(?:⟧|(?=⟦)|$)|⟧/gm;
+const reservedToken = /⟦路徑[^⟦⟧\r\n]*(?:⟧|(?=⟦)|$)/gm;
 
 export function profilePath(input: unknown): string | null {
   const key = memoryPath(input);

@@ -70,11 +70,11 @@ describe('節點側寫編輯契約', () => {
 
   it.each([
     ['modified-or-unknown', (body: string) => body.replace('⟦路徑1⟧', '⟦路徑三⟧')],
-    ['modified-or-unknown', (body: string) => body.replace('⟦路徑1⟧', '⟦路經1⟧')],
-    ['modified-or-unknown', (body: string) => body.replace('⟦路徑1⟧', '路徑1⟧')],
+    ['modified-or-unknown', (body: string) => body.replace('⟦路徑1⟧', '⟦路徑01⟧')],
     ['duplicate', (body: string) => body + '\n⟦路徑1⟧'],
     ['modified-or-unknown', (body: string) => body + '\n⟦路徑99⟧'],
     ['modified-or-unknown', (body: string) => body + '\n⟦路徑2'],
+    ['modified-or-unknown', (body: string) => body + '\n⟦路徑⟦注意⟧'],
   ])('拒絕無效佔位符 %s', async (issue, change) => {
     const draft = await readDraft();
     expect(await writer.saveProfileBody(nodeId, change(draft.body), draft.version, lookup, { acknowledgedRemovals: [1] })).toEqual({
@@ -82,6 +82,26 @@ describe('節點側寫編輯契約', () => {
     });
     expect(await readFile(target)).toEqual(original);
     expect(await readdir(join(root, 'nodes'))).toEqual(['封存', '星砂.md']);
+  });
+
+  it.each(['⟦路經1⟧', '路徑1⟧', '⟦注意⟧'])('路徑標記改成普通正文「%s」仍須確認移除原路徑', async (replacement) => {
+    const draft = await readDraft();
+    const edited = draft.body.replace('⟦路徑1⟧', replacement);
+    expect(await writer.saveProfileBody(nodeId, edited, draft.version, lookup)).toMatchObject({
+      ok: false, reason: 'invalid-placeholders', issue: 'missing', missingPlaceholders: [1],
+    });
+    expect(await readFile(target)).toEqual(original);
+  });
+
+  it('保留原有一般括號，且可新增 ⟦注意⟧、單獨的 ⟧ 與沒有路徑前綴的未閉合 ⟦', async () => {
+    const bodyWithBrackets = user.replace('原側寫。', '原側寫。⟦原有注意⟧');
+    await writeFile(target, Buffer.concat([header, Buffer.from(bodyWithBrackets), appendix]));
+    const draft = await readDraft();
+    expect(draft.body).toContain('原側寫。⟦原有注意⟧');
+    const addition = '新增 ⟦注意⟧、單獨 ⟧ 與未閉合 ⟦';
+    const edited = draft.body + '\n' + addition;
+    expect(await writer.saveProfileBody(nodeId, edited, draft.version, lookup)).toMatchObject({ ok: true });
+    expect(await readFile(target)).toEqual(Buffer.concat([header, Buffer.from(bodyWithBrackets + '\r\n' + addition), appendix]));
   });
 
   it('先回需要確認的編號與永久刪除說明，確認缺少的編號後才刪除路徑原文', async () => {
@@ -133,10 +153,10 @@ describe('節點側寫編輯契約', () => {
   });
 
   it('編輯文件已有的同形標記時，讀寫無變更仍可逐位元組往返', async () => {
-    const literal = Buffer.concat([header, Buffer.from(user + '\n範例：⟦路徑2⟧\n不同行的換行'), appendix]);
+    const literal = Buffer.concat([header, Buffer.from(user + '\n範例：⟦路徑2⟧\n未閉合：⟦路徑參考\n不同行的換行'), appendix]);
     await writeFile(target, literal);
     const draft = await readDraft();
-    expect(draft.body).toContain('範例：⟦路徑3⟧');
+    expect(draft.body).toContain('範例：⟦路徑3⟧\n未閉合：⟦路徑4⟧');
     expect((await writer.saveProfileBody(nodeId, draft.body, draft.version, lookup)).ok).toBe(true);
     expect(await readFile(target)).toEqual(literal);
   });
