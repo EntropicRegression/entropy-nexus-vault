@@ -2,7 +2,8 @@
    opacity only; no animated blur. */
 
 .universe {
-  flex: 1.38; min-width: 0; position: relative; overflow: hidden; z-index: 3;
+  /* clip (not hidden): focusing an off-screen galaxy must not scroll the stage; the camera reveals it (M6c review). */
+  flex: 1.38; min-width: 0; position: relative; overflow: hidden; overflow: clip; z-index: 3;
   background:
     radial-gradient(circle at 50% 48%, rgba(30, 41, 82, 0.35), transparent 62%),
     rgba(7, 12, 28, 0.54);
@@ -13,23 +14,29 @@
 }
 .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-.overview, .interior { position: absolute; inset: 0; }
+.overview, .interior { position: absolute; inset: 0; overflow: clip; }
 .overview { z-index: 2; }
 .interior { z-index: 3; display: flex; }
 .universe[data-moving='true'] .overview, .universe[data-moving='true'] .interior { will-change: transform, opacity; }
 
-/* Outer star-dust belt: a dashed ellipse, 88% × 82% of the stage. */
+/* Map overview (DESIGN.md §6.10.2): everything sits in one world layer at fixed world positions (hub = origin); the
+   camera only changes that layer's transform. --zoom (set when the camera settles) keeps text at least 11px. */
+.overview { cursor: grab; touch-action: none; }
+.overview[data-dragging] { cursor: grabbing; }
+.world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; --zoom: 1; }
+
+/* Outer star-dust belt: a dashed circle around every galaxy, in world coordinates. */
 .belt {
-  position: absolute; left: 50%; top: 50%; width: 88%; height: 82%; transform: translate(-50%, -50%);
-  border: 1px dashed rgba(148, 163, 184, 0.24); border-radius: 50%; pointer-events: none;
+  position: absolute; left: 0; top: 0; border: 1px dashed rgba(148, 163, 184, 0.24); border-radius: 50%; pointer-events: none;
 }
 .belt span {
-  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); white-space: nowrap;
-  padding: 2px 12px; border-radius: 10px; background: rgba(7, 11, 26, 0.85); color: #94a3b8; font-size: 11px; letter-spacing: 0.14em;
+  position: absolute; top: 100%; left: 50%; transform: translate(-50%, 6px); white-space: nowrap;
+  padding: 2px 12px; border-radius: 10px; background: rgba(7, 11, 26, 0.85); color: #94a3b8;
+  font-size: max(11px, calc(11px / var(--zoom))); letter-spacing: 0.14em;
 }
 
 /* Bridges: independent quadratic arcs, ends on the outer rings. */
-.bridges { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
+.bridges { position: absolute; z-index: 1; pointer-events: none; overflow: visible; }
 .bridgeLine { fill: none; stroke: #d9a441; stroke-opacity: 0.55; stroke-linecap: round; transition: stroke-opacity 0.2s; }
 .bead { fill: #fde68a; fill-opacity: 0.9; transition: fill-opacity 0.2s; }
 .bridgeHit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: help; }
@@ -65,17 +72,17 @@
 
 .plate {
   position: relative; display: flex; flex-direction: column; align-items: center; padding: 4px 14px;
-  background: rgba(6, 11, 26, 0.92); border: 1px solid rgba(217, 164, 65, 0.38); font-size: 12px; white-space: nowrap;
+  background: rgba(6, 11, 26, 0.92); border: 1px solid rgba(217, 164, 65, 0.38); font-size: max(12px, calc(11px / var(--zoom))); white-space: nowrap;
 }
 .plate::before, .plate::after {
   content: ''; position: absolute; top: 50%; width: 3px; height: 3px; border-radius: 50%; background: #d9a441; transform: translateY(-50%);
 }
 .plate::before { left: 4px; }
 .plate::after { right: 4px; }
-.plate small { color: #94a3b8; font-size: 10.5px; }
+.plate small { color: #94a3b8; font-size: max(10.5px, calc(11px / var(--zoom))); }
 .promote {
   padding: 2px 9px; border: 1px solid rgba(92, 225, 230, 0.45); border-radius: 3px;
-  background: rgba(11, 18, 40, 0.92); color: #bae6fd; font-size: 10.5px; cursor: pointer;
+  background: rgba(11, 18, 40, 0.92); color: #bae6fd; font-size: max(11px, calc(11px / var(--zoom))); cursor: pointer;
 }
 .promote:hover, .promote:focus-visible { border-color: var(--sky-gold); color: var(--sky-gold); outline: none; }
 
@@ -98,12 +105,13 @@
 
 .dust {
   z-index: 4; display: flex; align-items: center; gap: 5px; padding: 3px 8px; border: 0; border-radius: 10px;
-  background: none; color: #94a3b8; font-size: 11px; cursor: pointer; white-space: nowrap;
+  background: none; color: #94a3b8; font-size: max(11px, calc(11px / var(--zoom))); cursor: pointer; white-space: nowrap;
 }
 .dust:hover, .dust[aria-pressed='true'] { color: #e2e8f0; background: rgba(148, 163, 184, 0.14); }
 .dustDot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; opacity: 0.75; }
 
-.toolbar { position: absolute; top: 12px; right: 14px; z-index: 8; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.toolbar { position: absolute; top: 12px; right: 14px; z-index: 8; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; cursor: default; }
+.toolbar > .cameraTools { order: 0; }
 .toolbar > [data-arrange] { order: 1; }
 .toolbar > .glowFilters { order: 2; }
 .toolbar > .finder { order: 3; }
@@ -152,7 +160,7 @@
 .group, .hub, .dust { transition: opacity var(--hover-dur, 180ms) ease-out; }
 .overview[data-glow-filter] .hub[data-dimmed], .overview[data-glow-filter] .dust[data-dimmed] { opacity: 0.18; }
 .overview[data-glow-filter] .bridges { opacity: 0.25; }
-.glowCount { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 2px; color: #fde68a; font-size: 10.5px; font-style: normal; }
+.glowCount { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 2px; color: #fde68a; font-size: max(10.5px, calc(11px / var(--zoom))); font-style: normal; }
 :global([data-quiet='true']) .group, :global([data-quiet='true']) .hub, :global([data-quiet='true']) .dust { transition: none; }
 
 /* Rainbow showcase: a large panel over the galaxy stage. */
@@ -187,3 +195,30 @@
 .toolbar .finderResults button:hover, .toolbar .finderResults button:focus-visible { background: rgba(217, 164, 65, 0.16); outline: none; }
 .finderResults small { color: #94a3b8; font-size: 11px; font-weight: 500; }
 .finderEmpty { padding: 6px 8px; color: #94a3b8; font-size: 12px; }
+
+/* Camera tools (§6.10.2 point 2): zoom readout + 回到全覽 (+ 看亮著的星系 while filtering). */
+.cameraTools { display: flex; align-items: center; gap: 6px; }
+.cameraTools small { min-width: 3.2em; text-align: right; color: #94a3b8; font-size: 11px; font-variant-numeric: tabular-nums; }
+.toolbar .cameraTools button[disabled] { opacity: 0.45; cursor: default; }
+
+/* Reduced detail by zoom (§6.10.2 point 3). mid: one-line plates (counts on hover/focus), belt dots only; far: outer
+   ring + core + name, nebula cloud + name. The colour-filter count (× N) stays at every level. */
+.overview[data-detail='mid'] .groupButton:not(:hover):not(:focus-visible) .plate small,
+.overview[data-detail='far'] .groupButton:not(:hover):not(:focus-visible) .plate small { display: none; }
+.dust[data-label='hidden']:not(:hover):not(:focus-visible):not([aria-pressed='true']) .dustName { display: none; }
+.overview[data-detail='far'] .halo, .overview[data-detail='far'] .ringMid, .overview[data-detail='far'] .ringInner,
+.overview[data-detail='far'] .speck, .overview[data-detail='far'] .cloudInner, .overview[data-detail='far'] .cloudSpeck { display: none; }
+/* Far: 升格 stays reachable by Tab (never display:none) and shows on hover or focus. */
+.overview[data-detail='far'] .group:not(:hover):not(:focus-within) .promote { opacity: 0; }
+
+/* Minimap (§6.10.2 point 5; spec default): lower right, 180 × 110. */
+.minimap {
+  position: absolute; right: 14px; bottom: 14px; z-index: 9; width: 180px; height: 110px; cursor: pointer;
+  background: rgba(6, 11, 26, 0.88); border: 1px solid rgba(217, 164, 65, 0.45);
+}
+.minimap:focus-visible { outline: 2px solid var(--sky-gold); outline-offset: 2px; }
+.minimap svg { display: block; }
+.miniGalaxy { fill: #e0f2fe; }
+.miniNebula { fill: #94a3b8; }
+.miniHub { fill: #fde68a; }
+.miniView { fill: rgba(217, 164, 65, 0.08); stroke: #d9a441; stroke-width: 1; }

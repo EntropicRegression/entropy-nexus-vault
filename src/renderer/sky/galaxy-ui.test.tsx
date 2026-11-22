@@ -120,8 +120,8 @@ describe('專案星系畫面(M5e-b)', () => {
     expect(bridge.dataset.weight).toBe('2');
     expect(bridge.querySelector('path')!.getAttribute('stroke-width')).toBe('3');
     expect(bridge.querySelectorAll('circle')).toHaveLength(2);
-    // Ends sit exactly on the outer rings: centres at 772 ∓ 260; rings 165 × 0.44 = 72.6 and 150 × 0.44 = 66.
-    expect(bridge.querySelector('path')!.getAttribute('d')).toBe('M 584.6 396 Q 775.3 449.4 966 396');
+    // World coordinates (hub = origin, §6.10.2): centres at ∓260; rings 165 × 0.44 = 72.6 and 150 × 0.44 = 66.
+    expect(bridge.querySelector('path')!.getAttribute('d')).toBe('M -187.4 0 Q 3.3 53.4 194 0');
     expect(host.textContent).not.toMatch(/[a-z]:[\\/]|p_[a-f0-9]{24}/i);
   });
 
