@@ -6,6 +6,7 @@ import type {
   MemoryEntryDetail,
   NodeCrystalDetail,
   NodeHit,
+  GalaxyMap,
   AwardWriteResult,
   RecycledEntry,
   RecycledVersion,
@@ -27,6 +28,12 @@ export interface VaultApi {
   search(query: string, filter: EntryFilter): Promise<MemoryEntry[]>;
   searchNodes(query: string): Promise<NodeHit[]>;
   listCrystals(): Promise<CrystalList>;
+  /** Project galaxies (DESIGN.md §6.10); { enabled: false } without a 專案表. */
+  listGalaxies(): Promise<GalaxyMap>;
+  /** Promotes a shared-folder project (nebula) to a galaxy, or undoes it. Git projects are always galaxies. */
+  setGalaxyPromotion(projectKey: string, promoted: boolean): Promise<GalaxyMap>;
+  /** "Arrange once": re-lays out every group by collaboration. Only on the user's request; never automatic. */
+  arrangeGalaxies(): Promise<GalaxyMap>;
   readCrystal(nodeId: string): Promise<NodeCrystalDetail | null>;
   /** Grants (award = { reason }) or withdraws (null) a rainbow; expected = CrystalList.awards.version. */
   setAward(nodeId: string, award: { reason: string } | null, expected: FileVersion | null): Promise<AwardWriteResult>;
@@ -51,6 +58,9 @@ export const vaultChannels = {
   search: 'vault:search',
   searchNodes: 'vault:search-nodes',
   listCrystals: 'vault:list-crystals',
+  listGalaxies: 'vault:list-galaxies',
+  setGalaxyPromotion: 'vault:set-galaxy-promotion',
+  arrangeGalaxies: 'vault:arrange-galaxies',
   readCrystal: 'vault:read-crystal',
   setAward: 'vault:set-award',
   setStatus: 'vault:set-status',

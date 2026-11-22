@@ -23,6 +23,8 @@ export interface VaultInfo {
   wakeAvailable: boolean;
 }
 
+import type { GalaxyBridge, GalaxyGroup, GalaxyMembership } from './galaxies';
+import type { Point2 } from './galaxy-layout';
 import type { GlowAward, GlowTier, Richness } from './glow';
 
 export interface FileVersion {
@@ -123,6 +125,25 @@ export interface CrystalList {
   /** State of .vault-awards.json: the version for setAward, and whether the file is damaged (read as no awards). */
   awards?: { version: FileVersion | null; corrupt: boolean };
 }
+
+/**
+ * Project galaxies (DESIGN.md §6.10). enabled: false when the stats have no 專案表 — the flat star map stays and
+ * nothing else changes. Groups are keyed by opaque p_ keys; raw 專案ID values never appear.
+ */
+export type GalaxyMap =
+  | { enabled: false }
+  | {
+    enabled: true;
+    /** Galaxies (git repos and promoted folders) and nebulae (shared folders), each with its fixed position. */
+    groups: (GalaxyGroup & { position: Point2 })[];
+    /** Current chief(s): the hub at the centre. */
+    hub: string[];
+    /** Nodes without a project: the outer star-dust belt. */
+    outer: string[];
+    membership: Record<string, GalaxyMembership>;
+    /** Collaboration between galaxies over the last 30 days (delegations, meetings, dual residents). */
+    bridges: GalaxyBridge[];
+  };
 
 export interface CrystalStats {
   tasks: number | null;

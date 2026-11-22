@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { VaultReader } from '../src/main/vault';
 import { heatFilename, statsFilename } from '../src/main/vault/sidecars';
+import { opaqueKey } from '../src/main/vault/privacy';
+import { assignGalaxies } from '../src/shared/galaxies';
 
 const fixture = resolve('fixtures/memory-vault');
 const malformedStats = resolve('fixtures/malformed-stats', statsFilename);
@@ -320,9 +322,9 @@ describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
 
   it('解析不丟節點:null 欄位、缺 專案ID 的舊版節點與協作、同席都保留', async () => {
     const snapshot = await new VaultReader(consoleStats, now).read();
-    expect(snapshot.sidecars.stats?.nodes.size).toBe(5);
+    expect(snapshot.sidecars.stats?.nodes.size).toBe(9);
     const { crystals, links } = snapshot.listCrystals();
-    expect(crystals.map((crystal) => crystal.nodeId).sort()).toEqual([1, 2, 3, 4, 5].map(id));
+    expect(crystals.map((crystal) => crystal.nodeId).sort()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9].map(id));
     expect(crystals.find((crystal) => crystal.nodeId === id(2))).toMatchObject({ role: null, status: '休眠', canWake: false });
     expect(crystals.find((crystal) => crystal.nodeId === id(4))).toMatchObject({ status: '封存', canWake: true, projectNames: ['舊專案'] });
     expect(links).toEqual(expect.arrayContaining([
@@ -338,8 +340,12 @@ describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
     const snapshot = await new VaultReader(consoleStats, now).read();
     const projectLinks = snapshot.listCrystals().links.filter((link) => link.kind === 'project');
     expect(projectLinks.map((link) => link.kind === 'project' && [link.projectName, [...link.nodeIds].sort()])).toEqual(
-      expect.arrayContaining([['共用庫', [id(1), id(3)]], ['舊專案', [id(4), id(5)]]]));
-    expect(projectLinks.some((link) => link.kind === 'project' && link.projectName === 'app')).toBe(false);
+      expect.arrayContaining([['共用庫', [id(1), id(3), id(6)]], ['舊專案', [id(4), id(5)]]]));
+    // Two projects named "app" with different IDs stay two separate groups.
+    const apps = projectLinks.filter((link) => link.kind === 'project' && link.projectName === 'app')
+      .map((link) => link.kind === 'project' && [...link.nodeIds].sort());
+    expect(apps).toEqual(expect.arrayContaining([[id(1), id(6), id(8)], [id(2), id(9)]]));
+    expect(apps).toHaveLength(2);
     for (const link of projectLinks) if (link.kind === 'project') expect(link.projectKey).toMatch(/^p_[a-f0-9]{24}$/);
     expect(JSON.stringify(snapshot.listCrystals())).not.toMatch(/synthetic|[a-z]:\//i);
   });
@@ -405,5 +411,114 @@ describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
     const { crystals } = (await new VaultReader(root, now).read()).listCrystals();
     expect(crystals.find((crystal) => crystal.nodeId === heron)?.status).toBe('未知');
     expect(crystals.find((crystal) => crystal.nodeId === moss)?.status).toBe('封存');
+  });
+});
+
+describe('專案星系(M5e-a,DESIGN.md §6.10)', () => {
+  const consoleStats = resolve('fixtures/console-stats');
+  const id = (n: number) => '0b6f1c2e-0000-4000-8000-00000000000' + n;
+  const key = (projectId: string) => opaqueKey('p', projectId);
+  const WORK = key('d:/synthetic/work/app'), OTHER = key('e:/synthetic/other/app'), SHARED = key('d:/synthetic/shared-lib');
+  const LIGHT = key('d:/synthetic/lighthouse'), ATLAS = key('d:/synthetic/atlas');
+  const pair = (x: string, y: string) => (x < y ? [x, y] : [y, x]);
+
+  it('主星系四層退路、總管在中樞、資料夾是小星雲、舊版缺欄位進外環', async () => {
+    const snapshot = await new VaultReader(consoleStats, now).read();
+    const result = assignGalaxies(snapshot.galaxyInput(new Set())!);
+    const place = (n: number) => result.membership.get(id(n));
+    expect(place(1)).toEqual({ group: null, place: 'hub', rule: 'chief' });
+    expect(place(2)).toEqual({ group: OTHER, place: 'galaxy', rule: 'recent-tasks' });
+    expect(place(3)).toEqual({ group: SHARED, place: 'nebula', rule: 'recent-project' });
+    expect(place(4)).toEqual({ group: null, place: 'outer', rule: 'none' });
+    expect(place(5)).toEqual({ group: null, place: 'outer', rule: 'none' });
+    expect(place(6)).toEqual({ group: WORK, place: 'galaxy', rule: 'recent-tasks' });
+    expect(place(7)).toEqual({ group: LIGHT, place: 'galaxy', rule: 'recent-tasks' });
+    expect(place(8)).toEqual({ group: ATLAS, place: 'galaxy', rule: 'recent-project' });
+    // A 4–4 tie goes to the more recent project (earlier in the stats list).
+    expect(place(9)).toEqual({ group: OTHER, place: 'galaxy', rule: 'recent-tasks' });
+    expect(result.groups.map(({ name, kind, members }) => [name, kind, members.length]).sort()).toEqual([
+      ['app', 'galaxy', 1], ['app', 'galaxy', 2], ['共用庫', 'nebula', 1], ['星圖', 'galaxy', 1], ['燈塔', 'galaxy', 1]]);
+  });
+
+  it('連線只用 30 天的「不含總管」紀錄與 90 天的 專案任務數;星雲與同星系不計', async () => {
+    const snapshot = await new VaultReader(consoleStats, now).read();
+    const { bridges } = assignGalaxies(snapshot.galaxyInput(new Set())!);
+    const find = (x: string, y: string) => bridges.find(({ a, b }) => a === pair(x, y)[0] && b === pair(x, y)[1]);
+    expect(find(WORK, LIGHT)).toMatchObject({ delegations: 3, meetings: 2, dual: 1, count: 6, weight: 2 });
+    expect(find(OTHER, LIGHT)).toMatchObject({ delegations: 0, meetings: 2, dual: 1, count: 3, weight: 1 });
+    expect(find(WORK, OTHER)).toMatchObject({ meetings: 2, count: 2 });
+    // 7 → 8 appears only in 協作不含總管, so this bridge proves which list is used.
+    expect(find(LIGHT, ATLAS)).toMatchObject({ delegations: 1, count: 1 });
+    expect(bridges).toHaveLength(4);
+    expect(bridges.some(({ a, b }) => a === SHARED || b === SHARED)).toBe(false);
+  });
+
+  it('升格共用庫後它成為星系,開始參與連線', async () => {
+    const snapshot = await new VaultReader(consoleStats, now).read();
+    const result = assignGalaxies(snapshot.galaxyInput(new Set([SHARED]))!);
+    expect(result.membership.get(id(3))).toMatchObject({ group: SHARED, place: 'galaxy' });
+    const shared = result.bridges.find(({ a, b }) => [a, b].includes(SHARED) && [a, b].includes(LIGHT));
+    // 3 → 6 is a delegation into app (work); the meeting [3, 7] joins 共用庫 and 燈塔.
+    expect(shared).toMatchObject({ meetings: 4 });
+    expect(result.bridges.find(({ a, b }) => [a, b].includes(SHARED) && [a, b].includes(WORK))).toMatchObject({ delegations: 5 });
+  });
+
+  it('B1:第 (3) 層只看未確認與已確認的承辦判例,退回的不影響歸屬', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'entropy-vault-contract-'));
+    scratchDirs.push(root);
+    await cp(consoleStats, root, { recursive: true });
+    await mkdir(join(root, 'cases', '合成'), { recursive: true });
+    const write = (n: number, project: string, status: string) => writeFile(join(root, 'cases', '合成', '2026-00' + n + '-合成.md'),
+      ['---', '種類: case', '案號: 2026-00' + n, '專案: x', '專案ID: ' + project, '節點ID: ' + id(4), '狀態: ' + status, '---',
+        '摘要: 合成', ''].join('\n'));
+    // 合成丁 (old format, no usable stats project): two rejected cases in 星圖, one unconfirmed in 燈塔.
+    await write(11, 'd:/synthetic/atlas', '退回');
+    await write(12, 'd:/synthetic/atlas', '退回');
+    await write(13, 'd:/synthetic/lighthouse', '未確認');
+    const result = assignGalaxies((await new VaultReader(root, now).read()).galaxyInput(new Set())!);
+    expect(result.membership.get(id(4))).toEqual({ group: LIGHT, place: 'galaxy', rule: 'cases' });
+  });
+
+  it('統計檔的邊界:交辦端點不在節點清單時略過;專案任務數長度不符時改用第 (2) 層', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'entropy-vault-contract-'));
+    scratchDirs.push(root);
+    await cp(consoleStats, root, { recursive: true });
+    const stats = JSON.parse(await readFile(join(root, statsFilename), 'utf8'));
+    stats.協作不含總管.push({ 從: id(7), 到: 'node-not-in-stats', 次數: 50, 最後: '2026-11-20T00:00:00.000Z' });
+    stats.節點[id(6)].專案任務數 = [2, 6];
+    await writeFile(join(root, statsFilename), JSON.stringify(stats));
+    const result = assignGalaxies((await new VaultReader(root, now).read()).galaxyInput(new Set())!);
+    // 合成己's list is ignored (3 projects, 2 counts): the first project in its list (燈塔) becomes home.
+    expect(result.membership.get(id(6))).toEqual({ group: LIGHT, place: 'galaxy', rule: 'recent-project' });
+    expect(result.bridges.every(({ count }) => count < 50)).toBe(true);
+  });
+
+  it('沒有專案表的舊統計檔:星系功能關閉,星圖照舊', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'entropy-vault-contract-'));
+    scratchDirs.push(root);
+    await cp(consoleStats, root, { recursive: true });
+    const before = (await new VaultReader(root, now).read()).listCrystals();
+    const stats = JSON.parse(await readFile(join(root, statsFilename), 'utf8'));
+    delete stats.專案表;
+    await writeFile(join(root, statsFilename), JSON.stringify(stats));
+    const snapshot = await new VaultReader(root, now).read();
+    expect(snapshot.galaxyInput(new Set())).toBeNull();
+    expect(snapshot.listCrystals().crystals.map(({ nodeId }) => nodeId)).toEqual(before.crystals.map(({ nodeId }) => nodeId));
+    expect(snapshot.listCrystals().links).toEqual(before.links);
+  });
+
+  it('主控台去識別樣本(buildVaultStats 實際輸出,fixtures/console-sample)的分群與連線', async () => {
+    const snapshot = await new VaultReader(resolve('fixtures/console-sample'), now).read();
+    const result = assignGalaxies(snapshot.galaxyInput(new Set())!);
+    const group = (nodeId: string) => result.membership.get(nodeId);
+    expect(group('node-chief')).toMatchObject({ place: 'hub' });
+    expect(group('node-orion')).toMatchObject({ group: key('c:/projects/star-app'), place: 'galaxy', rule: 'recent-tasks' });
+    expect(group('node-vega')).toMatchObject({ group: key('c:/workspace/shared'), place: 'nebula', rule: 'recent-tasks' });
+    expect(group('node-lyra')).toMatchObject({ group: key('d:/repos/lantern-site'), place: 'galaxy' });
+    expect(group('node-cygnus')).toMatchObject({ place: 'outer' });
+    expect(group('node-legacy')).toMatchObject({ place: 'outer' });
+    // orion is dual resident (star-app 2, lantern-site 1 of 3); orion → vega goes into a nebula and does not count.
+    expect(result.bridges).toEqual([{ ...Object.fromEntries([['a', pair(key('c:/projects/star-app'), key('d:/repos/lantern-site'))[0]],
+      ['b', pair(key('c:/projects/star-app'), key('d:/repos/lantern-site'))[1]]]), delegations: 0, meetings: 0, dual: 1, count: 1, weight: 1 }]);
   });
 });

@@ -54,6 +54,9 @@ function bridge(overrides: Partial<VaultApi> = {}, initial: Partial<ViewSettings
     listEntries: vi.fn(async () => entries),
     search: vi.fn(async (term) => entries.filter(({ title }) => title.includes(term))),
     setAward: vi.fn<VaultApi['setAward']>(async () => ({ ok: false, reason: 'io' })),
+    listGalaxies: vi.fn(async () => ({ enabled: false as const })),
+    setGalaxyPromotion: vi.fn(async () => ({ enabled: false as const })),
+    arrangeGalaxies: vi.fn(async () => ({ enabled: false as const })),
     readEntry: vi.fn(async (path) => {
       const entry = entries.find((item) => item.path === path);
       return entry ? detail(entry) : null;

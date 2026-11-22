@@ -4,7 +4,7 @@ import { app, dialog, ipcMain } from 'electron';
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
 import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
-import type { VaultInfo, VaultWriteResult } from '../shared/types';
+import type { GalaxyMap, VaultInfo, VaultWriteResult } from '../shared/types';
 import { appUrl } from './app-assets';
 import { avatarUrl, portraitUrl } from './images';
 import { readVaultPath, readViewSettings, saveVaultPath, saveViewSettings } from './settings';
@@ -15,6 +15,8 @@ import { CrystalLayoutStore } from './vault/crystal-layout-store';
 import { readAwards, writeAward } from './vault/awards';
 import type { AwardsState } from './vault/awards';
 import { GlowPeakStore } from './vault/glow-peaks';
+import { GalaxyLayoutStore, GalaxySettingsStore } from './vault/galaxy-store';
+import { assignGalaxies } from '../shared/galaxies';
 import { computeRichness, glowOf } from '../shared/glow';
 import type { Richness } from '../shared/glow';
 
@@ -46,6 +48,8 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   const settingsFile = join(app.getPath('userData'), app.isPackaged ? 'settings.json' : 'settings.dev.json');
   const crystalLayout = new CrystalLayoutStore(join(app.getPath('userData'), 'crystal-layout.json'));
   const glowPeaks = new GlowPeakStore(join(app.getPath('userData'), 'glow-peaks.json'));
+  const galaxySettings = new GalaxySettingsStore(join(app.getPath('userData'), 'galaxy-settings.json'));
+  const galaxyLayout = new GalaxyLayoutStore(join(app.getPath('userData'), 'galaxy-layout.json'));
   const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
     : join(app.getAppPath(), 'fixtures', 'memory-vault');
   let activeVault: { path: string; reader: VaultReader; writer: VaultWriter } | undefined;
@@ -82,6 +86,21 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     const awards: AwardsState = await readAwards(context.root, inputs.keys())
       .catch(() => ({ awards: new Map(), version: null, corrupt: false }));
     return { richness, awards };
+  }
+
+  /** Project galaxies for the active vault (DESIGN.md §6.10). Only an explicit request re-arranges the layout. */
+  async function galaxyMap(context: Awaited<ReturnType<typeof readVaultContext>>, arrange = false): Promise<GalaxyMap> {
+    const key = opaqueKey('v', context.root);
+    const input = context.snapshot.galaxyInput(await galaxySettings.promoted(key));
+    if (!input) return { enabled: false };
+    const { groups, hub, outer, membership, bridges } = assignGalaxies(input);
+    const keys = groups.map((group) => group.key);
+    const positions = arrange ? await galaxyLayout.arrange(key, keys, bridges) : await galaxyLayout.positions(key, keys, bridges);
+    return {
+      enabled: true,
+      groups: groups.map((group) => ({ ...group, position: positions.get(group.key)! })),
+      hub, outer, membership: Object.fromEntries(membership), bridges,
+    };
   }
 
   const avatarCache = new WeakMap<object, Map<string, Promise<string | null>>>();
@@ -150,6 +169,17 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
         awards: { version: awards.version, corrupt: awards.corrupt },
       };
     },
+    listGalaxies: async () => galaxyMap(await readVaultContext()),
+    setGalaxyPromotion: async (_event, projectKey, promoted) => {
+      const context = await readVaultContext();
+      const key = opaqueKey('v', context.root);
+      // Only shared-folder projects of this vault's 專案表 can be promoted; git projects are galaxies already.
+      const input = context.snapshot.galaxyInput(new Set());
+      const project = typeof projectKey === 'string' ? input?.projects.get(projectKey) : undefined;
+      if (project?.type === '資料夾' && typeof promoted === 'boolean') await galaxySettings.setPromoted(key, projectKey, promoted);
+      return galaxyMap(context);
+    },
+    arrangeGalaxies: async () => galaxyMap(await readVaultContext(), true),
     readCrystal: async (_event, nodeId) => {
       const context = await readVaultContext();
       const detail = await context.snapshot.readCrystal(nodeId);

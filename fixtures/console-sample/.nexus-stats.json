@@ -1,0 +1,266 @@
+{
+  "_說明": "去識別的 .nexus-stats.json 樣本:由主控台的 buildVaultStats 實際產生(路徑、名稱、ID 都是虛構的),再手動加一個舊版格式的節點 node-legacy。以 _ 開頭的鍵是樣本說明,實際檔案沒有。",
+  "更新時間": "2026-11-22T08:00:00.000Z",
+  "圖像目錄": "C:/Example/portraits",
+  "節點": {
+    "node-chief": {
+      "名稱": "星盤總管",
+      "角色": null,
+      "狀態": "線上",
+      "任務數": 1,
+      "完成數": 1,
+      "完成率": 1,
+      "驗收數": 1,
+      "退回數": 0,
+      "判例數": 0,
+      "專案": [
+        "shared"
+      ],
+      "專案ID": [
+        "c:/workspace/shared"
+      ],
+      "專案任務數": [
+        1
+      ],
+      "總管": true,
+      "頭像路徑": null,
+      "立繪路徑": null,
+      "session": {
+        "後台": "claude",
+        "sessionId": "sess-chief",
+        "主控台有紀錄": true,
+        "CLI有紀錄": false,
+        "工作目錄存在": true,
+        "可接回": false
+      }
+    },
+    "node-orion": {
+      "名稱": "獵戶",
+      "角色": "example-hero",
+      "狀態": "線上",
+      "任務數": 4,
+      "完成數": 4,
+      "完成率": 1,
+      "驗收數": 4,
+      "退回數": 0,
+      "判例數": 0,
+      "專案": [
+        "star-app",
+        "lantern-site"
+      ],
+      "專案ID": [
+        "c:/projects/star-app",
+        "d:/repos/lantern-site"
+      ],
+      "專案任務數": [
+        2,
+        1
+      ],
+      "總管": false,
+      "頭像路徑": "C:/Example/portraits/example-hero/avatar.png",
+      "立繪路徑": "C:/Example/portraits/example-hero/neutral.png",
+      "session": {
+        "後台": "claude",
+        "sessionId": "sess-orion",
+        "主控台有紀錄": true,
+        "CLI有紀錄": false,
+        "工作目錄存在": true,
+        "可接回": false
+      }
+    },
+    "node-vega": {
+      "名稱": "織女",
+      "角色": null,
+      "狀態": "休眠",
+      "任務數": 3,
+      "完成數": 2,
+      "完成率": 0.67,
+      "驗收數": 1,
+      "退回數": 1,
+      "判例數": 0,
+      "專案": [
+        "shared",
+        "star-app"
+      ],
+      "專案ID": [
+        "c:/workspace/shared",
+        "c:/projects/star-app"
+      ],
+      "專案任務數": [
+        2,
+        1
+      ],
+      "總管": false,
+      "頭像路徑": null,
+      "立繪路徑": null,
+      "session": {
+        "後台": "antigravity",
+        "sessionId": null,
+        "主控台有紀錄": false,
+        "CLI有紀錄": false,
+        "工作目錄存在": true,
+        "可接回": false
+      }
+    },
+    "node-lyra": {
+      "名稱": "天琴",
+      "角色": null,
+      "狀態": "封存",
+      "任務數": 2,
+      "完成數": 2,
+      "完成率": 1,
+      "驗收數": 2,
+      "退回數": 0,
+      "判例數": 1,
+      "專案": [
+        "lantern-site",
+        "old-tool"
+      ],
+      "專案ID": [
+        "d:/repos/lantern-site",
+        "c:/archive/old-tool"
+      ],
+      "專案任務數": [
+        1,
+        0
+      ],
+      "總管": false,
+      "頭像路徑": null,
+      "立繪路徑": null,
+      "session": {
+        "後台": "codex",
+        "sessionId": "sess-lyra",
+        "主控台有紀錄": true,
+        "CLI有紀錄": true,
+        "工作目錄存在": true,
+        "可接回": true
+      }
+    },
+    "node-cygnus": {
+      "名稱": "天鵝",
+      "角色": "example-swan",
+      "狀態": "封存",
+      "任務數": 7,
+      "完成數": 6,
+      "完成率": 0.86,
+      "驗收數": 5,
+      "退回數": 1,
+      "判例數": 1,
+      "專案": [],
+      "專案ID": [],
+      "專案任務數": [],
+      "總管": false,
+      "頭像路徑": "C:/Example/memory-vault/nodes/封存/_圖像/node-cygnus/avatar.png",
+      "立繪路徑": null,
+      "session": {
+        "後台": "claude",
+        "sessionId": null,
+        "主控台有紀錄": false,
+        "CLI有紀錄": false,
+        "工作目錄存在": false,
+        "可接回": false
+      }
+    },
+    "node-legacy": {
+      "名稱": "舊格式節點",
+      "角色": null,
+      "狀態": "封存",
+      "任務數": 3,
+      "完成數": 2,
+      "完成率": 0.67,
+      "驗收數": 0,
+      "退回數": 0,
+      "判例數": 0,
+      "專案": [
+        "star-app"
+      ],
+      "頭像路徑": null,
+      "立繪路徑": null,
+      "session": {
+        "後台": "claude",
+        "sessionId": null,
+        "主控台有紀錄": true,
+        "CLI有紀錄": null,
+        "工作目錄存在": false,
+        "可接回": false
+      }
+    }
+  },
+  "協作": [
+    {
+      "從": "node-chief",
+      "到": "node-orion",
+      "次數": 1,
+      "最後": "2026-11-21T08:00:00.000Z"
+    },
+    {
+      "從": "node-orion",
+      "到": "node-vega",
+      "次數": 2,
+      "最後": "2026-11-20T08:00:00.000Z"
+    }
+  ],
+  "同席": [
+    {
+      "節點": [
+        "node-chief",
+        "node-orion",
+        "node-vega"
+      ],
+      "次數": 2
+    }
+  ],
+  "協作不含總管": [
+    {
+      "從": "node-orion",
+      "到": "node-vega",
+      "次數": 2,
+      "最後": "2026-11-20T08:00:00.000Z"
+    }
+  ],
+  "同席不含總管": [
+    {
+      "節點": [
+        "node-orion",
+        "node-vega"
+      ],
+      "次數": 1
+    }
+  ],
+  "專案表": {
+    "c:/projects/star-app": {
+      "名稱": "star-app",
+      "類型": "git"
+    },
+    "d:/repos/lantern-site": {
+      "名稱": "lantern-site",
+      "類型": "git"
+    },
+    "c:/workspace/shared": {
+      "名稱": "shared",
+      "類型": "資料夾"
+    },
+    "c:/archive/old-tool": {
+      "名稱": "old-tool",
+      "類型": "資料夾"
+    },
+    "e:/labs/nebula-lab": {
+      "名稱": "nebula-lab",
+      "類型": "git"
+    }
+  },
+  "總管任期": [
+    {
+      "節點": "node-former",
+      "名稱": "前任總管",
+      "開始": "2026-10-13T08:00:00.000Z",
+      "結束": "2026-11-12T08:00:00.000Z"
+    },
+    {
+      "節點": "node-chief",
+      "名稱": "星盤總管",
+      "開始": "2026-11-12T08:00:00.000Z",
+      "結束": null
+    }
+  ]
+}

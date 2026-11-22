@@ -149,6 +149,69 @@ describe('主程序 IPC 來源驗證', () => {
     expect(JSON.stringify(snapshot)).not.toMatch(/[a-z]:[\\/]|\/(?:Users|home|tmp|Volumes)\/|file:\/\/|test-server|RelativeName/i);
   });
 
+  it('專案星系 IPC:分群、連線、座標固定、升格與整理一次;整份 JSON 沒有路徑與原始專案ID', async () => {
+    electron.userData = await mkdtemp(join(tmpdir(), 'nexus-galaxy-ipc-'));
+    const vault = join(electron.userData, 'galaxy');
+    await cp(resolve('fixtures/console-stats'), vault, { recursive: true });
+    await saveVaultPath(join(electron.userData, 'settings.dev.json'), vault);
+    const sender = {};
+    registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
+    const event = { sender, senderFrame: { url: appUrl, parent: null } };
+    function invoke<M extends keyof VaultRequests>(method: M, ...args: Parameters<VaultRequests[M]>): ReturnType<VaultRequests[M]> {
+      return electron.handle.mock.calls.find(([channel]) => channel === vaultChannels[method])![1](event, ...args) as ReturnType<VaultRequests[M]>;
+    }
+    const map = await invoke('listGalaxies');
+    if (!map.enabled) throw new Error('galaxies should be enabled');
+    expect(map.hub).toEqual(['0b6f1c2e-0000-4000-8000-000000000001']);
+    expect(map.groups.filter(({ kind }) => kind === 'galaxy')).toHaveLength(4);
+    expect(map.groups.find(({ name }) => name === '共用庫')).toMatchObject({ kind: 'nebula', projectType: '資料夾', promoted: false });
+    for (const group of map.groups) {
+      expect(group.key).toMatch(/^p_[a-f0-9]{24}$/);
+      expect(group.position.every(Number.isFinite)).toBe(true);
+    }
+    expect(map.bridges).toHaveLength(4);
+    const raw = JSON.stringify(map);
+    expect(raw).not.toMatch(/synthetic|[a-z]:[\/]|\/Users\//i);
+
+    // Positions are fixed: a second call (and a new process) returns the same coordinates.
+    const again = await invoke('listGalaxies');
+    expect(again).toEqual(map);
+    const layout = await readFile(join(electron.userData, 'galaxy-layout.json'), 'utf8');
+    expect(layout).not.toMatch(/synthetic|[a-z]:[\/]/i);
+
+    const shared = map.groups.find(({ name }) => name === '共用庫')!;
+    const promoted = await invoke('setGalaxyPromotion', shared.key, true);
+    if (!promoted.enabled) throw new Error('galaxies should be enabled');
+    expect(promoted.groups.find(({ key }) => key === shared.key)).toMatchObject({ kind: 'galaxy', promoted: true, position: shared.position });
+    expect(promoted.bridges.length).toBeGreaterThan(map.bridges.length);
+    for (const group of map.groups) expect(promoted.groups.find(({ key }) => key === group.key)?.position).toEqual(group.position);
+    expect(await readFile(join(electron.userData, 'galaxy-settings.json'), 'utf8')).not.toMatch(/synthetic|[a-z]:[\/]/i);
+    // A git project cannot be promoted; an unknown key is ignored.
+    const git = map.groups.find(({ projectType }) => projectType === 'git')!;
+    expect(await invoke('setGalaxyPromotion', git.key, true)).toEqual(promoted);
+    expect(await invoke('setGalaxyPromotion', 'p_' + '0'.repeat(24), true)).toEqual(promoted);
+    const reverted = await invoke('setGalaxyPromotion', shared.key, false);
+    expect(reverted.enabled && reverted.groups.find(({ key }) => key === shared.key)?.kind).toBe('nebula');
+
+    const arranged = await invoke('arrangeGalaxies');
+    expect(arranged.enabled && arranged.groups.length).toBe(map.groups.length);
+    expect(JSON.stringify(arranged)).not.toMatch(/synthetic|[a-z]:[\/]/i);
+  });
+
+  it('沒有專案表時星系關閉', async () => {
+    electron.userData = await mkdtemp(join(tmpdir(), 'nexus-galaxy-off-'));
+    const vault = join(electron.userData, 'sky');
+    await cp(resolve('fixtures/sky-vault'), vault, { recursive: true });
+    await saveVaultPath(join(electron.userData, 'settings.dev.json'), vault);
+    const sender = {};
+    registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
+    const event = { sender, senderFrame: { url: appUrl, parent: null } };
+    const call = (channel: string, ...args: unknown[]) =>
+      electron.handle.mock.calls.find(([name]) => name === channel)![1](event, ...args) as Promise<unknown>;
+    expect(await call(vaultChannels.listGalaxies)).toEqual({ enabled: false });
+    expect(await call(vaultChannels.arrangeGalaxies)).toEqual({ enabled: false });
+  });
+
   it('星圖合成庫提供四種徽章、關係、履歷及白名單內的實際合成立繪', async () => {
     electron.userData = await mkdtemp(join(tmpdir(), 'nexus-sky-ipc-'));
     const vault = join(electron.userData, 'sky');
