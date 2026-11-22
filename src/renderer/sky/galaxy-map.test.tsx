@@ -31,6 +31,9 @@ const data: CrystalList = {
     ...['o1', 'o2', 'o3', 'o4', 'o5', 'o6'].map((id) => crystal(id, '外環' + id))],
   links: [],
 };
+// One gold and one rainbow member so the minimap dots show tier colours.
+data.crystals[0] = { ...data.crystals[0], glow: 'gold' };
+data.crystals[1] = { ...data.crystals[1], glow: 'rainbow' };
 const detail = (id: string): NodeCrystalDetail => ({
   ...data.crystals.find((node) => node.nodeId === id)!, profile: null, stats: null, archives: [], relatedEntries: [],
   confirmedCaseCount: 0, specialty: '', workflow: '', review: '', notRejectedRate: null, consoleAppendixCount: 0,
@@ -182,6 +185,52 @@ describe('星圖總覽地圖化(DESIGN.md §6.10.2)', () => {
     root = createRoot(host);
     await render();
     expect(readout()).toBe(zoom);
+  });
+
+
+  it('小地圖照 Hagemi 稿:星域圖、倍率、渾天儀環、七階六角點、中樞星徽;− / ⌂ / + 可用', async () => {
+    await render();
+    for (let i = 0; i < 4; i++) await keyDown('+');
+    await settle();
+    const mini = q('[data-minimap]')!;
+    expect(mini.textContent).toContain('星域圖');
+    expect(q('[data-minimap-zoom]')!.textContent).toBe(readout() + '%');
+    expect(mini.querySelector('[data-minimap-ring]')).not.toBeNull();
+    expect(mini.querySelector('[data-minimap-hub]')).not.toBeNull();
+    const dots = mini.querySelectorAll('[data-minimap-group]');
+    expect(dots).toHaveLength(12);
+    expect(dots[0].querySelector('polygon')!.getAttribute('fill')).toBe('#f59e0b');
+    expect(dots[1].querySelector('polygon')!.getAttribute('fill')).toMatch(/^url\(#[\w-]+\)$/);
+    expect(dots[1].getAttribute('data-tier')).toBe('rainbow');
+    expect(dots[2].querySelector('polygon')!.getAttribute('fill')).toBe('#e2e8f0');
+    expect(mini.innerHTML).not.toMatch(/data:|href=/);
+    expect(mini.querySelector('linearGradient')).not.toBeNull();
+    await keyDown('ArrowRight');
+    const frame = q('[data-minimap-view]')!, lining = q('[data-minimap-lining]')!;
+    expect(Number(lining.getAttribute('x'))).toBeCloseTo(Number(frame.getAttribute('x')) + 1.5, 0);
+    expect(Number(lining.getAttribute('width'))).toBeCloseTo(Number(frame.getAttribute('width')) - 3, 0);
+    expect(q('[data-minimap-reset] svg path')).not.toBeNull();
+    await settle();
+    const before = readout();
+    await act(async () => q<HTMLButtonElement>('[data-minimap-zoom-in]')!.click());
+    await settle();
+    expect(Math.abs(readout() - Math.min(160, before * 1.2))).toBeLessThanOrEqual(1);
+    await act(async () => q<HTMLButtonElement>('[data-minimap-zoom-out]')!.click());
+    await settle();
+    expect(Math.abs(readout() - before)).toBeLessThanOrEqual(1);
+    q<HTMLButtonElement>('[data-minimap-reset]')!.focus();
+    await act(async () => q<HTMLButtonElement>('[data-minimap-reset]')!.click());
+    expect(q('[data-galaxy-announcement]')!.textContent).toBe('已移到〈全覽〉');
+    await moveDone();
+    await settle();
+    expect(readout()).toBe(fit);
+    expect(q('[data-minimap]')).toBeNull();
+    // Focus was on ⌂ when the minimap went away: it moves to 回到全覽, not to body.
+    expect(document.activeElement).toBe(q('[data-fit-all]'));
+    const css = galaxyCss.replace(/\r\n/g, '\n');
+    const minimapCss = css.slice(css.indexOf('/* Minimap'));
+    expect(minimapCss).toContain('clip-path: polygon(8px 0');
+    expect(minimapCss.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/transition|animation|blur|url\(/);
   });
 
   it('顏色篩選時才有「看亮著的星系」;減量規則寫在樣式裡', async () => {

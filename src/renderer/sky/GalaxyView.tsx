@@ -12,10 +12,10 @@ import { createAnimator } from './frame-clock';
 import { beltLabels, bridgeStyle, cameraMoveMs, clampCamera, contains, detailLevel, dragThreshold, fitBoxes, fitCamera, groupBox,
   keyPan, lerpCamera, minimapTransform, panBy, revealBox, settleMs, toScreen, viewBox, worldLayout, zoomAt } from './galaxy-world';
 import type { Bounds, Camera } from './galaxy-world';
-import { GalaxyMinimap } from './GalaxyMinimap';
+import { GalaxyMinimap, liningOf } from './GalaxyMinimap';
 import { observeSize } from './canvas';
 import { glowNames, glowTiers } from '../../shared/glow';
-import type { AutoGlowTier } from '../../shared/glow';
+import type { AutoGlowTier, GlowTier } from '../../shared/glow';
 import { glowFilterView, glowTotals } from './glow-filter';
 import { GalaxyFinder } from './GalaxyFinder';
 import { RainbowShowcase } from './RainbowShowcase';
@@ -266,6 +266,15 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
   const placed = layout;
   const belt = layout.belt;
   const statusOf = useMemo(() => new Map(data.crystals.map((node) => [node.nodeId, node.status])), [data.crystals]);
+  /** Each group's strongest member glow, for the minimap dots (rainbow above the six automatic tiers). */
+  const groupTiers = useMemo(() => {
+    const rank = (tier: GlowTier) => tier === 'rainbow' ? glowTiers.length : glowTiers.indexOf(tier);
+    const glowOf = new Map(data.crystals.map((node) => [node.nodeId, node.glow]));
+    return new Map(map.groups.map((group) => [group.key, group.members.reduce<GlowTier>((best, id) => {
+      const tier = glowOf.get(id) ?? 'white';
+      return rank(tier) > rank(best) ? tier : best;
+    }, 'white')]));
+  }, [data.crystals, map.groups]);
 
   /** The fly zooms around the galaxy's current point on screen (computed when the fly starts, never stale). */
   function setOrigin(key: string) {
@@ -297,10 +306,12 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
     if (frame) {
       const t = minimapTransform(layout.bounds);
       const box = viewBox(next, viewport);
-      frame.setAttribute('x', (box.minX * t.scale + t.x).toFixed(1));
-      frame.setAttribute('y', (box.minY * t.scale + t.y).toFixed(1));
-      frame.setAttribute('width', ((box.maxX - box.minX) * t.scale).toFixed(1));
-      frame.setAttribute('height', ((box.maxY - box.minY) * t.scale).toFixed(1));
+      const geometry = { x: box.minX * t.scale + t.x, y: box.minY * t.scale + t.y, width: (box.maxX - box.minX) * t.scale, height: (box.maxY - box.minY) * t.scale };
+      const lining = frame.parentElement?.querySelector('[data-minimap-lining]') ?? null;
+      for (const [element, values] of [[frame, geometry], [lining, liningOf(geometry.x, geometry.y, geometry.width, geometry.height)]] as const) {
+        if (!element) continue;
+        for (const [name, value] of Object.entries(values)) element.setAttribute(name, value.toFixed(1));
+      }
     }
     rememberedCamera = following.current ? null : { camera: next, signature: mapSignature(map) };
     window.clearTimeout(settleTimer.current);
@@ -675,7 +686,11 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
           const next = clampCamera({ ...point, zoom: cam.zoom }, layout.bounds, viewport);
           if (animate) moveCamera(next); else userCamera(next);
         }}
-        onPan={(dx, dy) => userCamera(panBy(camera.current ?? view, dx, dy, layout.bounds, viewport))} />}
+        onPan={(dx, dy) => userCamera(panBy(camera.current ?? view, dx, dy, layout.bounds, viewport))}
+        tiers={groupTiers}
+        onZoom={(factor) => userCamera(zoomAt(camera.current ?? view, factor, { x: viewport.width / 2, y: viewport.height / 2 }, layout.bounds, viewport))}
+        onReset={() => showAll(true)}
+        onFocusOut={() => stage.current?.querySelector<HTMLElement>('[data-fit-all]')?.focus({ preventScroll: true })} />}
 
       <div className={styles.toolbar} data-galaxy-toolbar="">
         <div className={styles.cameraTools}>
