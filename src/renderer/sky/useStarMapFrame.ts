@@ -26,6 +26,8 @@ interface Options {
   clock: FrameClock;
   /** Crystals that keep a gap between their body and lineage lines (gold tier, DESIGN.md §6.9). */
   gapped?: ReadonlySet<string>;
+  /** Highest zoom the default view may fit to: 1 on the flat map (zoom out only), about 1.6 inside a galaxy. */
+  maxFitZoom?: number;
 }
 
 /**
@@ -60,6 +62,7 @@ export function measure(element: HTMLElement, anchors: ReadonlyMap<string, HTMLE
 export function useStarMapFrame(options: Options): () => void {
   const { active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock } = options;
   const gapped = options.gapped;
+  const maxFitZoom = options.maxFitZoom ?? 1;
   const radius = useMemo(() => boundingRadius(positions.values()), [positions]);
   const points = useMemo(() => [...positions.values()], [positions]);
   const density = densityScale(positions.size);
@@ -80,7 +83,7 @@ export function useStarMapFrame(options: Options): () => void {
         return;
       }
       // Default view: fit the bounding sphere into the stage (zoom out only) until the user takes over.
-      if (!adjusted.current) camera.current = { ...camera.current, zoom: autoZoom(points, viewport, density) };
+      if (!adjusted.current) camera.current = { ...camera.current, zoom: autoZoom(points, viewport, density, maxFitZoom) };
       const view = camera.current;
       const projected = new Map<string, Projection>();
       for (const [id, point] of positions) projected.set(id, project(point, view, viewport));
@@ -116,7 +119,7 @@ export function useStarMapFrame(options: Options): () => void {
     measured.current = null;
     if (active) animator.request();
     else animator.cancel();
-  }, [active, stage, armillary, canvas, nodes, camera, positions, connections, visible, selected, animator, gapped]);
+  }, [active, stage, armillary, canvas, nodes, camera, positions, connections, visible, selected, animator, gapped, maxFitZoom]);
 
   useEffect(() => {
     const element = stage.current;

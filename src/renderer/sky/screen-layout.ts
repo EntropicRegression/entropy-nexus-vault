@@ -50,8 +50,12 @@ function available({ width, height }: Viewport) {
  * Default-view auto-fit: the largest zoom (0.65–1) at which every crystal, as projected by the default camera,
  * fits the stage. It only zooms out, so a small constellation keeps the v9 framing.
  */
-export function autoZoom(points: readonly Point3[], viewport: Viewport, density = 1): number {
-  if (!points.length) return maxAutoZoom;
+/**
+ * Default-view zoom: the largest zoom (up to `maxZoom`) at which every crystal fits where it is. The flat map only
+ * zooms out (maxZoom 1); a galaxy interior may also zoom in (DESIGN.md §6.10, M5e-b review S2).
+ */
+export function autoZoom(points: readonly Point3[], viewport: Viewport, density = 1, maxZoom = maxAutoZoom): number {
+  if (!points.length) return maxZoom;
   const fits = (zoom: number) => {
     let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
     for (const point of points) {
@@ -66,8 +70,8 @@ export function autoZoom(points: readonly Point3[], viewport: Viewport, density 
     const safeTop = Math.min(topControls, viewport.height * 0.25);
     return left >= padding && right <= viewport.width - padding && top >= safeTop && bottom <= viewport.height - padding;
   };
-  if (fits(maxAutoZoom)) return maxAutoZoom;
-  let low = minZoom, high = maxAutoZoom;
+  if (fits(maxZoom)) return maxZoom;
+  let low = minZoom, high = maxZoom;
   for (let i = 0; i < 24; i++) {
     const middle = (low + high) / 2;
     if (fits(middle)) low = middle;

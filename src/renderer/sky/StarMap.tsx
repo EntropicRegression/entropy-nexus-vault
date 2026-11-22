@@ -12,9 +12,11 @@ import { useStarMapCamera } from './useStarMapCamera';
 import { useStarMapFrame } from './useStarMapFrame';
 import styles from './Sky.module.css';
 
-export function StarMap({ active, data, selected, visible, onToggle, onSelect, clock }: {
+export function StarMap({ active, data, selected, visible, onToggle, onSelect, clock, maxFitZoom }: {
   active: boolean; data: CrystalList; selected: string | null; visible: ReadonlySet<LinkKind>;
   onToggle: (kind: LinkKind) => void; onSelect: (id: string | null) => void; clock: FrameClock;
+  /** Inside a galaxy the default view may zoom in to fill the stage (DESIGN.md §6.10). */
+  maxFitZoom?: number;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const armillary = useRef<HTMLDivElement>(null);
@@ -25,7 +27,7 @@ export function StarMap({ active, data, selected, visible, onToggle, onSelect, c
   const positions = useMemo(() => new Map(data.crystals.map(({ nodeId, position }) => [nodeId, position])), [data.crystals]);
   const connections = useMemo(() => toLinkSegments(data.links, new Set(positions.keys())), [data.links, positions]);
   const gapped = useMemo(() => new Set(data.crystals.filter(({ glow }) => glow === 'gold').map(({ nodeId }) => nodeId)), [data.crystals]);
-  const demandFrame = useStarMapFrame({ active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock, gapped });
+  const demandFrame = useStarMapFrame({ active, stage, armillary, canvas, nodes, camera, adjusted, positions, connections, visible, selected, clock, gapped, maxFitZoom });
   const interaction = useStarMapCamera(stage, camera, demandFrame, active, adjusted);
 
   return <div ref={stage} role="region" aria-label="星圖舞台" aria-describedby="sky-map-controls" tabIndex={0} data-star-map=""

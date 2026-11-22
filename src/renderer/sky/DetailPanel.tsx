@@ -19,7 +19,7 @@ function Rate({ label, rate, amber, hint }: { label: string; rate: number | null
   </div>;
 }
 
-export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEntry, onAward, awardsCorrupt }: {
+export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEntry, onAward, awardsCorrupt, alsoIn }: {
   node?: NodeCrystal;
   detail: NodeCrystalDetail | null;
   loading: boolean;
@@ -30,6 +30,8 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
   onAward?: (mode: 'grant' | 'withdraw', trigger: HTMLButtonElement) => void;
   /** .vault-awards.json is damaged: read as no awards and not writable until fixed. */
   awardsCorrupt?: boolean;
+  /** With project galaxies: the other projects this node works in (where its bridges come from). */
+  alsoIn?: string[];
 }) {
   const crystal = detail ?? node;
   return <aside className={styles.gameFrame + ' ' + styles.detailPanel} data-sky-detail="" data-collapsed={!crystal}
@@ -65,6 +67,10 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
       </section>}
       {detail?.review && <section className={styles.reviewBox}>
         <h3 className={styles.reviewTitle}>節點回顧</h3><p>{detail.review}</p>
+      </section>}
+      {Boolean(alsoIn?.length) && <section className={styles.detailSection} data-also-in="">
+        <h3>同時參與的專案</h3>
+        <p className={styles.statsTotal}>{alsoIn!.join('、')}</p>
       </section>}
       {Boolean(detail?.relatedEntries.length) && <section className={styles.detailSection}>
         <h3>關聯卷宗</h3>

@@ -84,3 +84,20 @@ describe('星圖可視區及水晶銘牌', () => {
     expect(kept).toMatchObject([{ id: 'far', zIndex: 2, badgeHidden: false }, { id: 'near', zIndex: 1, badgeHidden: true }]);
   });
 });
+
+describe('星系內部的雙向自動適配(M5e-b 審查 S2)', () => {
+  const viewport = { width: 1100, height: 760 };
+  it('分布集中時放大(上限 1.6),平面星圖仍只縮小', () => {
+    const compact: [number, number, number][] = [[-60, 0, 30], [60, 10, -20], [0, -40, 0]];
+    expect(autoZoom(compact, viewport)).toBe(1);
+    const zoom = autoZoom(compact, viewport, 1, 1.6);
+    expect(zoom).toBeGreaterThan(1);
+    expect(zoom).toBeLessThanOrEqual(1.6);
+    expect(autoZoom([[0, 0, 0]], viewport, 1, 1.6)).toBe(1.6);
+  });
+  it('分布很廣時一樣會縮小', () => {
+    const wide: [number, number, number][] = [[-340, 0, 0], [340, 0, 0], [0, 200, 300], [0, -200, -300]];
+    expect(autoZoom(wide, viewport, 1, 1.6)).toBe(autoZoom(wide, viewport));
+    expect(autoZoom(wide, viewport, 1, 1.6)).toBeLessThan(1);
+  });
+});

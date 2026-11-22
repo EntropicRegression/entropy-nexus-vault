@@ -1,0 +1,130 @@
+/* Project galaxies (DESIGN.md §6.10; visual base docs/設計稿/premium/galaxy.html). Movement uses transform and
+   opacity only; no animated blur. */
+
+.universe {
+  flex: 1.38; min-width: 0; position: relative; overflow: hidden; z-index: 3;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(30, 41, 82, 0.35), transparent 62%),
+    rgba(7, 12, 28, 0.54);
+  border: 1px solid rgba(217, 164, 65, 0.34);
+  box-shadow: inset 0 2px 18px rgba(0, 0, 0, 0.65);
+  font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  color: var(--sky-text);
+}
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.overview, .interior { position: absolute; inset: 0; }
+.overview { z-index: 2; }
+.interior { z-index: 3; display: flex; }
+.universe[data-moving='true'] .overview, .universe[data-moving='true'] .interior { will-change: transform, opacity; }
+
+/* Outer star-dust belt: a dashed ellipse, 88% × 82% of the stage. */
+.belt {
+  position: absolute; left: 50%; top: 50%; width: 88%; height: 82%; transform: translate(-50%, -50%);
+  border: 1px dashed rgba(148, 163, 184, 0.24); border-radius: 50%; pointer-events: none;
+}
+.belt span {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  padding: 2px 12px; border-radius: 10px; background: rgba(7, 11, 26, 0.85); color: #94a3b8; font-size: 11px; letter-spacing: 0.14em;
+}
+
+/* Bridges: independent quadratic arcs, ends on the outer rings. */
+.bridges { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
+.bridgeLine { fill: none; stroke: #d9a441; stroke-opacity: 0.55; stroke-linecap: round; transition: stroke-opacity 0.2s; }
+.bead { fill: #fde68a; fill-opacity: 0.9; transition: fill-opacity 0.2s; }
+.bridgeHit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: help; }
+.bridges[data-chief-hover='true'] .bridgeLine { stroke-opacity: 0.2; }
+.bridges[data-chief-hover='true'] .bead { fill-opacity: 0.35; }
+.command { stroke: #fde68a; stroke-opacity: 0.72; stroke-width: 1.4; stroke-dasharray: 5 5; }
+.tip {
+  position: absolute; z-index: 20; pointer-events: none; padding: 4px 10px; border-radius: 3px;
+  background: rgba(6, 11, 26, 0.95); border: 1px solid #d9a441; color: #fde68a; font-size: 11.5px; white-space: nowrap;
+}
+
+/* Positioned elements sit at the origin and are moved with transform only. */
+.group, .hub, .dust { position: absolute; left: 0; top: 0; }
+.universe[data-arranging='true'] .group { transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1); }
+.group { z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.groupButton {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px;
+  border: 0; background: none; color: var(--sky-text); cursor: pointer;
+}
+.groupButton:focus-visible, .hub:focus-visible, .dust:focus-visible { outline: 2px solid var(--sky-gold); outline-offset: 4px; border-radius: 8px; }
+.armillary { transition: transform 0.2s ease; }
+.groupButton:hover .armillary { transform: scale(1.04); }
+.halo { fill: rgba(92, 225, 230, 0.06); }
+.ringOuter { fill: none; stroke: #7a5b35; stroke-width: 1; stroke-dasharray: 2 6; }
+.ringMid { fill: none; stroke: #d9a441; stroke-width: 1.2; }
+.ringInner { fill: none; stroke: rgba(92, 225, 230, 0.45); stroke-width: 1; }
+.coreGlow { fill: rgba(217, 164, 65, 0.22); }
+.core { fill: #fde68a; opacity: 0.88; }
+.speck { fill: #e0f2fe; opacity: 0.92; }
+.cloudOuter { fill: rgba(148, 163, 184, 0.12); stroke: rgba(148, 163, 184, 0.3); stroke-dasharray: 3 4; }
+.cloudInner { fill: rgba(92, 225, 230, 0.08); }
+.cloudSpeck { fill: #bae6fd; }
+
+.plate {
+  position: relative; display: flex; flex-direction: column; align-items: center; padding: 4px 14px;
+  background: rgba(6, 11, 26, 0.92); border: 1px solid rgba(217, 164, 65, 0.38); font-size: 12px; white-space: nowrap;
+}
+.plate::before, .plate::after {
+  content: ''; position: absolute; top: 50%; width: 3px; height: 3px; border-radius: 50%; background: #d9a441; transform: translateY(-50%);
+}
+.plate::before { left: 4px; }
+.plate::after { right: 4px; }
+.plate small { color: #94a3b8; font-size: 10.5px; }
+.promote {
+  padding: 2px 9px; border: 1px solid rgba(92, 225, 230, 0.45); border-radius: 3px;
+  background: rgba(11, 18, 40, 0.92); color: #bae6fd; font-size: 10.5px; cursor: pointer;
+}
+.promote:hover, .promote:focus-visible { border-color: var(--sky-gold); color: var(--sky-gold); outline: none; }
+
+/* Chief hub: warm gold double ring at the centre; it belongs to no galaxy. */
+.hub {
+  z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 0; border: 0; background: none; color: var(--sky-text); cursor: pointer;
+}
+.sun {
+  width: 84px; height: 84px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #d9a441;
+  background: radial-gradient(circle, rgba(253, 230, 138, 0.32) 0%, rgba(122, 91, 53, 0.18) 62%, transparent 74%);
+  box-shadow: 0 0 22px rgba(217, 164, 65, 0.35), inset 0 0 14px rgba(253, 230, 138, 0.28);
+}
+.sun span {
+  width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 1px dashed rgba(245, 185, 99, 0.8); color: var(--sky-gold); font-size: 18px;
+}
+.hub .plate { color: var(--sky-gold); border-color: rgba(217, 164, 65, 0.55); }
+
+.dust {
+  z-index: 4; display: flex; align-items: center; gap: 5px; padding: 3px 8px; border: 0; border-radius: 10px;
+  background: none; color: #94a3b8; font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+.dust:hover, .dust[aria-pressed='true'] { color: #e2e8f0; background: rgba(148, 163, 184, 0.14); }
+.dustDot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; opacity: 0.75; }
+
+.toolbar { position: absolute; top: 12px; right: 14px; z-index: 8; display: flex; gap: 6px; }
+.toolbar button, .back, .exit, .toast button {
+  padding: 5px 12px; border: 1px solid rgba(217, 164, 65, 0.45); background: rgba(6, 11, 26, 0.9);
+  color: #cbd5e1; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.toolbar button:hover, .toolbar button:focus-visible { color: #fff; border-color: #d9a441; outline: none; }
+
+/* Interior: the existing crystal star map, framed by the galaxy stage. */
+.universe .interior [data-star-map] { border: 0; background: none; clip-path: none; backdrop-filter: none; }
+.interior [data-star-map] > p:first-child { top: 54px; }
+.interior [data-crystal][data-status='休眠'] { opacity: 0.55; filter: saturate(0.7); }
+.back { position: absolute; top: 14px; left: 16px; z-index: 12; color: var(--sky-gold); border-color: rgba(217, 164, 65, 0.6); font-weight: 700; }
+.back:focus-visible, .exit:focus-visible, .toast button:focus-visible { outline: 2px solid var(--sky-gold); outline-offset: 2px; }
+.exits { position: absolute; left: 20px; right: 20px; bottom: 16px; z-index: 12; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; pointer-events: none; }
+.exit { pointer-events: auto; border-color: rgba(56, 189, 248, 0.45); color: #bae6fd; }
+.exit[data-exit='lineage'] { border-color: rgba(217, 164, 65, 0.7); color: var(--sky-gold); }
+
+.toast {
+  position: absolute; left: 20px; bottom: 18px; z-index: 30; display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border: 1px solid #d9a441; background: rgba(10, 15, 36, 0.96); color: var(--sky-text); font-size: 12.5px;
+}
+
+/* Low motion: the arrangement jumps into place. */
+:global([data-quiet='true']) .universe[data-arranging='true'] .group { transition: none; }
+@media (prefers-reduced-motion: reduce) { .universe[data-arranging='true'] .group { transition: none; } }
