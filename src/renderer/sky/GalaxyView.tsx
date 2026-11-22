@@ -9,6 +9,11 @@ import type { FlyDirection, FlyFrame } from './galaxy-camera';
 import { beltPositions, bridgeCurve, galaxyExits, galaxySpecks, interiorData, outerRingShare, placeOnScreen, viewportScale } from './galaxy-geometry';
 import type { GalaxyExit, Viewport } from './galaxy-geometry';
 import { observeSize } from './canvas';
+import { glowNames, glowTiers } from '../../shared/glow';
+import type { AutoGlowTier } from '../../shared/glow';
+import { glowFilterView, glowTotals } from './glow-filter';
+import { GalaxyFinder } from './GalaxyFinder';
+import { RainbowShowcase } from './RainbowShowcase';
 import skyStyles from './Sky.module.css';
 import styles from './Galaxy.module.css';
 
@@ -37,7 +42,12 @@ interface Props {
   onArrived: (key: string | null) => void;
   onExit: (exit: GalaxyExit) => void;
   onMapChange: (map: GalaxyMap) => void;
+  /** Go to a node from the finder or the rainbow showcase: fly to its galaxy (if any) and open its profile. */
+  onJump?: (nodeId: string) => void;
 }
+
+/** One-character tier names for the filter buttons (the diamond colour is never the only cue). */
+const tierShort: Record<AutoGlowTier, string> = { white: '白', green: '綠', blue: '藍', violet: '紫', gold: '金', red: '紅' };
 
 function ConfirmDialog({ title, children, confirmLabel, saving, failure, onConfirm, onCancel }: {
   title: string; children: ReactNode; confirmLabel: string; saving: boolean; failure: string | null;
@@ -76,7 +86,7 @@ function ConfirmDialog({ title, children, confirmLabel, saving, failure, onConfi
 }
 
 export function GalaxyView({ map, data, active, reduced, clock, selected, onSelect, visible, onToggle, target, onTarget,
-  onArrived, onExit, onMapChange }: Props) {
+  onArrived, onExit, onMapChange, onJump }: Props) {
   const stage = useRef<HTMLDivElement>(null);
   const overview = useRef<HTMLDivElement>(null);
   const interior = useRef<HTMLDivElement>(null);
@@ -92,6 +102,10 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  /** Colour quick filter (one tier at a time; pressing it again clears) and the rainbow showcase (DESIGN.md §6.10.1). */
+  const [filter, setFilter] = useState<AutoGlowTier | null>(null);
+  const [showcase, setShowcase] = useState(false);
+  const showcaseTrigger = useRef<HTMLButtonElement | null>(null);
   const targetRef = useRef(target);
   const lastGroup = useRef<string | null>(target);
   const dialogTrigger = useRef<HTMLElement | null>(null);
@@ -99,6 +113,37 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
   useEffect(() => () => window.clearTimeout(arrangeTimer.current), []);
   const names = useMemo(() => new Map(data.crystals.map((node) => [node.nodeId, node.name])), [data.crystals]);
   const groupName = useMemo(() => new Map(map.groups.map((group) => [group.key, group.name])), [map.groups]);
+  const filterView = useMemo(() => filter ? glowFilterView(map, data.crystals, filter) : null, [filter, map, data.crystals]);
+  const totals = useMemo(() => glowTotals(data.crystals), [data.crystals]);
+  const rainbowNodes = useMemo(() => data.crystals.filter((node) => node.glow === 'rainbow'), [data.crystals]);
+  /** Where a node lives, for search results. */
+  const placeOf = (nodeId: string) => {
+    if (map.hub.includes(nodeId)) return '總管中樞';
+    const key = map.membership[nodeId]?.group;
+    const group = key ? map.groups.find((item) => item.key === key) : undefined;
+    if (group) return (group.kind === 'nebula' ? '共用資料夾 · ' : '星系 · ') + group.name;
+    return '外環星塵帶';
+  };
+  function toggleFilter(tier: AutoGlowTier) {
+    const next = filter === tier ? null : tier;
+    setFilter(next);
+    if (!next) { setAnnouncement('已取消顏色篩選'); return; }
+    const view = glowFilterView(map, data.crystals, next);
+    const lit = [...view.groups.values()].filter((group) => group.count > 0).length;
+    setAnnouncement('篩選' + glowNames[next] + ':共 ' + view.total + ' 個節點,分布在 ' + lit + ' 個星系或共用資料夾');
+  }
+  /** Closing returns focus to the 彩虹 button — after the commit, once the overview is no longer inert. */
+  const restoreShowcaseFocus = useRef(false);
+  function closeShowcase() {
+    restoreShowcaseFocus.current = true;
+    setShowcase(false);
+  }
+  useEffect(() => {
+    if (showcase || !restoreShowcaseFocus.current) return;
+    restoreShowcaseFocus.current = false;
+    const trigger = showcaseTrigger.current;
+    if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+  }, [showcase]);
 
   useLayoutEffect(() => {
     const element = stage.current;
@@ -258,7 +303,8 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
     data-arranging={arranging} aria-label="專案星系">
     <p className={styles.srOnly} aria-live="polite" data-galaxy-announcement="">{announcement}</p>
 
-    <div ref={overview} className={styles.overview} inert={!insideOverview} aria-hidden={!insideOverview}
+    <div ref={overview} className={styles.overview} inert={!insideOverview || showcase} aria-hidden={!insideOverview}
+      data-glow-filter={filter ?? undefined}
       style={{ transformOrigin: origin ? origin.x + 'px ' + origin.y + 'px' : '50% 50%' }} data-galaxy-overview="">
       <div className={styles.belt} aria-hidden="true"><span>外環星塵帶(無專案的節點 · 缺資料的舊封存節點)</span></div>
       <svg className={styles.bridges} width={viewport.width} height={viewport.height} aria-hidden="true" data-chief-hover={chiefHover}>
@@ -283,6 +329,7 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
       </svg>
 
       {map.hub.length > 0 && <button type="button" className={styles.hub} data-galaxy-hub=""
+        data-dimmed={filterView && !map.hub.some((id) => filterView.nodes.has(id)) ? '' : undefined}
         style={{ transform: anchor(center.x, center.y, 84) }}
         aria-label={'總管中樞 ' + hubNames.join('、') + ',不屬於任何星系'}
         onMouseEnter={() => setChiefHover(true)} onMouseLeave={() => setChiefHover(false)}
@@ -298,8 +345,14 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
         const archived = group.members.length - active;
         const counts = group.members.length + ' 節點(' + active + ' 活躍 / ' + archived + ' 封存)';
         const size = point.size;
+        const lit = filterView?.groups.get(group.key);
+        // While filtering, brightness follows how many members have the tier; a text count says the same in words.
+        const filterStyle = lit ? { opacity: lit.brightness } : undefined;
+        const filterCount = lit && filter ? <em className={styles.glowCount} data-glow-count={lit.count}>
+          <span className={styles.glowDiamond} data-glow={filter} aria-hidden="true" />{glowNames[filter]} × {lit.count}</em> : null;
         if (group.kind === 'nebula') {
-          return <div key={group.key} className={styles.group} style={{ transform: anchor(point.center.x, point.center.y, size * 80 / 128) }}>
+          return <div key={group.key} className={styles.group} data-filter-brightness={lit?.brightness.toFixed(2)}
+            style={{ transform: anchor(point.center.x, point.center.y, size * 80 / 128), ...filterStyle }}>
             <button type="button" className={styles.groupButton} data-group={group.key} data-kind="nebula"
               aria-label={'共用資料夾 ' + group.name + ',' + counts + ',按下展開'} onClick={() => onTarget(group.key)}>
               <svg width={size} height={size * 80 / 128} viewBox="0 0 128 80" aria-hidden="true">
@@ -311,14 +364,15 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
                     r={1 + (index % 3) * 0.65} className={styles.cloudSpeck} opacity={0.45 + (index % 2) * 0.3} />;
                 })}
               </svg>
-              <span className={styles.plate}><strong>{group.name}</strong><small>共用資料夾 · {counts}</small></span>
+              <span className={styles.plate}><strong>{group.name}</strong><small>共用資料夾 · {counts}</small>{filterCount}</span>
             </button>
             <button type="button" className={styles.promote} data-promote={group.key}
               onClick={(event) => openDialog({ kind: 'promote', key: group.key, name: group.name }, event.currentTarget)}>升格為星系</button>
           </div>;
         }
         const ring = size * outerRingShare;
-        return <div key={group.key} className={styles.group} style={{ transform: anchor(point.center.x, point.center.y, size) }}>
+        return <div key={group.key} className={styles.group} data-filter-brightness={lit?.brightness.toFixed(2)}
+          style={{ transform: anchor(point.center.x, point.center.y, size), ...filterStyle }}>
           <button type="button" className={styles.groupButton} data-group={group.key} data-kind="galaxy"
             aria-label={'專案星系 ' + group.name + ',' + counts + (group.promoted ? ',由共用資料夾升格' : '') + ',按下飛入'}
             onClick={() => onTarget(group.key)}>
@@ -332,7 +386,7 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
               {galaxySpecks(group.members.length, size).map((speck, index) =>
                 <circle key={index} cx={speck.x} cy={speck.y} r={speck.r} className={styles.speck} />)}
             </svg>
-            <span className={styles.plate}><strong>{group.name}</strong><small>{counts}{group.promoted ? ' · 升格' : ''}</small></span>
+            <span className={styles.plate}><strong>{group.name}</strong><small>{counts}{group.promoted ? ' · 升格' : ''}</small>{filterCount}</span>
           </button>
         </div>;
       })}
@@ -340,12 +394,27 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
       {map.outer.map((id) => {
         const point = belt.get(id)!;
         return <button key={id} type="button" className={styles.dust} data-dust={id} style={{ transform: translate(point.x, point.y) }}
+          data-dimmed={filterView && !filterView.nodes.has(id) ? '' : undefined}
           aria-label={(names.get(id) ?? id) + ',外環星塵帶'} aria-pressed={selected === id} onClick={() => onSelect(selected === id ? null : id)}>
           <span className={styles.dustDot} aria-hidden="true" />{names.get(id) ?? id}
         </button>;
       })}
 
       <div className={styles.toolbar}>
+        {onJump && <GalaxyFinder crystals={data.crystals} placeOf={placeOf} onPick={onJump} />}
+        <div className={styles.glowFilters} role="group" aria-label="依光暈顏色篩選星系(再按一次取消)">
+          {glowTiers.map((tier) => <button key={tier} type="button" data-glow-filter={tier} aria-pressed={filter === tier}
+            aria-label={'篩選' + glowNames[tier] + ',共 ' + (totals.get(tier) ?? 0) + ' 個節點'} title={glowNames[tier]}
+            onClick={() => toggleFilter(tier)}>
+            <span className={styles.glowDiamond} data-glow={tier} aria-hidden="true" />{tierShort[tier]}
+            <small aria-hidden="true">{totals.get(tier) ?? 0}</small>
+          </button>)}
+          <button type="button" data-rainbow-open="" className={styles.rainbowButton}
+            aria-label={'開啟彩虹節點展示,共 ' + rainbowNodes.length + ' 個'}
+            onClick={(event) => { showcaseTrigger.current = event.currentTarget; setShowcase(true); }}>
+            <span className={styles.glowDiamond} data-glow="rainbow" aria-hidden="true" />彩虹<small aria-hidden="true">{rainbowNodes.length}</small>
+          </button>
+        </div>
         <button type="button" data-arrange="" onClick={(event) => openDialog({ kind: 'arrange' }, event.currentTarget)}>整理一次(依合作排列)</button>
       </div>
       {tip && <span className={styles.tip} role="tooltip" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</span>}
@@ -371,6 +440,8 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
       onConfirm={() => void confirmDialog()} onCancel={closeDialog}>
       <p data-arrange-text="">{arrangeText}</p>
     </ConfirmDialog>}
+    {showcase && <RainbowShowcase nodes={rainbowNodes} onClose={closeShowcase}
+      onPick={(nodeId) => { setShowcase(false); onJump?.(nodeId); }} />}
     {toast && <div className={styles.toast} role="status" data-galaxy-toast="">
       <span>{toast.text}</span>
       {toast.undo && <button type="button" onClick={toast.undo}>撤銷</button>}

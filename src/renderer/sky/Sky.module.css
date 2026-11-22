@@ -274,3 +274,5 @@
 .skyScene .nodePortrait button:disabled { opacity: 0.55; cursor: default; }
 .nodePortrait p { flex-basis: 100%; margin: 0; }
 .nodePortrait p[role='alert'] { color: #fda4af; }
+/* 典藏回憶 (DESIGN.md §6.6.4): 撰寫 / 參與 tag before each entry. */
+.archiveRole { margin-right: 6px; padding: 0 5px; border: 1px solid rgba(217, 164, 65, 0.45); color: #fde68a; font-size: 10.5px; }

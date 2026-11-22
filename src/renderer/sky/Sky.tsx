@@ -264,6 +264,22 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
 
   const inspected = node && detail?.nodeId === node.nodeId ? detail : undefined;
   const galaxyMode = vaultExists && galaxies?.enabled ? galaxies : null;
+
+  /** Galaxy finder and rainbow showcase: like a jump from downstairs — fly to the node's galaxy, then select it. */
+  function jumpTo(nodeId: string) {
+    onUserSelect?.();
+    const group = galaxyMode ? galaxyMode.membership[nodeId]?.group ?? null : null;
+    const requestId = -Date.now();
+    if (galaxyMode && group !== target) {
+      pendingSelect.current = { nodeId, group, requestId };
+      setSelected(null);
+      setTarget(group);
+      return;
+    }
+    pendingSelect.current = null;
+    setSelected(nodeId);
+    setJumpFocus({ nodeId, requestId });
+  }
   // Projects the selected node also works in, besides its home group (bridge sources; DESIGN.md §6.10).
   const homeKey = galaxyMode && node ? galaxyMode.membership[node.nodeId]?.group ?? null : null;
   const homeName = galaxyMode && homeKey ? galaxyMode.groups.find((group) => group.key === homeKey)?.name : undefined;
@@ -280,7 +296,7 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
     {galaxyMode ? <GalaxyView map={galaxyMode} data={data ?? empty} active={active} reduced={reduced} clock={clock}
       selected={selected} onSelect={select} visible={visible} onToggle={toggle} target={target}
       onTarget={(key) => { pendingSelect.current = null; setTarget(key); }} onArrived={arrived} onExit={exitTo}
-      onMapChange={setGalaxies} />
+      onMapChange={setGalaxies} onJump={jumpTo} />
       : vaultExists && !galaxies
         // Until we know whether the stats have a 專案表, keep an empty stage (no flash of the flat map).
         ? <div className={styles.gameFrame + ' ' + styles.mapStage} aria-busy="true" />
