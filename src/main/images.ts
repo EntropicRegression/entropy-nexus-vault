@@ -152,8 +152,8 @@ export async function serveVaultImage(
   },
 ): Promise<Response> {
   if (request.method !== 'GET') return notFound();
-  // Match the entire URL so the brand route accepts no extra segments, encoded identifiers, query or credentials.
-  const brand = /^vault-image:\/\/brand\/(claude|codex|gemini)\/(active|dormant)$/.exec(request.url);
+  // Match the whole URL. The optional version changes the image cache key and never enters filesystem resolution.
+  const brand = /^vault-image:\/\/brand\/(claude|codex|gemini)\/(active|dormant)(?:\?v=[1-9][0-9]*)?$/.exec(request.url);
   if (!brand) return serveNodeImage(request, readVaultContext);
   try {
     const folder = await readBrandPortraitFolder();

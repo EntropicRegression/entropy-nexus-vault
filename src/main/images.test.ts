@@ -59,6 +59,24 @@ describe('廠牌預設立繪協定', () => {
     expect((await fetchImage(new Request(active))).status).toBe(404);
   });
 
+  it('廠牌版本號只區分網址，同一個圖位在換資料夾後讀到新版位元組', async () => {
+    await writeFile(join(folder, 'claude', 'active.png'), png);
+    const first = await fetchImage(new Request(active + '?v=1'));
+    expect(first.status).toBe(200);
+    expect(Buffer.from(await first.arrayBuffer())).toEqual(png);
+
+    const replacement = await readFile(resolve('fixtures/sky-vault/nodes/封存/_圖像/fixture-sky-iris/avatar.png'));
+    expect(replacement).not.toEqual(png);
+    localSetting = join(directory, 'reselected');
+    await mkdir(join(localSetting, 'claude'), { recursive: true });
+    await writeFile(join(localSetting, 'claude', 'active.png'), replacement);
+    for (const url of [active, active + '?v=1', active + '?v=2']) {
+      const response = await fetchImage(new Request(url));
+      expect(response.status).toBe(200);
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(replacement);
+    }
+  });
+
   it('拒絕白名單以外的網址與殘留穿越片段，且不讀設定檔', async () => {
     await writeFile(join(folder, 'claude', 'active.png'), png);
     const invalid = [
@@ -68,6 +86,8 @@ describe('廠牌預設立繪協定', () => {
       'vault-image://brand/claude/active.png', 'vault-image://brand:80/claude/active',
       'https://brand/claude/active',
       active + '?file=anything', active + '?', active + '#', active + '/',
+      ...['v=', 'v=0', 'v=01', 'v=-1', 'v=+1', 'v=1.5', 'v=1e2', 'v=%31', '%76=1', 'V=1',
+        'v=1&v=2', 'v=1&other=2', 'other=2&v=1', 'v=1&', 'v=1#x'].map((query) => active + '?' + query),
     ];
     for (const url of invalid) expect((await fetchImage(new Request(url))).status, url).toBe(404);
     // Request normalizes dot segments. If the protocol transport preserves the original URL, it is rejected too.
@@ -192,6 +212,7 @@ describe('本機節點圖像協定', () => {
     await writeFile(join(archive, 'avatar.png'), png);
     const response = await serveNodeImage(new Request(url + '?size=20'), context);
     expect(response.status).toBe(404);
+    expect((await serveNodeImage(new Request(url + '?v=1'), context)).status).toBe(404);
     expect((await serveNodeImage(new Request('vault-image://node/unknown/avatar'), context)).status).toBe(404);
   });
 
