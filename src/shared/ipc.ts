@@ -4,6 +4,12 @@ import type {
   FileVersion,
   MemoryEntry,
   MemoryEntryDetail,
+  ReadableNodeProfile,
+  ProfileEditVersion,
+  ProfileEditResult,
+  ProfileSaveResult,
+  ProfileSaveOptions,
+  RequestWakeResult,
   NodeCrystalDetail,
   NodeHit,
   GalaxyMap,
@@ -18,7 +24,15 @@ import type {
   WakeResult,
 } from './types';
 
-export interface VaultApi {
+export interface NodeProfileApi {
+  readNodeProfile(nodeId: string): Promise<ReadableNodeProfile | null>;
+  readProfileForEdit(nodeId: string): Promise<ProfileEditResult>;
+  saveProfileBody(nodeId: string, body: string, expectedVersion: ProfileEditVersion, options?: ProfileSaveOptions): Promise<ProfileSaveResult>;
+  requestWake(nodeId: string): Promise<RequestWakeResult>;
+}
+
+// The M5d preload always provides these methods. Older consumers/test bridges can still use the base API.
+export interface VaultApi extends Partial<NodeProfileApi> {
   getVaultInfo(): Promise<VaultInfo>;
   chooseVault(): Promise<VaultInfo | null>;
   getSettings(): Promise<ViewSettings>;
@@ -46,7 +60,7 @@ export interface VaultApi {
   onVaultChanged(callback: (paths: string[]) => void): () => void;
 }
 
-export type VaultRequests = Omit<VaultApi, 'onVaultChanged'>;
+export type VaultRequests = Omit<VaultApi, keyof NodeProfileApi | 'onVaultChanged'> & NodeProfileApi;
 
 export const vaultChannels = {
   getVaultInfo: 'vault:get-info',
@@ -62,6 +76,10 @@ export const vaultChannels = {
   setGalaxyPromotion: 'vault:set-galaxy-promotion',
   arrangeGalaxies: 'vault:arrange-galaxies',
   readCrystal: 'vault:read-crystal',
+  readNodeProfile: 'vault:read-node-profile',
+  readProfileForEdit: 'vault:read-profile-for-edit',
+  saveProfileBody: 'vault:save-profile-body',
+  requestWake: 'vault:request-wake',
   setAward: 'vault:set-award',
   setStatus: 'vault:set-status',
   saveEntry: 'vault:save-entry',

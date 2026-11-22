@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import { vaultChannels } from '../shared/ipc';
-import type { VaultApi, VaultRequests } from '../shared/ipc';
+import type { NodeProfileApi, VaultApi, VaultRequests } from '../shared/ipc';
 
 function invoke<Method extends keyof VaultRequests>(
   method: Method,
@@ -10,7 +10,7 @@ function invoke<Method extends keyof VaultRequests>(
   return ipcRenderer.invoke(vaultChannels[method], ...args) as ReturnType<VaultRequests[Method]>;
 }
 
-const vault: VaultApi = {
+const vault: VaultApi & NodeProfileApi = {
   getVaultInfo: () => invoke('getVaultInfo'),
   chooseVault: () => invoke('chooseVault'),
   getSettings: () => invoke('getSettings'),
@@ -24,6 +24,10 @@ const vault: VaultApi = {
   setGalaxyPromotion: (projectKey, promoted) => invoke('setGalaxyPromotion', projectKey, promoted),
   arrangeGalaxies: () => invoke('arrangeGalaxies'),
   readCrystal: (nodeId) => invoke('readCrystal', nodeId),
+  readNodeProfile: (nodeId) => invoke('readNodeProfile', nodeId),
+  readProfileForEdit: (nodeId) => invoke('readProfileForEdit', nodeId),
+  saveProfileBody: (nodeId, body, expectedVersion, options) => invoke('saveProfileBody', nodeId, body, expectedVersion, options),
+  requestWake: (nodeId) => invoke('requestWake', nodeId),
   setAward: (nodeId, award, expected) => invoke('setAward', nodeId, award, expected),
   setStatus: (path, status, expected) => invoke('setStatus', path, status, expected),
   saveEntry: (path, text, expected) => invoke('saveEntry', path, text, expected),

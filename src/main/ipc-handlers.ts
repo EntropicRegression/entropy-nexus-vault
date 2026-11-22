@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { app, dialog, ipcMain } from 'electron';
+import { app, dialog, ipcMain, shell } from 'electron';
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
 import { vaultChannels } from '../shared/ipc';
 import type { VaultRequests } from '../shared/ipc';
@@ -19,6 +19,7 @@ import { GalaxyLayoutStore, GalaxySettingsStore } from './vault/galaxy-store';
 import { assignGalaxies } from '../shared/galaxies';
 import { computeRichness, glowOf } from '../shared/glow';
 import type { Richness } from '../shared/glow';
+import { requestWakeForNode, wakeEndpoint } from './wake';
 
 type VaultHandlers = {
   [Method in keyof VaultRequests]: (
@@ -72,6 +73,23 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     return (await readVaultContext()).snapshot;
   }
 
+  async function profileEditor() {
+    const { writer, reader } = await getActiveVault();
+    return {
+      writer,
+      find: async (nodeId: string) => (await getActiveVault()).writer === writer
+        ? (await reader.read()).nodeProfilePath(nodeId) : undefined,
+    };
+  }
+
+  function requestWake(nodeId: string) {
+    return requestWakeForNode(nodeId, {
+      findNode: async (id) => (await readVault()).wakeNode(id),
+      registered: (url) => Boolean(app.getApplicationNameForProtocol(url)),
+      open: (url) => shell.openExternal(url),
+    });
+  }
+
   /** Richness with the local peaks, and the manual awards, for every node of the snapshot (DESIGN.md §6.9). */
   async function glowState(context: Awaited<ReturnType<typeof readVaultContext>>) {
     const inputs = context.snapshot.richnessInputs();
@@ -116,7 +134,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       key: opaqueKey('v', path),
       path: path === defaultPath ? (app.isPackaged ? '%APPDATA%\\entropy-nexus\\memory-vault' : 'fixtures/memory-vault') : '自訂記憶庫',
       exists,
-      wakeAvailable: Boolean(app.getApplicationNameForProtocol('entropy-nexus://wake')),
+      wakeAvailable: Boolean(app.getApplicationNameForProtocol(wakeEndpoint)),
     };
   }
 
@@ -136,6 +154,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       const info = await getInfo(chosenPath);
       if (!info.exists) throw new Error('找不到選擇的記憶庫資料夾');
       await saveVaultPath(settingsFile, chosenPath);
+      if (activeVault?.path !== chosenPath) activeVault = undefined;
       return info;
     },
     getSettings: () => readViewSettings(settingsFile),
@@ -190,6 +209,16 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       return { ...detail, ...await crystalImages(context, nodeId), richness: nodeRichness, award,
         glow: glowOf(nodeRichness ?? { tier: 'white' }, award) };
     },
+    readNodeProfile: async (_event, nodeId) => (await readVault()).readNodeProfile(nodeId),
+    readProfileForEdit: async (_event, nodeId) => {
+      const { writer, find } = await profileEditor();
+      return writer.readProfileForEdit(nodeId, find);
+    },
+    saveProfileBody: async (_event, nodeId, body, expected, options) => {
+      const { writer, find } = await profileEditor();
+      return writer.saveProfileBody(nodeId, body, expected, find, options);
+    },
+    requestWake: (_event, nodeId) => requestWake(nodeId),
     setAward: async (_event, nodeId, award, expected) => {
       const context = await readVaultContext();
       if (!context.snapshot.hasNode(nodeId)) return { ok: false, reason: 'invalid' };
@@ -200,7 +229,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
     moveToRecycle: async (_event, path, expected) => (await getActiveVault()).writer.moveToRecycle(path, expected),
     restoreFromRecycle: async (_event, path, expected) => (await getActiveVault()).writer.restoreFromRecycle(path, expected),
     readRecycledEntry: async (_event, path, originalPath) => (await getActiveVault()).writer.readRecycledEntry(path, originalPath),
-    wake: async () => ({ ok: false, nodeName: null, sessionId: null }),
+    wake: (_event, nodeId) => requestWake(nodeId),
   };
 
   function register<Method extends keyof VaultRequests>(method: Method): void {

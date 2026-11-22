@@ -91,6 +91,8 @@ export interface NodeCrystal {
   /** 未知: no console statistics exist for this live profile, so its presence on the console cannot be told. */
   status: '線上' | '休眠' | '封存' | '未知';
   canWake: boolean;
+  /** First sentence of the first user-authored 特長 section, when present. */
+  specialty?: string;
   cliRecordExists?: boolean;
   projectNames: string[];
   avatarUrl?: string | null;
@@ -190,3 +192,52 @@ export interface RecycledEntry extends FileVersion { title: string; body: string
 export type WakeResult =
   | { ok: true }
   | { ok: false; nodeName: string | null; sessionId: string | null };
+
+export interface ConsoleAppendix {
+  /** The original UTC timestamp as written in the heading. */
+  at: string;
+  /** Formatted in the main process's local time zone, with a label. */
+  localTime: string | null;
+  text: string;
+  review: string;
+}
+
+export interface ReadableNodeProfile {
+  nodeId: string;
+  source: { kind: 'live' | 'archived'; path: string; archivedAt: string | null };
+  body: string;
+  review: string;
+  consoleAppendices: ConsoleAppendix[];
+  consoleAppendixCount: number;
+}
+
+export interface ProfileEditVersion extends FileVersion {
+  identity: string;
+  editToken: string;
+}
+
+export type ProfilePlaceholderIssue = 'missing' | 'duplicate' | 'modified-or-unknown';
+export type ProfilePlaceholderFailure =
+  | { ok: false; reason: 'invalid-placeholders'; issue: 'missing'; missingPlaceholders: number[]; message: string }
+  | { ok: false; reason: 'invalid-placeholders'; issue: Exclude<ProfilePlaceholderIssue, 'missing'> };
+
+export interface ProfileSaveOptions {
+  /** Must match exactly the missing numbers in the current edit. */
+  acknowledgedRemovals?: readonly number[];
+}
+
+export type ProfileFailure =
+  | VaultWriteFailure
+  | { ok: false; reason: 'encoding' | 'invalid-input' | 'edit-session' | 'appendix-marker' }
+  | ProfilePlaceholderFailure;
+
+export type ProfileEditResult =
+  | { ok: true; body: string; version: ProfileEditVersion; isArchive: boolean; archiveNotice: string | null }
+  | ProfileFailure;
+export type ProfileSaveResult = { ok: true; version: ProfileEditVersion } | ProfileFailure;
+export type RequestWakeResult = { ok: true } | {
+  ok: false;
+  reason: 'invalid-node' | 'not-wakeable' | 'unregistered' | 'rejected';
+  nodeName: string | null;
+  sessionId: string | null;
+};

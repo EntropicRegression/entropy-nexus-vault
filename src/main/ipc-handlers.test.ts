@@ -13,6 +13,8 @@ import type { VaultRequests } from '../shared/ipc';
 const electron = vi.hoisted(() => ({
   userData: '',
   handle: vi.fn<(channel: string, handler: (event: unknown, ...args: unknown[]) => unknown) => void>(),
+  registered: vi.fn((_url: string) => ''),
+  openExternal: vi.fn(async (_url: string) => {}),
 }));
 
 vi.mock('electron', () => ({
@@ -20,14 +22,17 @@ vi.mock('electron', () => ({
     isPackaged: false,
     getAppPath: () => resolve('.'),
     getPath: () => electron.userData,
-    getApplicationNameForProtocol: () => '',
+    getApplicationNameForProtocol: electron.registered,
   },
   dialog: {},
   ipcMain: { handle: electron.handle },
+  shell: { openExternal: electron.openExternal },
 }));
 
 afterEach(async () => {
   electron.handle.mockClear();
+  electron.registered.mockReset();
+  electron.openExternal.mockReset();
   if (electron.userData) {
     await rm(electron.userData, { recursive: true, force: true });
     electron.userData = '';
@@ -35,6 +40,116 @@ afterEach(async () => {
 });
 
 describe('主程序 IPC 來源驗證', () => {
+  it('M5d 回傳正確側寫與補充分節，編輯原路徑只留在主程序', async () => {
+    electron.userData = await mkdtemp(join(tmpdir(), 'nexus-profile-ipc-'));
+    const vault = join(electron.userData, 'sky');
+    await cp(resolve('fixtures/sky-vault'), vault, { recursive: true });
+    await saveVaultPath(join(electron.userData, 'settings.dev.json'), vault);
+    const nodeId = 'fixture-sky-iris';
+    const live = 'nodes/稜鏡.md';
+    const archived = 'nodes/封存/稜鏡-2026-11-21.md';
+    const latest = 'nodes/封存/稜鏡-2026-11-21-2.md';
+    const archivedBytes = await readFile(join(vault, archived));
+    await writeFile(join(vault, latest), archivedBytes.toString('utf8').replace('擅長核對合成脈衝的時間戳。', '同日較晚的封存。'));
+    const privateBody = [
+      '---', '種類: node', '節點ID: ' + nodeId, '工作目錄: C:\\Users\\SyntheticHeader\\secret', '---',
+      '', '## 特長', '', '現役使用者版第一句。第二句。', '看「C:\\Users\\SyntheticBody\\private.md」。',
+      '', '## 回顧', '', '編輯者回顧「/home/SyntheticReview/hidden.md」', '', '## 主控台補充(2026-11-22 08:00)', '',
+      '見 /Users/SyntheticAppendix/hidden.md', '## 特長', '主控台不能替代。', '',
+      '## 回顧', '', '補充回顧「C:\\Users\\SyntheticReview\\appendix.md」', '',
+      '## 主控台補充(2026-11-23 08:00)', '', '第二份補充', '',
+    ].join('\n');
+    await writeFile(join(vault, live), privateBody);
+    await writeFile(join(vault, 'nodes', '無統計.md'), '---\n種類: node\n節點ID: nostats\n---\n\n## 特長\n真實側寫但無統計。\n');
+    const sender = {};
+    registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
+    const event = { sender, senderFrame: { url: appUrl, parent: null } };
+    function invoke<M extends keyof VaultRequests>(method: M, ...args: Parameters<VaultRequests[M]>): ReturnType<VaultRequests[M]> {
+      return electron.handle.mock.calls.find(([channel]) => channel === vaultChannels[method])![1](event, ...args) as ReturnType<VaultRequests[M]>;
+    }
+    const read = await invoke('readNodeProfile', nodeId);
+    expect(read).toMatchObject({
+      source: { kind: 'live', path: live, archivedAt: null },
+      body: expect.stringContaining('現役使用者版第一句。'),
+      review: '編輯者回顧「[本機路徑已隱藏]」',
+      consoleAppendixCount: 2,
+      consoleAppendices: [
+        { at: '2026-11-22 08:00', localTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}（本機時間）$/),
+          text: '見 [本機路徑已隱藏]\n## 特長\n主控台不能替代。', review: '補充回顧「[本機路徑已隱藏]」' },
+        { at: '2026-11-23 08:00', text: '第二份補充', review: '' },
+      ],
+    });
+    expect(read?.body).not.toMatch(/回顧|第二份補充/);
+    expect((await invoke('listCrystals')).crystals.find((crystal) => crystal.nodeId === nodeId)?.specialty).toBe('現役使用者版第一句。');
+    expect(await invoke('readCrystal', nodeId)).toMatchObject({ specialty: '現役使用者版第一句。', consoleAppendixCount: 2 });
+    const draft = await invoke('readProfileForEdit', nodeId);
+    if (!draft.ok) throw Error(draft.reason);
+    expect(draft.body).toContain('看「⟦路徑1⟧」');
+    expect(draft.body).toContain('編輯者回顧');
+    expect(draft.body).not.toContain('第二份補充');
+    expect(Object.keys(draft).sort()).toEqual(['archiveNotice', 'body', 'isArchive', 'ok', 'version']);
+    expect(draft).toMatchObject({ isArchive: false, archiveNotice: null });
+    expect(Object.keys(draft.version).sort()).toEqual(['editToken', 'identity', 'mtime', 'size']);
+    const missing = await invoke('saveProfileBody', nodeId, draft.body.replace('⟦路徑1⟧', ''), draft.version);
+    expect(missing).toMatchObject({ ok: false, reason: 'invalid-placeholders', issue: 'missing', missingPlaceholders: [1],
+      message: expect.stringMatching(/#1.*永久移除/) });
+    const save = await invoke('saveProfileBody', nodeId, draft.body.replace('現役使用者版第一句。', '新第一句。'), draft.version);
+    expect(save).toMatchObject({ ok: true });
+    expect(await readFile(join(vault, live), 'utf8')).toEqual(privateBody.replace('現役使用者版第一句。', '新第一句。'));
+    expect((await invoke('readCrystal', nodeId))?.specialty).toBe('新第一句。');
+    expect(JSON.stringify([read, draft, save, missing, await invoke('readCrystal', nodeId)]))
+      .not.toMatch(/(?<![a-z0-9-])[a-z]:[\\/]|\/(?:Users|home)\/|Synthetic(?:Header|Body|Appendix|Review)/i);
+    if (!save.ok) throw Error(save.reason);
+    const removedBody = draft.body.replace('現役使用者版第一句。', '新第一句。').replace('看「⟦路徑1⟧」。', '');
+    expect(await invoke('saveProfileBody', nodeId, removedBody, save.version, { acknowledgedRemovals: [1] })).toMatchObject({ ok: true });
+    const editedBytes = await readFile(join(vault, live), 'utf8');
+    expect(editedBytes).not.toContain('SyntheticBody');
+    expect(editedBytes).toContain('編輯者回顧「/home/SyntheticReview/hidden.md」');
+
+    expect(await invoke('readNodeProfile', 'nostats')).toMatchObject({ body: expect.stringContaining('真實側寫但無統計。') });
+    expect(await invoke('readCrystal', 'nostats')).toMatchObject({ stats: null, status: '未知' });
+    expect(await invoke('readNodeProfile', 'fixture-sky-dawn')).toBeNull();
+    expect(await invoke('readProfileForEdit', 'fixture-sky-dawn')).toEqual({ ok: false, reason: 'missing' });
+    expect(await invoke('readProfileForEdit', 'cases/其他.md')).toEqual({ ok: false, reason: 'missing' });
+    await rm(join(vault, live));
+    expect(await invoke('readNodeProfile', nodeId)).toMatchObject({
+      source: { kind: 'archived', path: latest, archivedAt: '2026-11-21 08:00' },
+      body: expect.stringContaining('同日較晚的封存。'),
+    });
+    const archivedDraft = await invoke('readProfileForEdit', nodeId);
+    if (!archivedDraft.ok) throw Error(archivedDraft.reason);
+    expect(archivedDraft).toMatchObject({ isArchive: true, archiveNotice: '這份是封存檔，修改會在日後接回時帶進新節點。' });
+    expect(await invoke('saveProfileBody', nodeId, archivedDraft.body.replace('同日較晚的封存。', '編輯最新封存。'), archivedDraft.version))
+      .toMatchObject({ ok: true });
+    expect(await readFile(join(vault, archived))).toEqual(archivedBytes);
+    expect((await invoke('readNodeProfile', nodeId))?.body).toContain('編輯最新封存。');
+  });
+
+  it('喚醒 IPC 檢查目前星圖、協定與來源，只有符合白名單的封存節點能送出', async () => {
+    electron.userData = await mkdtemp(join(tmpdir(), 'nexus-wake-ipc-'));
+    const vault = join(electron.userData, 'sky');
+    await cp(resolve('fixtures/sky-vault'), vault, { recursive: true });
+    await saveVaultPath(join(electron.userData, 'settings.dev.json'), vault);
+    const path = join(vault, '.nexus-stats.json');
+    const stats = JSON.parse(await readFile(path, 'utf8'));
+    stats.節點['fixture-sky-iris'].session.sessionId = 'synthetic-session';
+    await writeFile(path, JSON.stringify(stats));
+    const sender = {};
+    registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
+    const event = { sender, senderFrame: { url: appUrl, parent: null } };
+    const [, invoke] = electron.handle.mock.calls.find(([channel]) => channel === vaultChannels.requestWake)!;
+    expect(() => invoke({ sender, senderFrame: { url: 'https://outside.invalid/', parent: null } }, 'fixture-sky-iris')).toThrow('無法驗證');
+    expect(await invoke(event, 'https://wake?node=fixture-sky-iris')).toMatchObject({ ok: false, reason: 'invalid-node' });
+    expect(await invoke(event, 'fixture-sky-quill')).toMatchObject({ ok: false, reason: 'not-wakeable' });
+    expect(await invoke(event, 'fixture-sky-dawn')).toMatchObject({ ok: false, reason: 'not-wakeable' });
+    expect(await invoke(event, 'fixture-sky-iris')).toEqual({ ok: false, reason: 'unregistered', nodeName: '稜鏡', sessionId: 'synthetic-session' });
+    expect(electron.openExternal).not.toHaveBeenCalled();
+    electron.registered.mockReturnValue('Synthetic Console');
+    expect(await invoke(event, 'fixture-sky-iris')).toEqual({ ok: true });
+    expect(electron.openExternal).toHaveBeenCalledExactlyOnceWith('entropy-nexus://wake?node=fixture-sky-iris');
+    expect((await (electron.handle.mock.calls.find(([channel]) => channel === vaultChannels.readCrystal)![1])(event, 'fixture-sky-iris')))
+      .toMatchObject({ status: '封存', canWake: true });
+  });
   it.each([appUrl, appUrl + '#/library', appUrl + '?layout=B#/library', appUrl + '/library'])('接受 %s', (source) => {
     expect(isVaultFrameUrl(source)).toBe(true);
   });
