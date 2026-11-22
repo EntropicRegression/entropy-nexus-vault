@@ -2,6 +2,7 @@ import type { MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/t
 import { CrystalPortrait, crystalBadge } from './Crystal';
 import { GlowBadge } from './GlowBadge';
 import { localDate } from './local-date';
+import { NodePortraitControl } from '../brand/NodePortraitControl';
 import styles from './Sky.module.css';
 
 const notRejectedHint = '以主控台統計的完成數與退回數計算:1 − 退回 ÷ 完成。正常完成的任務預設通過,使用者按退回才算未通過;'
@@ -64,6 +65,7 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
             onClick={(event) => onReadFull(event.currentTarget)}>閱讀全文</button>}
         </div>
       </div>
+      <NodePortraitControl key={crystal.nodeId} node={crystal} className={styles.nodePortrait} />
       {loading && <p role="status">正在讀取履歷…</p>}
       {error && <p role="alert">無法讀取節點履歷。</p>}
       {detail && <>

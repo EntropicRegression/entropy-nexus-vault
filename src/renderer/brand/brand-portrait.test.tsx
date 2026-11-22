@@ -9,7 +9,8 @@ import { CrystalPortrait } from '../sky/Crystal';
 import { AvatarSeals } from '../library/Paper';
 import { NodeMatches } from '../library/NodeMatches';
 import { BrandPortraitPanel, brandPortraitHelp } from './BrandPortraitPanel';
-import { brandPortraitUrl, loadBrandPortraitSettings, portraitSources, resetBrandPortraits } from './brand-portrait';
+import { brandPortraitUrl, loadBrandPortraitSettings, portraitSources, resetBrandPortraits, resetNodePortraitOverrides,
+  setNodePortraitOverride } from './brand-portrait';
 
 const configured: BrandPortraitSettings = { configured: true, label: '自訂立繪資料夾' };
 const unset: BrandPortraitSettings = { configured: false, label: null };
@@ -19,11 +20,20 @@ const node = (extra: Partial<NodeCrystal> = {}) => ({
 }) as NodeCrystal;
 
 describe('廠牌預設立繪:來源順序(純函式)', () => {
-  it('節點立繪 → 頭像 → 廠牌圖;未設定或沒有廠牌就不請求廠牌圖;沉睡用 dormant', () => {
+  it('四層順序(使用者指定):手動指定 → 廠牌圖 → 節點立繪 → 頭像;頭像章與搜尋小章略過立繪', () => {
+    const all = node({ customPortraitUrl: 'vault-image://manual/n1?v=2', portraitUrl: 'vault-image://node/p', avatarUrl: 'vault-image://node/a' });
+    expect(portraitSources(all, configured).map((item) => item.source)).toEqual(['custom', 'brand', 'portrait', 'avatar']);
+    expect(portraitSources(all, configured, 'avatar').map((item) => item.source)).toEqual(['custom', 'brand', 'avatar']);
+    expect(portraitSources(all, unset).map((item) => item.source)).toEqual(['custom', 'portrait', 'avatar']);
+    expect(portraitSources(node({ customPortraitUrl: 'vault-image://manual/n1?v=1', brand: undefined }), null).map((item) => item.url))
+      .toEqual(['vault-image://manual/n1?v=1']);
+  });
+
+  it('沒有手動指定:廠牌圖 → 節點立繪 → 頭像;未設定或沒有廠牌就不請求廠牌圖;沉睡用 dormant', () => {
     const full = node({ portraitUrl: 'vault-image://node/p', avatarUrl: 'vault-image://node/a' });
-    expect(portraitSources(full, configured).map((item) => item.source)).toEqual(['portrait', 'avatar', 'brand']);
-    expect(portraitSources(full, configured).at(-1)!.url).toBe('vault-image://brand/claude/active?v=1');
-    expect(portraitSources(full, configured, 'avatar').map((item) => item.source)).toEqual(['avatar', 'brand']);
+    expect(portraitSources(full, configured).map((item) => item.source)).toEqual(['brand', 'portrait', 'avatar']);
+    expect(portraitSources(full, configured)[0].url).toBe('vault-image://brand/claude/active?v=1');
+    expect(portraitSources(full, configured, 'avatar').map((item) => item.source)).toEqual(['brand', 'avatar']);
     expect(portraitSources(full, unset).map((item) => item.source)).toEqual(['portrait', 'avatar']);
     expect(portraitSources(full, null).map((item) => item.source)).toEqual(['portrait', 'avatar']);
     expect(portraitSources(node({ brand: { vendor: null, mode: 'active' } }), configured)).toEqual([]);
@@ -31,7 +41,7 @@ describe('廠牌預設立繪:來源順序(純函式)', () => {
     expect(brandPortraitUrl({ vendor: 'gemini', mode: 'dormant' }, configured)).toBe('vault-image://brand/gemini/dormant?v=1');
     // N = generation + 1: always a positive integer, as the main process requires.
     expect(brandPortraitUrl({ vendor: 'gemini', mode: 'dormant' }, configured, 4)).toBe('vault-image://brand/gemini/dormant?v=5');
-    expect(portraitSources(full, configured, 'portrait', 2).at(-1)!.url).toBe('vault-image://brand/claude/active?v=3');
+    expect(portraitSources(full, configured, 'portrait', 2)[0].url).toBe('vault-image://brand/claude/active?v=3');
   });
 });
 
@@ -59,23 +69,43 @@ describe('廠牌預設立繪:介面', () => {
     host.remove();
     vi.unstubAllGlobals();
     resetBrandPortraits();
+    resetNodePortraitOverrides();
   });
 
   const img = () => host.querySelector('img')!;
   const fail = async () => act(async () => { img().dispatchEvent(new Event('error')); });
 
-  it('水晶立繪逐級退回:立繪 → 頭像 → 廠牌圖 → 星座線符', async () => {
+  it('水晶逐級退回:手動指定 → 廠牌圖 → 立繪 → 頭像 → 星座線符', async () => {
     resetBrandPortraits({ settings: configured });
-    await act(async () => root.render(<CrystalPortrait node={node({ portraitUrl: 'vault-image://node/p', avatarUrl: 'vault-image://node/a' })} />));
-    expect(img().getAttribute('src')).toBe('vault-image://node/p');
-    expect(img().dataset.portraitSource).toBe('portrait');
-    await fail();
-    expect(img().getAttribute('src')).toBe('vault-image://node/a');
+    await act(async () => root.render(<CrystalPortrait node={node({ customPortraitUrl: 'vault-image://manual/n1?v=1',
+      portraitUrl: 'vault-image://node/p', avatarUrl: 'vault-image://node/a' })} />));
+    expect(img().getAttribute('src')).toBe('vault-image://manual/n1?v=1');
+    expect(img().dataset.portraitSource).toBe('custom');
     await fail();
     expect(img().getAttribute('src')).toBe('vault-image://brand/claude/active?v=1');
     expect(img().dataset.portraitSource).toBe('brand');
     await fail();
+    expect(img().getAttribute('src')).toBe('vault-image://node/p');
+    await fail();
+    expect(img().getAttribute('src')).toBe('vault-image://node/a');
+    await fail();
     expect(img().dataset.portrait).toBe('constellation');
+  });
+
+  it('本次指定或清除立即套用到所有顯示處;換記憶庫時重置', async () => {
+    resetBrandPortraits({ settings: configured });
+    const crystal = node({ portraitUrl: 'vault-image://node/p' });
+    const entry = { nodeId: 'n1', nodeIds: ['n1'], nodeLabel: '晨星' } as unknown as MemoryEntry;
+    await act(async () => root.render(<><CrystalPortrait node={crystal} /><AvatarSeals entry={entry} nodes={new Map([['n1', crystal]])} /></>));
+    const sources = () => [...host.querySelectorAll('img')].map((image) => image.getAttribute('src'));
+    expect(sources()).toEqual(['vault-image://brand/claude/active?v=1', 'vault-image://brand/claude/active?v=1']);
+    await act(async () => setNodePortraitOverride('n1', 'vault-image://manual/n1?v=3'));
+    expect(sources()).toEqual(['vault-image://manual/n1?v=3', 'vault-image://manual/n1?v=3']);
+    await act(async () => setNodePortraitOverride('n1', null));
+    expect(sources()).toEqual(['vault-image://brand/claude/active?v=1', 'vault-image://brand/claude/active?v=1']);
+    await act(async () => setNodePortraitOverride('n1', 'vault-image://manual/n1?v=4'));
+    await act(async () => resetNodePortraitOverrides());
+    expect(sources()[0]).toBe('vault-image://brand/claude/active?v=1');
   });
 
   it('未設定資料夾:沒有自己的圖就直接用星座線符,不請求廠牌網址;沉睡節點用 dormant 圖', async () => {
@@ -147,16 +177,21 @@ describe('廠牌預設立繪:介面', () => {
     await fail();
     expect(host.querySelector('img')).toBeNull();
     expect(host.querySelector('[data-node-hit]')!.textContent).toContain('晨');
+    await act(async () => root.render(<NodeMatches hits={[{ ...hit, nodeId: 'n2', customPortraitUrl: 'vault-image://manual/n2?v=1' }]} onNode={() => {}} />));
+    expect(img().getAttribute('src')).toBe('vault-image://manual/n2?v=1');
+    expect(img().dataset.portraitSource).toBe('custom');
   });
 
-  it('樓下頭像章:頭像 → 廠牌圖(圓形裁切沿用 .seal)→ 名字首字', async () => {
+  it('樓下頭像章:手動指定 → 廠牌圖 → 頭像(圓形裁切沿用 .seal)→ 名字首字;不用全身立繪', async () => {
     resetBrandPortraits({ settings: configured });
-    const crystal = node({ avatarUrl: 'vault-image://node/a', portraitUrl: 'vault-image://node/p' });
+    const crystal = node({ customPortraitUrl: 'vault-image://manual/n1?v=1', avatarUrl: 'vault-image://node/a', portraitUrl: 'vault-image://node/p' });
     const entry = { nodeId: 'n1', nodeIds: ['n1'], nodeLabel: '晨星' } as unknown as MemoryEntry;
     await act(async () => root.render(<AvatarSeals entry={entry} nodes={new Map([['n1', crystal]])} />));
-    expect(img().getAttribute('src')).toBe('vault-image://node/a');
+    expect(img().getAttribute('src')).toBe('vault-image://manual/n1?v=1');
     await fail();
     expect(img().getAttribute('src')).toBe('vault-image://brand/claude/active?v=1');
+    await fail();
+    expect(img().getAttribute('src')).toBe('vault-image://node/a');
     await fail();
     expect(host.querySelector('img')).toBeNull();
     expect(host.textContent).toContain('晨');

@@ -84,21 +84,58 @@ export function brandPortraitUrl(brand: CrystalBrand | undefined, settings: Bran
   return 'vault-image://brand/' + brand.vendor + '/' + brand.mode + '?v=' + (Math.max(0, Math.floor(generation)) + 1);
 }
 
-export type PortraitSource = 'portrait' | 'avatar' | 'brand';
-interface PortraitNode { portraitUrl?: string | null; avatarUrl?: string | null; brand?: CrystalBrand }
+export type PortraitSource = 'custom' | 'brand' | 'portrait' | 'avatar';
+interface PortraitNode {
+  nodeId?: string; customPortraitUrl?: string | null; portraitUrl?: string | null; avatarUrl?: string | null; brand?: CrystalBrand;
+}
+
+/*
+ * Pictures assigned in this session (DESIGN.md §6.5.2): after chooseNodePortrait/clearNodePortrait the new URL (or null)
+ * applies at once to every place that shows the node — crystal, panel, seals, search chips — until the next list read
+ * carries the same value from the main process.
+ */
+const customOverrides = new Map<string, string | null>();
+const overrideListeners = new Set<() => void>();
+let overrideVersion = 0;
+function subscribeOverrides(listener: () => void) {
+  overrideListeners.add(listener);
+  return () => { overrideListeners.delete(listener); };
+}
+export function setNodePortraitOverride(nodeId: string, url: string | null) {
+  customOverrides.set(nodeId, url);
+  overrideVersion++;
+  for (const listener of overrideListeners) listener();
+}
+/** For a vault switch and for tests. */
+export function resetNodePortraitOverrides() {
+  customOverrides.clear();
+  overrideVersion++;
+  for (const listener of overrideListeners) listener();
+}
+/** The node's assigned picture URL, with this session's change applied (re-renders when it changes). */
+export function useNodeCustomPortrait(node: PortraitNode): string | null | undefined {
+  useSyncExternalStore(subscribeOverrides, () => overrideVersion);
+  return customUrlOf(node);
+}
+function customUrlOf(node: PortraitNode): string | null | undefined {
+  return node.nodeId !== undefined && customOverrides.has(node.nodeId) ? customOverrides.get(node.nodeId) : node.customPortraitUrl;
+}
 
 /**
- * The images to try, best first (docs/架構.md §4.2): the node's own portrait → its avatar → the brand default.
- * Seals downstairs are small and round, so they start at the avatar.
+ * The images to try, best first (user's order, DESIGN.md §6.5.2): the picture the user assigned to the node → the brand
+ * default (folder set and vendor known; active/dormant by the node's state) → the node's own portrait → its avatar.
+ * Seals and search chips are small and round, so they skip the portrait: assigned → brand → avatar. When all fail the
+ * caller shows the first character or the constellation glyph.
  */
 export function portraitSources(node: PortraitNode | undefined, settings: BrandPortraitSettings | null,
   from: 'portrait' | 'avatar' = 'portrait', generation = 0): { url: string; source: PortraitSource }[] {
   if (!node) return [];
   const brand = brandPortraitUrl(node.brand, settings, generation);
   const list: { url: string | null | undefined; source: PortraitSource }[] = [
+    { url: customUrlOf(node), source: 'custom' },
+    { url: brand, source: 'brand' },
     ...(from === 'portrait' ? [{ url: node.portraitUrl, source: 'portrait' as const }] : []),
     { url: node.avatarUrl, source: 'avatar' },
-    { url: brand, source: 'brand' },
   ];
   const seen = new Set<string>();
   return list.filter((item): item is { url: string; source: PortraitSource } => {
@@ -114,6 +151,7 @@ export function portraitSources(node: PortraitNode | undefined, settings: BrandP
  */
 export function usePortraitChain(node: PortraitNode | undefined, from: 'portrait' | 'avatar' = 'portrait') {
   const { settings, generation } = useBrandPortraits();
+  useSyncExternalStore(subscribeOverrides, () => overrideVersion);
   const sources = portraitSources(node, settings, from, generation);
   const [failed, setFailed] = useState<{ generation: number; urls: string[] }>({ generation, urls: [] });
   const failedNow = failed.generation === generation ? failed.urls : [];

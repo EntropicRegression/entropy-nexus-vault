@@ -6,7 +6,7 @@ import { browserFrameClock } from '../sky/frame-clock';
 import type { FrameClock } from '../sky/frame-clock';
 import { Sky } from '../sky/Sky';
 import { BrandPortraitPanel } from '../brand/BrandPortraitPanel';
-import { loadBrandPortraitSettings } from '../brand/brand-portrait';
+import { loadBrandPortraitSettings, resetNodePortraitOverrides } from '../brand/brand-portrait';
 import { SkyHud } from '../sky/SkyHud';
 import { useSystemMotion } from '../sky/use-system-motion';
 import { createFloorCamera } from './floor-camera';
@@ -96,6 +96,8 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
 
   // Brand default portraits: read whether a folder is set (images are requested only when it is).
   useEffect(() => { void loadBrandPortraitSettings(); }, []);
+  // Assigned node pictures changed in this session belong to one vault (node IDs are per vault).
+  useEffect(() => { resetNodePortraitOverrides(); }, [vaultInfo?.key]);
 
   // Runs after React has committed the arrival: focus first, then pending jumps, which move focus to their target
   // (the selected crystal, or the reading desk). If the user already acted on the new floor during the pan, their

@@ -15,7 +15,7 @@ import styles from './PrismCrystal.module.css';
  * (data-glow) drives aura, backlight, inner glass glow and pedestal ring together.
  */
 export function PrismCrystal({ node, glow }: {
-  node: Pick<NodeCrystal, 'portraitUrl' | 'avatarUrl' | 'brand'>;
+  node: Pick<NodeCrystal, 'portraitUrl' | 'avatarUrl' | 'brand'> & Partial<Pick<NodeCrystal, 'nodeId' | 'customPortraitUrl'>>;
   glow: string;
 }) {
   const { current, generation, fail } = usePortraitChain(node);

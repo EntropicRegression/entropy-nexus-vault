@@ -9,7 +9,7 @@ import styles from './Sky.module.css';
  * The crystal's picture: the node's portrait → its avatar → the brand default (when a folder is set) → the bundled
  * constellation glyph; each load error moves one step down (docs/架構.md §4.2).
  */
-export function CrystalPortrait({ node }: { node: Pick<NodeCrystal, 'portraitUrl' | 'avatarUrl' | 'brand'> }) {
+export function CrystalPortrait({ node }: { node: Pick<NodeCrystal, 'portraitUrl' | 'avatarUrl' | 'brand'> & Partial<Pick<NodeCrystal, 'nodeId' | 'customPortraitUrl'>> }) {
   const { current, generation, fail } = usePortraitChain(node);
   if (!current) return <img src={constellation} alt="" decoding="async" data-portrait="constellation" />;
   // Keyed by folder generation: after choosing the folder again the same brand URL is requested afresh.
