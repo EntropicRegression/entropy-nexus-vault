@@ -37,6 +37,14 @@ describe('打包前的正式建置檢查(M5b 審查 S7)', () => {
     expect(checkProductionBuild(await fakeBuild('console.log(1)'))).toEqual([]);
   });
 
+  it('CSS 內嵌 data: 圖片會被拒絕(App 的 CSP 只允許同源與 vault-image: 圖片;M5g)', async () => {
+    const root = await fakeBuild('console.log(1)');
+    await writeFile(join(root, 'renderer', 'assets', 'index.css'), ':root{--paper-tex:url("data:image/svg+xml,%3Csvg%3E")}');
+    expect(checkProductionBuild(root)).toEqual([join('renderer', 'assets', 'index.css') + ' 含 data: 圖片(會被 CSP 擋下)']);
+    await writeFile(join(root, 'renderer', 'assets', 'index.css'), ':root{--paper-tex:url(./paper-grain-abc.svg)}');
+    expect(checkProductionBuild(root)).toEqual([]);
+  });
+
   it('含驗收時鐘的開發模式產物被拒絕', async () => {
     const problems = checkProductionBuild(await fakeBuild('window.__floorClock = createAcceptanceClock();'));
     expect(problems).toHaveLength(2);
@@ -83,7 +91,8 @@ describe('正式打包的 ASAR 與字型授權', () => {
       'out/renderer/index.html': '<link href="./assets/index-x.css"><script src="./assets/index-x.js"></script>',
       [assetDir + 'library-starry-xyz.png']: 'synthetic background',
       [assetDir + 'constellation-abc.svg']: '<svg />',
-      [assetDir + 'index-x.css']: 'a{background:url(/assets/library-starry-xyz.png)}',
+      [assetDir + 'paper-grain-def.svg']: '<svg>grain</svg>',
+      [assetDir + 'index-x.css']: 'a{background:url(/assets/library-starry-xyz.png)}b{background:url(/assets/paper-grain-def.svg)}',
       [assetDir + 'index-x.js']: 'const fallback="/assets/constellation-abc.svg";',
       ...Object.fromEntries(families.map((name) => [assetDir + name + '-x.woff2', 'wOF2 synthetic header'])),
       ...extra,
@@ -99,6 +108,7 @@ describe('正式打包的 ASAR 與字型授權', () => {
     await write(project, {
       'assets/bg/library-starry.png': 'synthetic background',
       'assets/ui/constellation.svg': '<svg />',
+      'assets/ui/paper-grain.svg': '<svg>grain</svg>',
       ...Object.fromEntries(families.map((name) => ['node_modules/@fontsource-variable/' + name + '/LICENSE', 'license ' + name])),
     });
     await write(resources, Object.fromEntries(families.filter((name) => includeLicense || name !== families[0])
@@ -111,7 +121,7 @@ describe('正式打包的 ASAR 與字型授權', () => {
   it('確認 ASAR 入口、圖像、三種字型與原始授權', async () => {
     expect(await packed()).toMatchObject({
       problems: [],
-      graphics: expect.arrayContaining([expect.stringContaining('library-starry'), expect.stringContaining('constellation')]),
+      graphics: expect.arrayContaining([expect.stringContaining('library-starry'), expect.stringContaining('constellation'), expect.stringContaining('paper-grain')]),
       fonts: { 'noto-serif-tc': 1, 'noto-sans-tc': 1, 'jetbrains-mono': 1 },
     });
   });

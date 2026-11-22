@@ -6,6 +6,8 @@ const path = require('node:path');
 /** Markers that exist only in development-mode builds (src/renderer/app/accept-clock.ts). */
 const developmentMarkers = ['__floorClock', 'createAcceptanceClock'];
 const requiredEntries = ['main/index.js', 'preload/index.js', 'renderer/index.html'];
+/** CSS url(data:…) images: the app's CSP (img-src 'self' vault-image:) blocks them, so they never show (M5g). */
+const dataImage = /url\(\s*["']?data:/i;
 
 function filesUnder(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((item) => {
@@ -20,6 +22,10 @@ function checkProductionBuild(outDir) {
   const problems = requiredEntries.filter((entry) => !fs.existsSync(path.join(outDir, entry)))
     .map((entry) => '建置輸出缺少 ' + entry);
   for (const file of filesUnder(outDir)) {
+    if (/\.css$/i.test(file)) {
+      if (dataImage.test(fs.readFileSync(file, 'utf8'))) problems.push(path.relative(outDir, file) + ' 含 data: 圖片(會被 CSP 擋下)');
+      continue;
+    }
     if (!/\.(?:c?js|mjs|html)$/i.test(file)) continue;
     const text = fs.readFileSync(file, 'utf8');
     for (const marker of developmentMarkers) {

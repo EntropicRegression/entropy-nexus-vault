@@ -6,6 +6,7 @@ import tokensCss from './styles/tokens.css?raw';
 import galaxyCss from './sky/Galaxy.module.css?raw';
 import profileCss from './sky/Profile.module.css?raw';
 import brandCss from './brand/Brand.module.css?raw';
+import paperGrain from '../../assets/ui/paper-grain.svg?raw';
 
 const normal = (text: string) => text.replace(/\r\n/g, '\n');
 const library = normal(libraryCss);
@@ -16,11 +17,19 @@ const all = [library, sky, app, galaxyCss, profileCss, brandCss].map(normal).joi
 
 describe('質感精修(M5f,DESIGN.md §10.1)', () => {
   it('紙紋是預先算好的 64×64 平鋪圖,卡片與閱讀紙沒有逐卡即時濾鏡', () => {
-    expect(tokens).toMatch(/--paper-tex: url\("data:image\/svg\+xml,[^"]*width='64' height='64'/);
+    expect(tokens).toContain("--paper-tex: url('../../../assets/ui/paper-grain.svg');");
+    expect(paperGrain).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="64" height="64">/);
+    expect(paperGrain).toContain('opacity=".04"');
     expect(library).not.toContain('url(#paperGrain)');
     expect(library).toMatch(/\.plaqueFace \{[^}]*background: var\(--paper-tex\) 0 0 \/ 64px 64px, var\(--card-paper\);/);
     expect(library).toMatch(/\.plaqueFace::after \{[^}]*inset: 4px; border: 1px solid var\(--foil-frame\)/);
     expect(library).toMatch(/\.shelf \{[^}]*background: var\(--velvet\);[^}]*box-shadow: var\(--velvet-inset\);/);
+  });
+
+  it('樣式表不內嵌 data: 圖片(App 的 CSP 只允許同源與 vault-image: 圖片,data: 會被擋下;M5g)', () => {
+    const sheets = Object.entries(import.meta.glob('./**/*.css', { query: '?raw', import: 'default', eager: true }) as Record<string, string>);
+    expect(sheets.length).toBeGreaterThan(5);
+    for (const [file, text] of sheets) expect(text, file).not.toMatch(/url\(\s*["']?data:/i);
   });
 
   it('動態只剩 hover 上移 2px、開卷淡入、確認時金箔掃光;低動態與系統減少動態全部 0ms', () => {

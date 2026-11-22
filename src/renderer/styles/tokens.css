@@ -28,9 +28,10 @@
   --gem-off: #8a7965;
   --gem-on-stroke: #4b3423;
   --ember: #8c3a27;
-  /* Premium finish (M5f, DESIGN.md §10.1). One 64x64 grain tile computed once by the browser and tiled, instead of a
-     live feTurbulence filter per card. */
-  --paper-tex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='64' height='64' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  /* Premium finish (M5f, DESIGN.md §10.1). One 64x64 grain tile, rasterised once by the browser and tiled, instead of
+     a live feTurbulence filter per card. It is a same-origin file (not a data: URL): the app's CSP allows images only
+     from 'self' and vault-image: (M5g). */
+  --paper-tex: url('../../../assets/ui/paper-grain.svg');
   --paper-edge: inset 0 1px 0 rgba(255, 247, 224, 0.6), 0 2px 0 #9d8362;
   --paper-drop: 0 6px 12px rgba(4, 7, 19, 0.42);
   --foil-frame: rgba(217, 164, 65, 0.32);

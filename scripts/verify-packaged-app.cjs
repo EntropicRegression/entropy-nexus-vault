@@ -12,6 +12,8 @@ const staticAssets = renderer + 'assets/';
 const requiredGraphics = [
   { source: 'assets/bg/library-starry.png', name: /^library-starry-[\w-]+\.png$/ },
   { source: 'assets/ui/constellation.svg', name: /^constellation-[\w-]+\.svg$/ },
+  // Premium finish paper grain (DESIGN.md §10.1); a file rather than a data: URL, which the CSP blocks.
+  { source: 'assets/ui/paper-grain.svg', name: /^paper-grain-[\w-]+\.svg$/ },
 ];
 const fontFamilies = ['noto-serif-tc', 'noto-sans-tc', 'jetbrains-mono'];
 const requiredEntries = ['package.json', 'out/main/index.js', 'out/preload/index.js', renderer + 'index.html'];
