@@ -5,7 +5,7 @@ const path = require('node:path');
 
 /** Markers that exist only in development-mode builds (src/renderer/app/accept-clock.ts). */
 const developmentMarkers = ['__floorClock', 'createAcceptanceClock'];
-const requiredEntries = ['main/index.js', 'preload', 'renderer/index.html'];
+const requiredEntries = ['main/index.js', 'preload/index.js', 'renderer/index.html'];
 
 function filesUnder(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((item) => {
@@ -36,9 +36,9 @@ function assertProductionBuild(outDir) {
 
 module.exports = { checkProductionBuild, assertProductionBuild, developmentMarkers };
 
-// electron-builder beforePack hook: (context) => Promise<void>. The project directory is the current directory.
-module.exports.default = async function beforePack() {
-  assertProductionBuild(path.resolve(process.cwd(), 'out'));
+// electron-builder beforePack hook.
+module.exports.default = async function beforePack(context) {
+  assertProductionBuild(path.join(context.packager.projectDir, 'out'));
 };
 
 if (require.main === module) {

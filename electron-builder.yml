@@ -1,5 +1,6 @@
 appId: com.entropynexus.vault
 productName: Entropy Nexus Vault
+asar: true
 directories:
   buildResources: resources
   output: release
@@ -26,3 +27,5 @@ nsis:
 publish: null
 # Refuse development-mode output (M5b review S7); see scripts/verify-production-build.cjs.
 beforePack: scripts/verify-production-build.cjs
+# Verify the assembled ASAR and its companion licenses before emitting a distribution.
+afterPack: scripts/verify-packaged-app.cjs
