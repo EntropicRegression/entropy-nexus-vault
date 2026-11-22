@@ -142,7 +142,9 @@ describe('專案星系畫面(M5e-b)', () => {
     expect(document.activeElement).toBe(q('[data-galaxy-back]'));
     // Dormant crystals are dimmed inside a galaxy (CSS rule scoped to the interior).
     expect(q('[data-crystal="a2"]')!.dataset.status).toBe('休眠');
-    expect(galaxyCss).toContain(".interior [data-crystal][data-status='休眠'] { opacity: 0.55;");
+    expect(galaxyCss).toContain(".interior [data-crystal][data-status='休眠'] > :not([data-crystal-label]) { opacity: 0.55;");
+    // The nameplate is not faded with the crystal, so its text stays ≥ 4.5:1 (M5f).
+    expect(galaxyCss).toContain(".interior [data-crystal][data-status='休眠'] [data-crystal-label] strong { color: var(--text-night-muted); }");
 
     await act(async () => { q('[data-sky]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
     expect(q('[data-galaxy-announcement]')!.textContent).toBe('返回星系總覽');

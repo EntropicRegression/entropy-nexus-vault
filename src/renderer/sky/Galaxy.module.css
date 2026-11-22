@@ -113,7 +113,9 @@
 /* Interior: the existing crystal star map, framed by the galaxy stage. */
 .universe .interior [data-star-map] { border: 0; background: none; clip-path: none; backdrop-filter: none; }
 .interior [data-star-map] > p:first-child { top: 54px; }
-.interior [data-crystal][data-status='休眠'] { opacity: 0.55; filter: saturate(0.7); }
+/* Dormant crystals fade, but their nameplate stays readable (≥ #A89A8A, ≥ 4.5:1; M5f). */
+.interior [data-crystal][data-status='休眠'] > :not([data-crystal-label]) { opacity: 0.55; filter: saturate(0.7); }
+.interior [data-crystal][data-status='休眠'] [data-crystal-label] strong { color: var(--text-night-muted); }
 .back { position: absolute; top: 14px; left: 16px; z-index: 12; color: var(--sky-gold); border-color: rgba(217, 164, 65, 0.6); font-weight: 700; }
 .back:focus-visible, .exit:focus-visible, .toast button:focus-visible { outline: 2px solid var(--sky-gold); outline-offset: 2px; }
 .exits { position: absolute; left: 20px; right: 20px; bottom: 16px; z-index: 12; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; pointer-events: none; }

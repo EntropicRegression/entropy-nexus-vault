@@ -21,9 +21,8 @@
 }
 .skyScene .mapStage {
   flex: 1.38; min-width: 0; position: relative; touch-action: none; container-type: inline-size;
-  background: rgba(7, 12, 28, 0.52);
+  background: rgba(7, 12, 28, 0.6);
   border: 1px solid rgba(92, 225, 230, 0.35);
-  backdrop-filter: blur(4px);
   overflow: hidden; cursor: grab; user-select: none;
 }
 .skyScene .mapStage:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: -3px; }
@@ -67,37 +66,52 @@
 
 .skyScene .crystal {
   position: relative; width: 100%; padding: 0; border: 0; background: none; color: inherit; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.25s ease;
+  display: flex; flex-direction: column; align-items: center; cursor: pointer;
+  transition: transform var(--hover-dur, 180ms) ease-out;
 }
 .crystalShape, .crystalPedestal, .crystalLabel { pointer-events: auto; }
-.skyScene .crystal:hover { transform: translateY(-8px) scale(1.06); }
+/* Premium finish (DESIGN.md §10.1): the only motion is a 2px lift on hover; crystals no longer float. */
+.skyScene .crystal:hover { transform: translateY(-2px); }
+/* A glass specimen: two angled facet gradients (white .08–.22, cyan→violet .14–.26), no mirror-white sheen. */
 .skyScene .crystalShape {
   width: 96px; height: 136px; position: relative;
   clip-path: polygon(50% 0%, 92% 24%, 92% 76%, 50% 100%, 8% 76%, 8% 24%);
-  background: linear-gradient(155deg, rgba(255,255,255,0.34), rgba(92,225,230,0.16) 45%, rgba(167,139,250,0.32));
+  background:
+    linear-gradient(125deg, rgba(255,255,255,0.22) 0%, transparent 40%, rgba(255,255,255,0.08) 100%),
+    linear-gradient(235deg, rgba(92,225,230,0.14) 0%, rgba(167,139,250,0.26) 100%);
   box-shadow: var(--shape-glow);
   display: flex; align-items: center; justify-content: center;
-  animation: floatCrystal 4.2s ease-in-out infinite; overflow: hidden;
+  overflow: hidden;
 }
 .skyScene .crystal[data-archived='true'] .crystalShape {
-  background: linear-gradient(155deg, rgba(186,230,253,0.22), rgba(56,189,248,0.10) 50%, rgba(148,163,184,0.26));
+  background:
+    linear-gradient(125deg, rgba(255,255,255,0.16) 0%, transparent 40%, rgba(255,255,255,0.06) 100%),
+    linear-gradient(235deg, rgba(56,189,248,0.12) 0%, rgba(148,163,184,0.24) 100%);
   filter: saturate(0.72);
 }
-.skyScene .crystal[aria-pressed='true'] .crystalShape { box-shadow: inset 0 0 32px rgba(255,255,255,0.75); }
+.skyScene .crystal[aria-pressed='true'] .crystalShape { box-shadow: inset 0 0 28px rgba(253,230,138,0.62); }
+/* Aura: a radial gradient (no blur filter). Size and strength grow with the tier so the seven stay distinct. */
 .skyScene .crystalAura {
-  position: absolute; width: 124px; height: 152px; top: -6px; border-radius: 50%; z-index: -1; transition: opacity 0.25s;
-  background: var(--aura); filter: blur(var(--aura-blur)); opacity: var(--aura-opacity);
+  position: absolute; z-index: -1; border-radius: 50%; pointer-events: none;
+  width: calc(124px * var(--aura-scale)); height: calc(152px * var(--aura-scale)); top: calc(-6px - 76px * (var(--aura-scale) - 1));
+  background: radial-gradient(ellipse closest-side,
+    var(--aura) 0%, color-mix(in srgb, var(--aura) 62%, transparent) 52%, transparent 100%);
+  opacity: var(--aura-opacity); transition: opacity var(--hover-dur, 180ms) ease-out;
 }
-/* Selected or hovered: a brighter aura of the same colour; the pale gold pedestal marks the selection. */
-.skyScene .crystal[aria-pressed='true'] .crystalAura, .skyScene .crystal:hover .crystalAura { opacity: min(0.95, calc(var(--aura-opacity) + 0.24)); }
 .skyScene .crystalShape img { width: 112%; height: 112%; object-fit: cover; object-position: top center; opacity: 0.94; mix-blend-mode: screen; }
-.skyScene .crystalFacet { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(125deg, rgba(255,255,255,0.42) 0%, transparent 38%, transparent 65%, rgba(255,255,255,0.18) 100%); }
-.skyScene .crystalPedestal {
-  width: 88px; height: 22px; margin-top: -8px; border-radius: 50%;
-  border: 1.5px solid var(--ring);
-  box-shadow: var(--ring-glow);
+.skyScene .crystalFacet {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(125deg, rgba(255,255,255,0.2) 0%, transparent 36%), linear-gradient(235deg, transparent 58%, rgba(255,255,255,0.12) 100%);
 }
-.skyScene .crystal[aria-pressed='true'] .crystalPedestal { border-color: #fde68a; box-shadow: 0 0 20px rgba(253, 230, 138, 0.65), inset 0 0 12px rgba(253, 230, 138, 0.45); }
+/* Solid brass pedestal: a #7A5B35 ring, a fine #D9A441 second ring and highlight (the same for every tier). */
+.skyScene .crystalPedestal {
+  width: 92px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(122,91,53,0.85) 0%, rgba(44,30,20,0.95) 75%);
+  border: 1.5px solid var(--brass);
+  box-shadow: inset 0 1px 0 rgba(217,164,65,0.6), 0 0 0 1px rgba(217,164,65,0.55), 0 4px 10px rgba(0,0,0,0.7);
+}
+/* Selected: the pedestal turns pale gold (M5c rule, unchanged). */
+.skyScene .crystal[aria-pressed='true'] .crystalPedestal { border-color: #fde68a; box-shadow: inset 0 1px 0 rgba(253,230,138,0.7), 0 0 0 1.5px #fde68a, 0 0 16px rgba(253,230,138,0.5); }
 .skyScene .crystalLabel {
   margin-top: 6px; text-align: center; background: rgba(6, 11, 26, 0.88); padding: 4px 12px;
   border: 1px solid rgba(125, 211, 252, 0.25);
@@ -113,7 +127,6 @@
 .skyScene .badgeOnline { background: rgba(52, 211, 153, 0.18); color: #6ee7b7; }
 .skyScene .badgeWake { background: rgba(92, 225, 230, 0.22); color: #67e8f9; }
 .skyScene .badgeMemorial { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
-@keyframes floatCrystal { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
 
 .skyScene .detailPanel {
   width: 440px; min-width: 370px; max-width: 500px; padding: 20px 22px;
@@ -145,55 +158,27 @@
 .skyScene button:focus-visible { outline: 1.5px solid var(--sky-gold); outline-offset: 2px; }
 .nodeAnchor { position: absolute; width: 144px; visibility: hidden; }
 .crystalLabel strong { display: block; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Glow tiers (DESIGN.md §6.9). Values follow Hagemi's preview: aura blur/opacity, shape glow, pedestal ring. */
-.skyScene .crystal {
-  --aura: var(--glow-white); --aura-blur: 16px; --aura-opacity: 0.42;
-  --shape-glow: inset 0 0 22px rgba(226, 232, 240, 0.38), 0 0 14px rgba(226, 232, 240, 0.24);
-  --ring: rgba(226, 232, 240, 0.58);
-  --ring-glow: 0 0 12px rgba(226, 232, 240, 0.34), inset 0 0 8px rgba(226, 232, 240, 0.26);
+/* Glow tiers (DESIGN.md §6.9; Hagemi's palette). M5f: the aura is a radial gradient whose size (--aura-scale) and
+   strength (--aura-opacity) step up with the tier; the shape keeps an inset tint. Seven tiers, one look each. */
+.skyScene .crystal { --aura: var(--glow-white); --aura-scale: 1.22; --aura-opacity: 0.5; --shape-glow: inset 0 0 22px rgba(226, 232, 240, 0.4); }
+.skyScene .crystal[data-glow='green'] { --aura: var(--glow-green); --aura-scale: 1.3; --aura-opacity: 0.56; --shape-glow: inset 0 0 24px rgba(74, 222, 128, 0.46); }
+.skyScene .crystal[data-glow='blue'] { --aura: var(--glow-blue); --aura-scale: 1.38; --aura-opacity: 0.62; --shape-glow: inset 0 0 26px rgba(59, 130, 246, 0.5); }
+.skyScene .crystal[data-glow='violet'] { --aura: var(--glow-violet); --aura-scale: 1.46; --aura-opacity: 0.66; --shape-glow: inset 0 0 28px rgba(192, 132, 252, 0.52); }
+.skyScene .crystal[data-glow='gold'] { --aura: var(--glow-gold); --aura-scale: 1.54; --aura-opacity: 0.72; --shape-glow: inset 0 0 28px rgba(245, 158, 11, 0.56); }
+.skyScene .crystal[data-glow='red'] { --aura: var(--glow-red); --aura-scale: 1.62; --aura-opacity: 0.78; --shape-glow: inset 0 0 30px rgba(244, 63, 94, 0.58); }
+.skyScene .crystal[data-glow='rainbow'] { --aura: var(--glow-gold); --aura-scale: 1.62; --aura-opacity: 0.8; --shape-glow: inset 0 0 30px rgba(255, 255, 255, 0.46); }
+/* Selected or hovered: a brighter aura of the same colour (M5c rule, unchanged). */
+.skyScene .crystal[aria-pressed='true'] .crystalAura, .skyScene .crystal:hover .crystalAura { opacity: min(0.95, calc(var(--aura-opacity) + 0.24)); }
+/* The only moving tier: a slow 10s turn; still under low motion or the system reduce-motion setting. Only the colours
+   turn: a round conic layer rotates inside the oval aura, softened by a radial mask instead of a blur. */
+.skyScene .crystal[data-glow='rainbow'] .crystalAura {
+  background: none; overflow: hidden;
+  mask-image: radial-gradient(ellipse closest-side, #000 25%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse closest-side, #000 25%, transparent 100%);
 }
-.skyScene .crystal[data-glow='green'] {
-  --aura: var(--glow-green); --aura-blur: 18px; --aura-opacity: 0.5;
-  --shape-glow: inset 0 0 24px rgba(74, 222, 128, 0.4), 0 0 18px rgba(74, 222, 128, 0.32);
-  --ring: rgba(74, 222, 128, 0.65);
-  --ring-glow: 0 0 15px rgba(74, 222, 128, 0.42), inset 0 0 10px rgba(74, 222, 128, 0.32);
-}
-.skyScene .crystal[data-glow='blue'] {
-  --aura: var(--glow-blue); --aura-blur: 20px; --aura-opacity: 0.56;
-  --shape-glow: inset 0 0 26px rgba(59, 130, 246, 0.44), 0 0 22px rgba(59, 130, 246, 0.38);
-  --ring: rgba(59, 130, 246, 0.72);
-  --ring-glow: 0 0 18px rgba(59, 130, 246, 0.48), inset 0 0 11px rgba(59, 130, 246, 0.36);
-}
-.skyScene .crystal[data-glow='violet'] {
-  --aura: var(--glow-violet); --aura-blur: 22px; --aura-opacity: 0.62;
-  --shape-glow: inset 0 0 28px rgba(192, 132, 252, 0.46), 0 0 24px rgba(192, 132, 252, 0.42);
-  --ring: rgba(192, 132, 252, 0.75);
-  --ring-glow: 0 0 20px rgba(192, 132, 252, 0.52), inset 0 0 12px rgba(192, 132, 252, 0.38);
-}
-.skyScene .crystal[data-glow='gold'] {
-  --aura: var(--glow-gold); --aura-blur: 24px; --aura-opacity: 0.68;
-  --shape-glow: inset 0 0 28px rgba(245, 158, 11, 0.5), 0 0 28px rgba(245, 158, 11, 0.46);
-  --ring: rgba(245, 158, 11, 0.8);
-  --ring-glow: 0 0 22px rgba(245, 158, 11, 0.56), inset 0 0 13px rgba(245, 158, 11, 0.42);
-}
-.skyScene .crystal[data-glow='red'] {
-  --aura: var(--glow-red); --aura-blur: 26px; --aura-opacity: 0.72;
-  --shape-glow: inset 0 0 30px rgba(244, 63, 94, 0.52), 0 0 30px rgba(244, 63, 94, 0.5);
-  --ring: rgba(244, 63, 94, 0.82);
-  --ring-glow: 0 0 24px rgba(244, 63, 94, 0.58), inset 0 0 14px rgba(244, 63, 94, 0.44);
-}
-.skyScene .crystal[data-glow='rainbow'] {
-  --aura: var(--glow-rainbow); --aura-blur: 26px; --aura-opacity: 0.76;
-  --shape-glow: inset 0 0 30px rgba(255, 255, 255, 0.5), 0 0 32px rgba(192, 132, 252, 0.44);
-  --ring: rgba(253, 230, 138, 0.85);
-  --ring-glow: 0 0 22px rgba(92, 225, 230, 0.5), 0 0 34px rgba(244, 63, 94, 0.35), inset 0 0 14px rgba(253, 230, 138, 0.45);
-}
-/* The only moving tier: a slow 10s turn; still under low motion or the system reduce-motion setting. */
-/* Only the colours turn: the aura keeps its oval shape and clips a larger round conic layer that rotates inside it. */
-.skyScene .crystal[data-glow='rainbow'] .crystalAura { background: none; overflow: hidden; }
 .skyScene .crystal[data-glow='rainbow'] .crystalAura::before {
-  content: ''; position: absolute; left: 50%; top: 50%; width: 200px; height: 200px; margin: -100px 0 0 -100px;
-  border-radius: 50%; background: var(--glow-rainbow); animation: rainbowSpin 10s linear infinite;
+  content: ''; position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
+  border-radius: 50%; background: var(--glow-rainbow); opacity: 0.8; animation: rainbowSpin 10s linear infinite;
 }
 @keyframes rainbowSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; }

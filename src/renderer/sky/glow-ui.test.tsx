@@ -206,7 +206,9 @@ describe('經歷等級光暈與彩虹頒發(介面)', () => {
     expect(crystal('n-rainbow').dataset.glow).toBe('rainbow');
     const css = skyCss;
     // The oval aura itself never rotates; only its inner conic layer does (M5c review, visual item).
-    expect(css).toContain(".skyScene .crystal[data-glow='rainbow'] .crystalAura { background: none; overflow: hidden; }");
+    expect(css).toMatch(/\.skyScene \.crystal\[data-glow='rainbow'\] \.crystalAura \{[^}]*background: none; overflow: hidden;[^}]*mask-image: radial-gradient/);
+    // M5f: auras are radial gradients, never a blur filter (performance; DESIGN.md §10.1).
+    expect(css).not.toMatch(/\.crystalAura \{[^}]*filter: blur/);
     expect(css).toMatch(/\.crystalAura::before \{[^}]*animation: rainbowSpin 10s linear infinite;/);
     expect(css).not.toMatch(/\.crystalAura \{[^}]*animation: rainbowSpin/);
     expect(css).toContain(".skyScene[data-quiet='true'] .crystal[data-glow='rainbow'] .crystalAura::before { animation: none; }");
