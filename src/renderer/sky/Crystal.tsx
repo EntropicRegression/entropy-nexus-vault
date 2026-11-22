@@ -1,15 +1,19 @@
-import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { NodeCrystal } from '../../shared/types';
 import constellation from '../../../assets/ui/constellation.svg';
+import { usePortraitChain } from '../brand/brand-portrait';
 import styles from './Sky.module.css';
 
-export function CrystalPortrait({ src }: { src?: string | null }) {
-  const [failed, setFailed] = useState<string | null>(null);
-  const portrait = Boolean(src && failed !== src);
-  return <img src={portrait ? src! : constellation} alt="" decoding="async"
-    data-portrait={portrait ? 'image' : 'constellation'}
-    onError={portrait ? () => setFailed(src!) : undefined} />;
+/**
+ * The crystal's picture: the node's portrait → its avatar → the brand default (when a folder is set) → the bundled
+ * constellation glyph; each load error moves one step down (docs/架構.md §4.2).
+ */
+export function CrystalPortrait({ node }: { node: Pick<NodeCrystal, 'portraitUrl' | 'avatarUrl' | 'brand'> }) {
+  const { current, generation, fail } = usePortraitChain(node);
+  if (!current) return <img src={constellation} alt="" decoding="async" data-portrait="constellation" />;
+  // Keyed by folder generation: after choosing the folder again the same brand URL is requested afresh.
+  return <img key={current.url + '#' + generation} src={current.url} alt="" decoding="async"
+    data-portrait="image" data-portrait-source={current.source} onError={() => fail(current.url)} />;
 }
 
 export function crystalBadge(node: Pick<NodeCrystal, 'status' | 'canWake'>) {
@@ -30,7 +34,7 @@ export function Crystal({ node, index, selected, setAnchor, onClick }: {
       type="button" aria-pressed={selected} aria-label={node.name + ' ' + badge.text} onClick={onClick}>
       <span className={styles.crystalAura} aria-hidden="true" />
       <span className={styles.crystalShape} style={{ animationDelay: index * 0.6 + 's' }}>
-        <CrystalPortrait src={node.portraitUrl} />
+        <CrystalPortrait node={node} />
         <span className={styles.crystalFacet} aria-hidden="true" />
       </span>
       <span className={styles.crystalPedestal} aria-hidden="true" />

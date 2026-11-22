@@ -8,6 +8,9 @@ import { StarMap } from './StarMap';
 import { StarField } from './StarField';
 import { DetailPanel } from './DetailPanel';
 import { AwardDialog } from './AwardDialog';
+import { ProfileOverlay, profileApi } from './ProfileOverlay';
+import { SkyDialog } from './SkyDialog';
+import type { WakeState } from './DetailPanel';
 import { GalaxyView } from './GalaxyView';
 import { alsoInProjects } from './galaxy-geometry';
 import type { GalaxyExit } from './galaxy-geometry';
@@ -15,6 +18,8 @@ import type { AwardFailure } from './AwardDialog';
 import { useSystemMotion } from './use-system-motion';
 import styles from './Sky.module.css';
 
+/** How long 「已送出」 stays when no new stats snapshot arrives (review M5d-b #5). */
+export const wakeSentMs = 60_000;
 const empty: CrystalList = { crystals: [], links: [] };
 
 interface Props {
@@ -45,6 +50,23 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
   const [award, setAward] = useState<{ mode: 'grant' | 'withdraw'; nodeId: string; name: string; saving: boolean;
     failure: AwardFailure | null }>();
   const awardTrigger = useRef<HTMLButtonElement | null>(null);
+  /** Full profile reader/editor over the star map, and the button to return focus to. */
+  const [reader, setReader] = useState<{ nodeId: string; name: string } | null>(null);
+  const readerTrigger = useRef<HTMLButtonElement | null>(null);
+  const [wakeAsk, setWakeAsk] = useState<{ nodeId: string; name: string } | null>(null);
+  const [wakeState, setWakeState] = useState<{ nodeId: string; state: WakeState } | null>(null);
+  // The wake button is disabled while sending, which drops focus; once the result is shown, hand focus back to it.
+  const wakePhase = wakeState?.state.phase;
+  const previousWakePhase = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const was = previousWakePhase.current;
+    previousWakePhase.current = wakePhase;
+    if (was === 'sending' && (wakePhase === 'sent' || wakePhase === 'failed'))
+      scene.current?.querySelector<HTMLButtonElement>('[data-wake-action]')?.focus({ preventScroll: true });
+  }, [wakePhase]);
+  /** The star list on screen when the request was sent; the next list read is the next stats snapshot. */
+  const wakeSentData = useRef<CrystalList | undefined>(undefined);
+  const wakeTrigger = useRef<HTMLButtonElement | null>(null);
   const consumedSelection = useRef(new Set<number>());
   /** A jump's target crystal receives focus once rendered (M5b review S1), also when it was already selected. */
   const [jumpFocus, setJumpFocus] = useState<{ nodeId: string; requestId: number }>();
@@ -174,6 +196,53 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
     }
   }
 
+  function focusLater(button: HTMLButtonElement | null, fallback: string) {
+    queueMicrotask(() => (button?.isConnected ? button : scene.current?.querySelector<HTMLButtonElement>(fallback))?.focus({ preventScroll: true }));
+  }
+
+  async function sendWake(nodeId: string, name: string) {
+    setWakeAsk(null);
+    setWakeState({ nodeId, state: { phase: 'sending' } });
+    focusLater(wakeTrigger.current, '[data-wake-action]');
+    let result;
+    try {
+      result = await (await profileApi()).requestWake(nodeId);
+    } catch {
+      // The request itself failed (IPC); we cannot tell whether the console is there.
+      result = null;
+    }
+    // Success only means the request reached the console, which asks the user again (DESIGN.md §6.7).
+    const fallback = (nodeName: string | null) => '請在主控台用「開啟舊 session」接回〈' + (nodeName ?? name) + '〉。';
+    const state: WakeState = !result ? { phase: 'failed', message: '請求沒有成功送出,請確認主控台已開啟。', sessionId: null }
+      : result.ok ? { phase: 'sent' }
+      : result.reason === 'unregistered'
+        ? { phase: 'failed', message: '沒有送出:找不到主控台的喚醒網址。' + fallback(result.nodeName), sessionId: result.sessionId }
+      : result.reason === 'rejected'
+        ? { phase: 'failed', message: '無法聯絡主控台,請確認主控台已開啟;也可以' + fallback(result.nodeName), sessionId: result.sessionId }
+        : { phase: 'failed', message: '這個節點目前無法喚醒。', sessionId: null };
+    if (state.phase === 'sent') wakeSentData.current = data;
+    setWakeState({ nodeId, state });
+  }
+
+  // 「已送出」 does not stay forever (review #5): it fades when the next stats snapshot arrives or after a minute.
+  const wakeSent = wakeState?.state.phase === 'sent' && !wakeState.state.fading ? wakeState : null;
+  useEffect(() => {
+    if (!wakeSent) return;
+    const fade = () => {
+      if (reduced) { setWakeState((current) => current === wakeSent ? null : current); return; }
+      setWakeState((current) => current === wakeSent ? { nodeId: wakeSent.nodeId, state: { phase: 'sent', fading: true } } : current);
+    };
+    if (data !== wakeSentData.current) { fade(); return; }
+    const timer = setTimeout(fade, wakeSentMs);
+    return () => clearTimeout(timer);
+  }, [wakeSent, data, reduced]);
+  useEffect(() => {
+    if (wakeState?.state.phase !== 'sent' || !wakeState.state.fading) return;
+    const fading = wakeState;
+    const timer = setTimeout(() => setWakeState((current) => current === fading ? null : current), 500);
+    return () => clearTimeout(timer);
+  }, [wakeState]);
+
   function toggle(kind: LinkKind) {
     setVisible((previous) => {
       const next = new Set(previous);
@@ -226,6 +295,17 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
     <DetailPanel node={vaultExists ? node : undefined} detail={inspected?.result ?? null} loading={Boolean(node && !inspected)}
       error={Boolean(inspected && !inspected.result)} onDismiss={() => select(null)} onOpenEntry={onOpenEntry}
       awardsCorrupt={data?.awards?.corrupt} alsoIn={alsoIn}
+      onReadFull={(trigger) => {
+        if (!node) return;
+        readerTrigger.current = trigger;
+        setReader({ nodeId: node.nodeId, name: node.name });
+      }}
+      onWake={(trigger) => {
+        if (!node || wakeState?.state.phase === 'sending') return;
+        wakeTrigger.current = trigger;
+        setWakeAsk({ nodeId: node.nodeId, name: node.name });
+      }}
+      wake={node && wakeState?.nodeId === node.nodeId ? wakeState.state : undefined}
       onAward={(mode, trigger) => {
         if (!node) return;
         awardTrigger.current = trigger;
@@ -234,6 +314,16 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
     {award && <AwardDialog key={award.mode + award.nodeId} mode={award.mode} name={award.name} saving={award.saving}
       failure={award.failure} onConfirm={(reason) => void confirmAward(reason)} onCancel={closeAward}
       onReload={() => { setReload((value) => value + 1); setAward((current) => current && { ...current, failure: null }); }} />}
+    {reader && <ProfileOverlay key={reader.nodeId} nodeId={reader.nodeId} name={reader.name}
+      onClose={() => { setReader(null); focusLater(readerTrigger.current, '[data-read-full]'); }}
+      onSaved={() => setReload((value) => value + 1)} />}
+    {wakeAsk && <SkyDialog title="主控台喚醒確認" label="wake" onCancel={() => { setWakeAsk(null); focusLater(wakeTrigger.current, '[data-wake-action]'); }}
+      actions={[
+        { label: '取消', onClick: () => { setWakeAsk(null); focusLater(wakeTrigger.current, '[data-wake-action]'); } },
+        { label: '確認接回舊 Session', primary: true, onClick: () => void sendWake(wakeAsk.nodeId, wakeAsk.name) },
+      ]}>
+      <p>會請主控台接回〈{wakeAsk.name}〉的舊對話,主控台會再請你確認。</p>
+    </SkyDialog>}
     <button type="button" className={styles.skylight} onClick={onReturn}>▼ 向下俯視，回到大圖書館判例卷宗室 ▼</button>
   </div>;
 }

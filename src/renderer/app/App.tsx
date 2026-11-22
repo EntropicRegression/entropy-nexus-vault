@@ -5,6 +5,8 @@ import { useDelayed } from '../library/use-delayed';
 import { browserFrameClock } from '../sky/frame-clock';
 import type { FrameClock } from '../sky/frame-clock';
 import { Sky } from '../sky/Sky';
+import { BrandPortraitPanel } from '../brand/BrandPortraitPanel';
+import { loadBrandPortraitSettings } from '../brand/brand-portrait';
 import { SkyHud } from '../sky/SkyHud';
 import { useSystemMotion } from '../sky/use-system-motion';
 import { createFloorCamera } from './floor-camera';
@@ -43,6 +45,8 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
   const [saving, setSaving] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [brandOpen, setBrandOpen] = useState(false);
+  const brandTrigger = useRef<HTMLButtonElement | null>(null);
   const showLoading = useDelayed(!vaultInfo && !vaultError ? 'vault' : null);
   const systemReduced = useSystemMotion();
   const quiet = settings.reducedMotion || systemReduced;
@@ -89,6 +93,9 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
     swapBars('library');
     return () => camera.current?.cancel();
   }, [swapBars]);
+
+  // Brand default portraits: read whether a folder is set (images are requested only when it is).
+  useEffect(() => { void loadBrandPortraitSettings(); }, []);
 
   // Runs after React has committed the arrival: focus first, then pending jumps, which move focus to their target
   // (the selected crystal, or the reading desk). If the user already acted on the new floor during the pan, their
@@ -207,6 +214,14 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
   }
 
   const toggleMotion = () => void updateSettings({ reducedMotion: !settings.reducedMotion });
+  function openBrandPortraits(trigger: HTMLButtonElement) {
+    brandTrigger.current = trigger;
+    setBrandOpen(true);
+  }
+  function closeBrandPortraits() {
+    setBrandOpen(false);
+    queueMicrotask(() => brandTrigger.current?.focus({ preventScroll: true }));
+  }
   const skyShown = floor === 'sky' || moving;
   const libraryShown = floor === 'library' || moving;
 
@@ -233,11 +248,13 @@ export function App({ clock = browserFrameClock }: { clock?: FrameClock }) {
         <button type="button" onClick={() => setAttempt((value) => value + 1)}>重新整理</button>
         <button type="button" aria-pressed={settings.reducedMotion} disabled={!settingsReady || saving}
           onClick={toggleMotion}>低動態：{settings.reducedMotion ? '開' : '關'}</button>
+        <button type="button" data-brand-open="" onClick={(event) => openBrandPortraits(event.currentTarget)}>廠牌立繪</button>
         <button type="button" disabled={choosing} onClick={() => void chooseVault()} title={vaultInfo?.path}>記憶庫位置</button>
       </div>
     </header>
     <SkyHud barRef={skyBar} reducedMotion={settings.reducedMotion} settingsDisabled={!settingsReady || saving}
-      onLibrary={() => go('library')} onToggleMotion={toggleMotion} />
+      onLibrary={() => go('library')} onToggleMotion={toggleMotion} onBrandPortraits={openBrandPortraits} />
+    {brandOpen && <BrandPortraitPanel onClose={closeBrandPortraits} />}
     <main className={styles.stage}>
       <p className={styles.notice} role="status" data-jump-notice="">{notice}</p>
       {(settingsError || (vaultInfo?.exists && vaultError)) &&

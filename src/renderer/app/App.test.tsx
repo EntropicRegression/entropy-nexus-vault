@@ -8,6 +8,7 @@ import type { VaultApi } from '../../shared/ipc';
 import type { CrystalList, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit, VaultInfo, ViewSettings } from '../../shared/types';
 import { manualClock } from '../test-support/manual-clock';
 import { App } from './App';
+import { resetBrandPortraits } from '../brand/brand-portrait';
 import { floorTiming } from './floor-camera';
 
 const vaultInfo: VaultInfo = { key: 'fixture-vault', path: 'fixtures/memory-vault', exists: true, wakeAvailable: false };
@@ -94,6 +95,7 @@ describe('典藏室', () => {
     container.remove();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    resetBrandPortraits();
   });
 
   async function renderApp(vault = bridge()) {
@@ -140,6 +142,25 @@ describe('典藏室', () => {
     await frame(start, 0);
     await frame(start, 1);
   }
+
+  it('廠牌立繪:頂列開設定面板,讀取設定狀態,Esc 關閉並把焦點還給按鈕', async () => {
+    const vault = await renderApp(bridge({
+      getBrandPortraitSettings: vi.fn(async () => ({ configured: true as const, label: '自訂立繪資料夾' })),
+      chooseBrandPortraitFolder: vi.fn(async () => null),
+      clearBrandPortraitFolder: vi.fn(async () => ({ configured: false as const, label: null })),
+    }));
+    expect(vault.getBrandPortraitSettings).toHaveBeenCalledTimes(1);
+    const open = container.querySelector<HTMLButtonElement>('[data-library-bar] [data-brand-open]')!;
+    open.focus();
+    await act(async () => open.click());
+    const panel = container.querySelector('[data-brand-panel]')!;
+    expect(panel.querySelector('[data-brand-status]')!.textContent).toBe('已設定:自訂立繪資料夾');
+    await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(container.querySelector('[data-brand-panel]')).toBeNull();
+    expect(container.querySelector('[data-floor]')!.getAttribute('data-floor')).toBe('library');
+    expect(document.activeElement).toBe(open);
+    expect(container.querySelector('[data-sky-hud] [data-brand-open]')).not.toBeNull();
+  });
 
   it('上下樓:鏡頭平移、Y 軸模糊、45% 換頂列、結束移除濾鏡並移焦點與播報', async () => {
     await renderApp();

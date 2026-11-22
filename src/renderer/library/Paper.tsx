@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { usePortraitChain } from '../brand/brand-portrait';
 import { HEAT_LABELS, HEAT_LEVELS } from '../../shared/heat';
 import type { HeatInfo, MemoryEntry, NodeCrystal, SupersessionLink } from '../../shared/types';
 import { dateLabel } from './catalog';
@@ -34,13 +34,14 @@ export function nodeName(entry: MemoryEntry, id: string, nodes: ReadonlyMap<stri
 
 function Seal({ id, entry, nodes, onNode }: AvatarProps & { id: string }) {
   const node = nodes.get(id);
-  const source = node?.avatarUrl;
-  const [failedSource, setFailedSource] = useState<string>();
+  // Avatar → brand default (cropped round by .seal) → the name's first character.
+  const { current, generation, fail } = usePortraitChain(node, 'avatar');
   const name = nodeName(entry, id, nodes);
   const label = (entry.nodeId === id ? '承辦：' : '參與：') + name;
   const initial = Array.from(name.trim())[0]?.toUpperCase() || '？';
-  const content = source && failedSource !== source
-    ? <img src={source} alt="" loading="lazy" width="20" height="20" onError={() => setFailedSource(source)} />
+  const content = current
+    ? <img key={current.url + '#' + generation} src={current.url} alt="" loading="lazy" width="20" height="20"
+      data-portrait-source={current.source} onError={() => fail(current.url)} />
     : initial;
   return <>
     {node && onNode

@@ -1,0 +1,20 @@
+/* 廠牌預設立繪 settings: a small night card above both floors (it lives outside the camera world). */
+.veil { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0, 0, 0, 0.6); }
+.card {
+  width: 420px; max-width: calc(100% - 40px); padding: 22px 24px; display: flex; flex-direction: column; gap: 10px;
+  background: linear-gradient(180deg, rgba(16, 22, 42, 0.98), rgba(8, 12, 24, 0.98)); border: 1px solid rgba(217, 164, 65, 0.5);
+  color: var(--text-night, #e2e8f0); font-size: 13px;
+}
+.card h2 { margin: 0; font-size: 15px; letter-spacing: 0.1em; color: var(--amber-bright, #f5c26b); }
+.help { margin: 0; color: var(--text-night-muted, #94a3b8); line-height: 1.6; }
+.status { margin: 0; }
+.status strong { color: var(--amber-bright, #f5c26b); font-weight: 600; }
+.error { margin: 0; color: #fda4af; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+.actions button {
+  padding: 4px 12px; border: 1px solid rgba(217, 164, 65, 0.45); background: transparent; color: inherit; font: inherit;
+  font-size: 12.5px; cursor: pointer;
+}
+.actions button:disabled { opacity: 0.45; cursor: default; }
+.actions button:focus-visible { outline: 1.5px solid var(--amber-bright, #f5c26b); outline-offset: 2px; }
+.actions .primary { border-color: var(--amber-bright, #f5c26b); color: var(--amber-bright, #f5c26b); }
