@@ -508,7 +508,7 @@ describe('主程序 IPC 來源驗證', () => {
       relatedEntries: expect.arrayContaining([{ title: '對齊觀測時間' }, { title: '未確認' }, { title: '只參與' }]
         .map((entry) => expect.objectContaining(entry))),
       portraitUrl: iris.portraitUrl,
-      richness: { score: 15, tier: 'green', parts: { confirmedCases: 10, participatedCases: 1, projects: 4, completed: 0 } },
+      richness: { score: 51, tier: 'green', parts: { confirmedCases: 20, participatedCases: 10, projects: 15, completed: 6 } },
       award: null,
       glow: 'green',
     });

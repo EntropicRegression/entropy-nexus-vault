@@ -12,32 +12,20 @@ function dateOnly(iso: string) {
   return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
 }
 
-const percent = (rate: number) => Math.round(rate * 100) + '%';
-const rateText = (rate: number | null, rejected: number, completed: number) =>
-  rate === null ? '不足 ' + t.rejectionSample + ' 件' : percent(rate) + '=' + rejected + '/' + completed;
-
-/** The score breakdown behind a tier (DESIGN.md §6.9), one line per item, plus the reasons a tier was capped. */
+/** The score breakdown behind a tier (DESIGN.md §6.9 version 3), one line per item, plus what a skipped tier lacked. */
 export function richnessLines(richness: Richness): string[] {
   const { input, parts } = richness;
   const lines = [
     '經歷分數 ' + richness.score + ' 分',
     '承辦的已確認判例 ' + input.confirmedCases + ' 份 × ' + t.weights.confirmedCase + ' = ' + parts.confirmedCases,
-    '參與的已確認判例 ' + input.participatedCases + ' 份 → +' + parts.participatedCases + '(上限 ' + t.limits.participated + ')',
+    '參與的已確認判例 ' + input.participatedCases + ' 份 × ' + t.weights.participatedCase + ' = ' + parts.participatedCases,
     '跨專案 ' + input.projects + ' 個' + (input.projectScope === 'git' ? '(只算 git 專案)' : '(含非 git 資料夾,近似)') +
-      ' → +' + parts.projects + '(最多計 ' + t.limits.projects + ' 個)',
+      ' × ' + t.weights.project + ' = ' + parts.projects,
     '有效完成 ' + richness.effectiveCompleted + ' 件(完成峰值 ' + input.completedPeak + ' − 退回峰值 ' + input.rejectedPeak +
-      ')→ +' + parts.completed + '(每 ' + t.weights.completedPerPoint + ' 件 1 分,上限 ' + t.limits.completed + ')',
-    richness.rejectionRate === null
-      ? '完成數未滿 ' + t.rejectionSample + ' 件,不判斷退回率'
-      : '退回率 ' + percent(richness.rejectionRate) + '(目前 ' + rateText(richness.windowRejectionRate, input.rejectedNow, input.completedNow) +
-        '、峰值 ' + rateText(richness.peakRejectionRate, input.rejectedPeak, input.completedPeak) + ',取較高者)',
+      ')= ' + parts.completed,
   ];
-  if (richness.rejectionRate !== null) lines.push('退回數含失敗或中斷任務上的退回,退回率可能偏高');
   if (richness.tier !== richness.scoreTier) lines.push('分數可到' + glowNames[richness.scoreTier] + ',但:');
   for (const cap of richness.caps) lines.push('・' + capText(cap));
-  if (input.confirmedCases === 0 && !richness.caps.some(({ kind }) => kind === 'no-cases')) {
-    lines.push('沒有自己承辦的已確認判例,最高只能到藍晶');
-  }
   return lines;
 }
 

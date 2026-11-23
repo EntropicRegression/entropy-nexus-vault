@@ -424,8 +424,9 @@ describe('主控台 stats 契約(仿 buildVaultStats 目前輸出)', () => {
     expect(inputs.get(id(1))).toMatchObject({ participatedCases: 0 });
     expect(inputs.get(id(2))).toMatchObject({ participatedCases: 2 });
     expect(inputs.get(id(3))).toMatchObject({ confirmedCases: 2, participatedCases: 0 });
-    // The archived 合成丙 had only a non-git folder in the stats; it does not fall back to its case project.
-    expect(inputs.get(id(3))).toMatchObject({ projects: 0 });
+    // The archived 合成丙 had only a non-git folder in the stats (not counted); its handled cases' git project now
+    // counts too (version 3: stats projects ∪ projects of confirmed cases it handled or took part in).
+    expect(inputs.get(id(3))).toMatchObject({ projects: 1 });
   });
 
   it('封存節點沒有統計專案時,跨專案改用其已確認判例的專案;判例數由寶庫自己計', async () => {

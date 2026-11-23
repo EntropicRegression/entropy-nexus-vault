@@ -199,14 +199,14 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
 
     const confirmed = relatedEntries.filter((entry) => entry.kind === 'case' && entry.status === '已確認');
     const handled = confirmed.filter((entry) => entry.nodeId === nodeId);
-    // Projects from the stats (專案ID keys, or names for old data); archived nodes without them fall back to the
-    // projects of their confirmed cases (DESIGN.md §6.9). With a 專案表, only git repos count (M5c review B4): shared
-    // non-git folders cannot be used to collect project points.
+    // Projects = the stats' projects (where the node ran tasks; 專案ID keys, or names for old data) together with the
+    // projects of the confirmed cases it handled or took part in, so help given to another repo from one's own working
+    // folder counts too (version 3, user 2026-11-24). The chief's participations are skipped, as for the score (M5c
+    // review B3). With a 專案表, only git repos count (M5c review B4): shared non-git folders cannot collect points.
     const types = snapshot?.projectTypes ?? null;
     const counts = (key: string) => Boolean(key) && (!types || types.get(key) === 'git');
-    const statsProjects = new Set((statsNode?.projects ?? []).map(({ key }) => key).filter(counts));
-    const projectCount = statsProjects.size || (statsNode?.projects.length && types ? 0 :
-      new Set(confirmed.map((entry) => entry.projectId).filter(counts)).size);
+    const caseProjects = (statsNode?.chief ? handled : confirmed).map((entry) => entry.projectId);
+    const projectCount = new Set([...(statsNode?.projects ?? []).map(({ key }) => key), ...caseProjects].filter(counts)).size;
     records.set(nodeId, {
       crystal,
       richness: {

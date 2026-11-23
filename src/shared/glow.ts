@@ -1,4 +1,4 @@
-/** Experience richness and crystal glow tiers (DESIGN.md §6.9 version 2, confirmed 2026-11-22; docs/架構.md §9.2). */
+/** Experience richness and crystal glow tiers (DESIGN.md §6.9 version 3, user 2026-11-24; docs/架構.md §9.2). */
 
 export type GlowTier = 'white' | 'green' | 'blue' | 'violet' | 'gold' | 'red' | 'rainbow';
 export type AutoGlowTier = Exclude<GlowTier, 'rainbow'>;
@@ -20,7 +20,7 @@ export interface RichnessInput {
    * new completion, still lowers the effective completed count.
    */
   rejectedPeak: number;
-  /** Current 完成數 in the console's 180-day window; used only for the rejection rate. */
+  /** Current 完成數 in the console's 180-day window; folded into the peak, shown in the tooltip (version 3 has no rejection gate). */
   completedNow: number;
   /** Current 退回數 in the same window. */
   rejectedNow: number;
@@ -40,12 +40,13 @@ export interface RichnessParts {
   completed: number;
 }
 
-/** Why a node stops below the tier its score would reach. */
+/** Why a node stops below the tier its score would reach (version 3, user 2026-11-24). */
 export type GlowCap =
-  | { kind: 'no-cases' }
-  | { kind: 'rejection'; limit: number; rate: number }
+  | { kind: 'involvement'; tier: AutoGlowTier; need: number; have: number }
   | { kind: 'cases'; tier: AutoGlowTier; need: number; have: number }
-  | { kind: 'projects'; tier: AutoGlowTier; need: number; have: number };
+  | { kind: 'projects'; tier: AutoGlowTier; need: number; have: number }
+  | { kind: 'breadth'; tier: AutoGlowTier; needProjects: number; needParticipated: number; projects: number; participated: number }
+  | { kind: 'completed'; tier: AutoGlowTier; need: number; have: number };
 
 export interface Richness {
   /** The counts the score was computed from (shown in the badge tooltip). */
@@ -58,93 +59,87 @@ export interface Richness {
   scoreTier: AutoGlowTier;
   tier: AutoGlowTier;
   caps: GlowCap[];
-  /**
-   * The rejection rate the gate used: the less favourable of the current window and the peaks (M5c review B1), each
-   * only when it has enough completed tasks; null when neither has.
-   */
-  rejectionRate: number | null;
-  /** 退回 ÷ 完成 of the current window (null below the sample size). */
-  windowRejectionRate: number | null;
-  /** 退回峰值 ÷ 完成峰值 (null below the sample size). */
-  peakRejectionRate: number | null;
+}
+
+/** Minimum counts for a tier; each is "at least", so 承辦+參與 > 1 is involvement: 2. */
+export interface GlowRequirement {
+  /** Own plus participated confirmed cases. */
+  involvement?: number;
+  /** Own confirmed cases. */
+  cases?: number;
+  projects?: number;
+  /** Either this many projects or this many participated cases. */
+  breadth?: { projects: number; participated: number };
+  /** Effective completed tasks (peak − rejected peak). */
+  completed?: number;
 }
 
 export interface GlowThresholds {
-  weights: { confirmedCase: number; participatedCase: number; project: number; completedPerPoint: number };
-  limits: { participated: number; projects: number; completed: number };
+  /** Points per item; completed counts one point per effective completed task. No item has a cap (version 3). */
+  weights: { confirmedCase: number; participatedCase: number; project: number; completed: number };
   /** Minimum score for each tier, in tier order. */
   minimumScore: Record<AutoGlowTier, number>;
   /** Extra requirements for violet and above. */
-  requirements: Partial<Record<AutoGlowTier, { cases: number; projects: number; maxRejection: number }>>;
-  /** Without own confirmed cases, the tier stops here. */
-  withoutCasesMax: AutoGlowTier;
-  /** The rejection gate needs at least this many completed tasks in the current window. */
-  rejectionSample: number;
+  requirements: Partial<Record<AutoGlowTier, GlowRequirement>>;
 }
 
+/** Version 3 (user 2026-11-24): no caps, no rejection gate, no "own case" rule below gold's involvement. */
 export const defaultGlowThresholds: GlowThresholds = {
-  weights: { confirmedCase: 10, participatedCase: 1, project: 4, completedPerPoint: 10 },
-  limits: { participated: 10, projects: 6, completed: 20 },
-  minimumScore: { white: 0, green: 10, blue: 30, violet: 60, gold: 120, red: 200 },
+  weights: { confirmedCase: 20, participatedCase: 10, project: 15, completed: 1 },
+  minimumScore: { white: 0, green: 10, blue: 100, violet: 200, gold: 300, red: 500 },
   requirements: {
-    violet: { cases: 3, projects: 0, maxRejection: 0.2 },
-    gold: { cases: 8, projects: 2, maxRejection: 0.2 },
-    red: { cases: 15, projects: 3, maxRejection: 0.1 },
+    violet: { involvement: 1 },
+    gold: { involvement: 2, projects: 2 },
+    red: { cases: 3, breadth: { projects: 3, participated: 5 }, completed: 201 },
   },
-  withoutCasesMax: 'blue',
-  rejectionSample: 10,
 };
 
 const count = (value: number) => Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 
+function unmet(tier: AutoGlowTier, need: GlowRequirement, have: { cases: number; participated: number; projects: number; completed: number }): GlowCap[] {
+  const caps: GlowCap[] = [];
+  const involvement = have.cases + have.participated;
+  if (need.involvement !== undefined && involvement < need.involvement) caps.push({ kind: 'involvement', tier, need: need.involvement, have: involvement });
+  if (need.cases !== undefined && have.cases < need.cases) caps.push({ kind: 'cases', tier, need: need.cases, have: have.cases });
+  if (need.projects !== undefined && have.projects < need.projects) caps.push({ kind: 'projects', tier, need: need.projects, have: have.projects });
+  if (need.breadth && have.projects < need.breadth.projects && have.participated < need.breadth.participated) {
+    caps.push({ kind: 'breadth', tier, needProjects: need.breadth.projects, needParticipated: need.breadth.participated,
+      projects: have.projects, participated: have.participated });
+  }
+  if (need.completed !== undefined && have.completed < need.completed) caps.push({ kind: 'completed', tier, need: need.completed, have: have.completed });
+  return caps;
+}
+
 export function computeRichness(input: RichnessInput, t: GlowThresholds = defaultGlowThresholds): Richness {
   const confirmed = count(input.confirmedCases);
+  const participated = count(input.participatedCases);
   const projects = count(input.projects);
   const effectiveCompleted = Math.max(0, count(input.completedPeak) - count(input.rejectedPeak));
   const parts: RichnessParts = {
     confirmedCases: confirmed * t.weights.confirmedCase,
-    participatedCases: Math.min(t.limits.participated, count(input.participatedCases) * t.weights.participatedCase),
-    projects: Math.min(t.limits.projects, projects) * t.weights.project,
-    completed: Math.min(t.limits.completed, Math.floor(effectiveCompleted / t.weights.completedPerPoint)),
+    participatedCases: participated * t.weights.participatedCase,
+    projects: projects * t.weights.project,
+    completed: effectiveCompleted * t.weights.completed,
   };
   const score = parts.confirmedCases + parts.participatedCases + parts.projects + parts.completed;
-  const completedNow = count(input.completedNow);
-  const completedPeak = count(input.completedPeak);
-  const windowRejectionRate = completedNow >= t.rejectionSample ? count(input.rejectedNow) / completedNow : null;
-  const peakRejectionRate = completedPeak >= t.rejectionSample ? count(input.rejectedPeak) / completedPeak : null;
-  const rates = [windowRejectionRate, peakRejectionRate].filter((rate): rate is number => rate !== null);
-  const rejectionRate = rates.length ? Math.max(...rates) : null;
-
   const scoreTier = [...glowTiers].reverse().find((tier) => score >= t.minimumScore[tier]) ?? 'white';
+  const have = { cases: confirmed, participated, projects, completed: effectiveCompleted };
   const caps: GlowCap[] = [];
   let tier: AutoGlowTier = scoreTier;
-  // Walk down from the score's tier until every requirement of the tier holds; record the first reason found.
+  // Walk down from the score's tier until every requirement of the tier holds; list what each skipped tier lacked.
   while (tier !== 'white') {
-    const index = glowTiers.indexOf(tier);
     const requirement = t.requirements[tier];
-    let cap: GlowCap | null = null;
-    if (confirmed === 0 && index > glowTiers.indexOf(t.withoutCasesMax)) cap = { kind: 'no-cases' };
-    else if (requirement && rejectionRate !== null && rejectionRate > requirement.maxRejection) {
-      cap = { kind: 'rejection', limit: requirement.maxRejection, rate: rejectionRate };
-    } else if (requirement && confirmed < requirement.cases) {
-      cap = { kind: 'cases', tier, need: requirement.cases, have: confirmed };
-    } else if (requirement && projects < requirement.projects) {
-      cap = { kind: 'projects', tier, need: requirement.projects, have: projects };
-    }
-    if (!cap) break;
-    const found = cap;
-    // A stricter rejection gate further down replaces the looser one above (one rejection line in the tooltip).
-    const kept = caps.filter((existing) => existing.kind !== found.kind || found.kind === 'cases' || found.kind === 'projects');
-    caps.length = 0;
-    caps.push(...kept, found);
-    tier = glowTiers[index - 1];
+    const missing = requirement ? unmet(tier, requirement, have) : [];
+    if (!missing.length) break;
+    caps.push(...missing);
+    tier = glowTiers[glowTiers.indexOf(tier) - 1];
   }
   const counted: RichnessInput = {
-    confirmedCases: confirmed, participatedCases: count(input.participatedCases), completedPeak,
-    rejectedPeak: count(input.rejectedPeak), completedNow, rejectedNow: count(input.rejectedNow), projects,
+    confirmedCases: confirmed, participatedCases: participated, completedPeak: count(input.completedPeak),
+    rejectedPeak: count(input.rejectedPeak), completedNow: count(input.completedNow), rejectedNow: count(input.rejectedNow), projects,
     projectScope: input.projectScope ?? 'all',
   };
-  return { input: counted, effectiveCompleted, score, parts, scoreTier, tier, caps, rejectionRate, windowRejectionRate, peakRejectionRate };
+  return { input: counted, effectiveCompleted, score, parts, scoreTier, tier, caps };
 }
 
 export interface GlowAward {
@@ -158,16 +153,16 @@ export function glowOf(richness: Pick<Richness, 'tier'>, award: GlowAward | null
   return award ? 'rainbow' : richness.tier;
 }
 
-const percent = (value: number) => Math.round(value * 100) + '%';
 
 /** Human-readable explanation of a cap (badge tooltip). */
 export function capText(cap: GlowCap): string {
   switch (cap.kind) {
-    case 'no-cases': return '沒有自己承辦的已確認判例,最高到藍晶';
-    case 'rejection': return '退回率 ' + percent(cap.rate) + ',超過 ' + percent(cap.limit) + ',' +
-      (cap.limit >= 0.2 ? '最高到藍晶' : '不能到紅晶');
-    case 'cases': return glowNames[cap.tier] + '需要 ' + cap.need + ' 份承辦的已確認判例(目前 ' + cap.have + ' 份)';
-    case 'projects': return glowNames[cap.tier] + '需要 ' + cap.need + ' 個專案(目前 ' + cap.have + ' 個)';
+    case 'involvement': return glowNames[cap.tier] + '需要至少 ' + cap.need + ' 份承辦或參與的已確認判例(目前 ' + cap.have + ' 份)';
+    case 'cases': return glowNames[cap.tier] + '需要至少 ' + cap.need + ' 份承辦的已確認判例(目前 ' + cap.have + ' 份)';
+    case 'projects': return glowNames[cap.tier] + '需要至少 ' + cap.need + ' 個專案(目前 ' + cap.have + ' 個)';
+    case 'breadth': return glowNames[cap.tier] + '需要至少 ' + cap.needProjects + ' 個專案或 ' + cap.needParticipated +
+      ' 份參與的已確認判例(目前 ' + cap.projects + ' 個專案、' + cap.participated + ' 份參與)';
+    case 'completed': return glowNames[cap.tier] + '需要有效完成至少 ' + cap.need + ' 件(目前 ' + cap.have + ' 件)';
   }
 }
 

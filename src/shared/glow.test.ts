@@ -7,107 +7,68 @@ const base: RichnessInput = {
 };
 const node = (patch: Partial<RichnessInput>) => computeRichness({ ...base, ...patch });
 
-describe('經歷豐富度第 2 版(DESIGN.md §6.9 試算表)', () => {
-  it.each([
-    ['claudia jr', { confirmedCases: 6, participatedCases: 1, projects: 2, completedPeak: 40, rejectedPeak: 3, completedNow: 40, rejectedNow: 3 }, 72, 'violet'],
-    ['claudia(一代)', { confirmedCases: 4, projects: 1, completedPeak: 26, rejectedPeak: 3, completedNow: 26, rejectedNow: 3 }, 46, 'blue'],
-    ['Hagemi', { confirmedCases: 3, projects: 2, completedPeak: 30, rejectedPeak: 2, completedNow: 30, rejectedNow: 2 }, 40, 'blue'],
-    ['gpt', { confirmedCases: 2, projects: 1, completedPeak: 17, rejectedPeak: 2, completedNow: 17, rejectedNow: 2 }, 25, 'green'],
-    ['新節點', { projects: 1, completedPeak: 5, completedNow: 5 }, 4, 'white'],
-    ['灌水:200 件瑣碎任務、6 專案、0 判例', { projects: 6, completedPeak: 200, completedNow: 200 }, 44, 'blue'],
-  ] as const)('%s', (_name, input, score, tier) => {
-    const result = node(input);
-    expect(result.score).toBe(score);
-    expect(result.tier).toBe(tier);
+describe('經歷豐富度第 3 版(DESIGN.md §6.9,使用者 2026-11-24)', () => {
+  it('分數 = 承辦 ×20 + 參與 ×10 + 專案 ×15 + 有效完成(每件 1 分),都沒有上限', () => {
+    const result = node({ confirmedCases: 3, participatedCases: 99, projects: 40, completedPeak: 5000, rejectedPeak: 100 });
+    expect(result.parts).toEqual({ confirmedCases: 60, participatedCases: 990, projects: 600, completed: 4900 });
+    expect(result.score).toBe(6550);
   });
 
-  it('灌水上限:參與 +10、專案最多 6 個(+24)、有效完成 +20,沒有承辦判例最高 54 分且停在藍', () => {
-    const result = node({ participatedCases: 99, projects: 40, completedPeak: 5000, completedNow: 5000 });
-    expect(result.parts).toEqual({ confirmedCases: 0, participatedCases: 10, projects: 24, completed: 20 });
-    expect(result.score).toBe(54);
-    expect(result.tier).toBe('blue');
-  });
-
-  it('有效完成 = 完成峰值 − 達峰時的退回數,每 10 件 1 分;退回多於完成時為 0', () => {
-    expect(node({ completedPeak: 59, rejectedPeak: 10 }).parts.completed).toBe(4);
+  it('有效完成 = 完成峰值 − 退回峰值;退回多於完成時為 0', () => {
+    expect(node({ completedPeak: 59, rejectedPeak: 10 }).parts.completed).toBe(49);
     expect(node({ completedPeak: 3, rejectedPeak: 9 }).effectiveCompleted).toBe(0);
   });
 
   it.each([
-    [9, 'white'], [10, 'green'], [29, 'green'], [30, 'blue'], [59, 'blue'],
-  ] as const)('門檻邊界(不需另外條件的等級):%s 分 → %s', (score, tier) => {
-    // Only own cases (×10) plus participations (×1, at most 10) to hit an exact score.
-    const confirmedCases = Math.floor(score / 10);
-    expect(node({ confirmedCases, participatedCases: score - confirmedCases * 10 }).tier).toBe(tier);
+    [9, 'white'], [10, 'green'], [99, 'green'], [100, 'blue'], [199, 'blue'],
+  ] as const)('分數門檻:%s 分 → %s', (score, tier) => {
+    expect(node({ completedPeak: score }).tier).toBe(tier);
   });
 
-  it('紫:60 分且 ≥3 份承辦判例;金:120 分、≥8 份、≥2 個專案;紅:200 分、≥15 份、≥3 個專案', () => {
-    expect(node({ confirmedCases: 6 }).tier).toBe('violet');
-    expect(node({ confirmedCases: 5, participatedCases: 9 }).tier).toBe('blue');
-    expect(node({ confirmedCases: 2, participatedCases: 10, projects: 6, completedPeak: 200 }).tier).toBe('blue');
-    expect(node({ confirmedCases: 12 }).tier).toBe('violet');
-    expect(node({ confirmedCases: 12 }).caps).toEqual([{ kind: 'projects', tier: 'gold', need: 2, have: 0 }]);
-    expect(node({ confirmedCases: 11, projects: 2, participatedCases: 2 }).tier).toBe('gold');
-    expect(node({ confirmedCases: 20, projects: 2 }).tier).toBe('gold');
-    expect(node({ confirmedCases: 20, projects: 3 }).tier).toBe('red');
-    // 14 own cases can score at most 140 + 54 = 194, so red's 15-case rule is never the binding one below 200.
-    expect(node({ confirmedCases: 14, projects: 6, participatedCases: 10, completedPeak: 400 }).tier).toBe('gold');
-    expect(node({ confirmedCases: 2, participatedCases: 10, projects: 6, completedPeak: 200 }).caps)
-      .toEqual([{ kind: 'cases', tier: 'violet', need: 3, have: 2 }]);
+  it('紫:200 分且承辦或參與至少 1 份;只有參與也可以', () => {
+    expect(node({ completedPeak: 250 }).tier).toBe('blue');
+    expect(node({ completedPeak: 250 }).caps).toEqual([{ kind: 'involvement', tier: 'violet', need: 1, have: 0 }]);
+    expect(node({ participatedCases: 1, completedPeak: 190 }).tier).toBe('violet');
+    expect(node({ confirmedCases: 1, completedPeak: 180 }).tier).toBe('violet');
   });
 
-  it('退回率 >20% 最高到藍;紅要求 ≤10%;完成數 <10 件時不判斷', () => {
-    const strong = { confirmedCases: 20, projects: 3 };
-    expect(node({ ...strong, completedNow: 50, rejectedNow: 11 }).tier).toBe('blue');
-    expect(node({ ...strong, completedNow: 50, rejectedNow: 11 }).caps).toEqual([{ kind: 'rejection', limit: 0.2, rate: 0.22 }]);
-    expect(node({ ...strong, completedNow: 50, rejectedNow: 6 }).caps).toEqual([{ kind: 'rejection', limit: 0.1, rate: 0.12 }]);
-    expect(node({ ...strong, completedNow: 50, rejectedNow: 10 }).tier).toBe('gold');
-    expect(node({ ...strong, completedNow: 50, rejectedNow: 6 }).tier).toBe('gold');
-    expect(node({ ...strong, completedNow: 50, rejectedNow: 5 }).tier).toBe('red');
-    expect(node({ ...strong, completedNow: 9, rejectedNow: 9 }).tier).toBe('red');
-    expect(node({ ...strong, completedNow: 9, rejectedNow: 9 }).rejectionRate).toBeNull();
+  it('金:300 分、承辦+參與至少 2 份、專案至少 2 個', () => {
+    expect(node({ confirmedCases: 1, participatedCases: 1, projects: 2, completedPeak: 240 }).tier).toBe('gold');
+    expect(node({ confirmedCases: 1, projects: 2, completedPeak: 300 }).caps)
+      .toEqual([{ kind: 'involvement', tier: 'gold', need: 2, have: 1 }]);
+    expect(node({ confirmedCases: 1, participatedCases: 1, projects: 1, completedPeak: 300 }).tier).toBe('violet');
   });
 
-  it('退回率用目前窗口,有效完成用峰值:舊任務過期時分數不掉', () => {
-    const before = node({ confirmedCases: 3, completedPeak: 120, rejectedPeak: 0, completedNow: 120 });
-    const after = node({ confirmedCases: 3, completedPeak: 120, rejectedPeak: 0, completedNow: 12, rejectedNow: 0 });
-    expect(after.score).toBe(before.score);
+  it('紅:500 分、承辦至少 3 份、(專案至少 3 個或參與至少 5 份)、有效完成至少 201 件', () => {
+    const red = { confirmedCases: 3, projects: 3, completedPeak: 201 };
+    expect(node(red).tier).toBe('gold');
+    expect(node({ ...red, completedPeak: 400 }).tier).toBe('red');
+    expect(node({ confirmedCases: 3, participatedCases: 5, projects: 2, completedPeak: 400 }).tier).toBe('red');
+    expect(node({ confirmedCases: 2, participatedCases: 9, projects: 9, completedPeak: 900 }).caps)
+      .toEqual([{ kind: 'cases', tier: 'red', need: 3, have: 2 }]);
+    expect(node({ confirmedCases: 3, participatedCases: 4, projects: 2, completedPeak: 900 }).caps)
+      .toEqual([{ kind: 'breadth', tier: 'red', needProjects: 3, needParticipated: 5, projects: 2, participated: 4 }]);
+    expect(node({ confirmedCases: 20, projects: 3, completedPeak: 200 }).caps)
+      .toEqual([{ kind: 'completed', tier: 'red', need: 201, have: 200 }]);
+    // Rejections only lower the effective count: 300 done − 100 rejected = 200 is not enough for red.
+    expect(node({ confirmedCases: 20, projects: 3, completedPeak: 300, rejectedPeak: 100 }).tier).toBe('gold');
   });
 
-  it('B1:完成數不變、之後才補按的退回 → 有效完成數下降,峰值退回率也進閘門', () => {
-    const before = node({ confirmedCases: 20, projects: 3, completedPeak: 100, rejectedPeak: 0, completedNow: 100, rejectedNow: 0 });
-    const after = node({ confirmedCases: 20, projects: 3, completedPeak: 100, rejectedPeak: 30, completedNow: 100, rejectedNow: 30 });
-    expect(before.parts.completed).toBe(10);
-    expect(after.parts.completed).toBe(7);
-    expect(after.score).toBe(before.score - 3);
-    expect(before.tier).toBe('red');
-    expect(after.tier).toBe('blue');
-    // Old tasks left the window (now 12 done, 1 rejected = 8%), but the peaks still say 30 / 100: the gate uses 30%.
-    const later = node({ confirmedCases: 20, projects: 3, completedPeak: 100, rejectedPeak: 30, completedNow: 12, rejectedNow: 1 });
-    expect(later.windowRejectionRate).toBeCloseTo(1 / 12);
-    expect(later.peakRejectionRate).toBeCloseTo(0.3);
-    expect(later.rejectionRate).toBeCloseTo(0.3);
-    expect(later.tier).toBe('blue');
-    // A recent bad window counts even when the peaks look fine.
-    const recent = node({ confirmedCases: 20, projects: 3, completedPeak: 200, rejectedPeak: 30, completedNow: 40, rejectedNow: 12 });
-    expect(recent.rejectionRate).toBeCloseTo(0.3);
-    expect(recent.tier).toBe('blue');
+  it('沒有退回率閘門:退回率高也不會因此降級', () => {
+    expect(node({ confirmedCases: 20, projects: 3, completedPeak: 300, completedNow: 50, rejectedNow: 40 }).tier).toBe('red');
   });
 
-  it('B2:退回數大於完成數(含失敗任務上的退回)時不出現負值', () => {
-    const result = node({ confirmedCases: 3, completedPeak: 5, rejectedPeak: 40, completedNow: 12, rejectedNow: 40 });
-    expect(result.effectiveCompleted).toBe(0);
-    expect(result.parts.completed).toBe(0);
-    expect(result.score).toBe(30);
-    expect(result.rejectionRate).toBeGreaterThan(1);
-    expect(result.tier).toBe('blue');
+  it('跳過的每一級都列出缺什麼', () => {
+    expect(node({ completedPeak: 600 }).caps.map(({ tier }) => tier)).toEqual(['red', 'red', 'gold', 'gold', 'violet']);
   });
 
-  it('封頂說明文字', () => {
-    expect(capText({ kind: 'no-cases' })).toBe('沒有自己承辦的已確認判例,最高到藍晶');
-    expect(capText({ kind: 'rejection', limit: 0.2, rate: 0.25 })).toBe('退回率 25%,超過 20%,最高到藍晶');
-    expect(capText({ kind: 'rejection', limit: 0.1, rate: 0.12 })).toBe('退回率 12%,超過 10%,不能到紅晶');
-    expect(capText({ kind: 'cases', tier: 'gold', need: 8, have: 5 })).toBe('金晶需要 8 份承辦的已確認判例(目前 5 份)');
+  it('說明文字', () => {
+    expect(capText({ kind: 'involvement', tier: 'violet', need: 1, have: 0 })).toBe('紫晶需要至少 1 份承辦或參與的已確認判例(目前 0 份)');
+    expect(capText({ kind: 'cases', tier: 'red', need: 3, have: 2 })).toBe('紅晶需要至少 3 份承辦的已確認判例(目前 2 份)');
+    expect(capText({ kind: 'projects', tier: 'gold', need: 2, have: 1 })).toBe('金晶需要至少 2 個專案(目前 1 個)');
+    expect(capText({ kind: 'breadth', tier: 'red', needProjects: 3, needParticipated: 5, projects: 2, participated: 4 }))
+      .toBe('紅晶需要至少 3 個專案或 5 份參與的已確認判例(目前 2 個專案、4 份參與)');
+    expect(capText({ kind: 'completed', tier: 'red', need: 201, have: 200 })).toBe('紅晶需要有效完成至少 201 件(目前 200 件)');
   });
 
   it('彩虹只來自手動頒發', () => {
