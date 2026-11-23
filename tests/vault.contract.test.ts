@@ -35,12 +35,12 @@ afterEach(async () => {
 });
 
 describe('記憶庫唯讀契約', () => {
-  it('掃描四類記憶、排除附屬目錄與暫存檔，並保留各種判例和書籤狀態', async () => {
+  it('掃描回憶錄與既有記憶、排除附屬目錄與暫存檔，並保留各種判例和書籤狀態', async () => {
     const snapshot = await new VaultReader(fixture, now).read();
     const entries = snapshot.listEntries({ includeSuperseded: true });
 
-    expect(entries).toHaveLength(12);
-    expect(new Set(entries.map(({ kind }) => kind))).toEqual(new Set(['node', 'case', 'knowledge', 'preference']));
+    expect(entries).toHaveLength(16);
+    expect(new Set(entries.map(({ kind }) => kind))).toEqual(new Set(['node', 'case', 'knowledge', 'preference', 'memoir']));
     expect(entries.every(({ path }) => !path.includes('/_') && !path.endsWith('.tmp'))).toBe(true);
     expect(snapshot.listEntries({ kind: 'case' }).map(({ status }) => status)).toEqual(['已確認', '未確認', '退回']);
     expect(snapshot.listEntries({ kind: 'case', status: '未確認' }).map(({ path }) => path)).toEqual([casePaths[1]]);
@@ -100,10 +100,10 @@ describe('記憶庫唯讀契約', () => {
     ].join('\n'));
     const snapshot = await new VaultReader(root, now).read();
     const note = await snapshot.readEntry(path);
-    expect(note).toMatchObject({ summary: paragraph.slice(0, 80), shelf: 'archive', nodeIds: [moss, heron] });
+    expect(note).toMatchObject({ summary: paragraph.slice(0, 80), shelf: 'knowledge', nodeIds: [moss, heron] });
     expect(note?.attributes.slice(0, 2)).toEqual([['3000', '最先'], ['1000', '其次']]);
-    expect(snapshot.search('青松閥 斷面水流', { shelf: 'archive', status: ['未確認', '退回'] }).map((entry) => entry.path)).toEqual([path]);
-    expect(snapshot.search('紙鷺', { shelf: 'archive' }).map((entry) => entry.path)).toEqual([path]);
+    expect(snapshot.search('青松閥 斷面水流', { shelf: 'knowledge', status: ['未確認', '退回'] }).map((entry) => entry.path)).toEqual([path]);
+    expect(snapshot.search('紙鷺', { shelf: 'knowledge' }).map((entry) => entry.path)).toEqual([path]);
     expect(snapshot.search('回顧關鍵字')).toEqual([]);
     expect(snapshot.listEntries({ kind: 'node' }).every((entry) => entry.shelf === null)).toBe(true);
   });
