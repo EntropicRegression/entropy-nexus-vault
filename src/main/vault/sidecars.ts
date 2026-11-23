@@ -4,6 +4,7 @@ import type { HeatRecall } from '../../shared/heat';
 import type { CrystalLink, CrystalStats, NodeCrystal } from '../../shared/types';
 import { opaqueKey } from './privacy';
 import { memoryPath } from './scan';
+import { decodeSavepoints, type StatsSavepoint } from './savepoints';
 
 export const heatFilename = '.nexus-heat.json';
 export const statsFilename = '.nexus-stats.json';
@@ -29,6 +30,8 @@ export interface VaultStatsNode {
   cliRecordExists?: boolean;
   /** 總管 (console 2026-11-22): the current chief; absent in older files. */
   chief: boolean;
+  /** 存點 (console S2, 2026-11-23): newest first; [] in older files (docs/架構.md §15). */
+  savepoints: StatsSavepoint[];
 }
 
 export type ProjectType = 'git' | '資料夾';
@@ -131,6 +134,7 @@ function decodeStatsNode(value: unknown): VaultStatsNode | undefined {
     sessionId: stringValue(value.session.sessionId),
     canWake: status === '封存' && value.session.可接回 === true,
     chief: value.總管 === true,
+    savepoints: decodeSavepoints(value.存點),
     ...(typeof value.session.CLI有紀錄 === 'boolean' ? { cliRecordExists: value.session.CLI有紀錄 } : {}),
   };
 }

@@ -1,5 +1,5 @@
 import type { RichnessInput } from '../../shared/glow';
-import type { CrystalBrand, CrystalLink, CrystalProject, CrystalStats, MemoryEntry, NodeCrystal } from '../../shared/types';
+import type { CrystalBrand, CrystalLink, CrystalProject, CrystalSavepoint, CrystalStats, MemoryEntry, NodeCrystal } from '../../shared/types';
 import { markdownHeadings, memoryTimestamp } from './entry';
 import type { ParsedEntry } from './entry';
 import { field } from './frontmatter';
@@ -7,6 +7,7 @@ import { lineageReference } from './links';
 import type { VaultLinks } from './links';
 import type { VaultStatsNode, VaultStatsSnapshot } from './sidecars';
 import { profileOutline, profilePath } from './profile-content';
+import { withRestoreTarget } from './savepoints';
 
 interface Archive {
   parsed: ParsedEntry;
@@ -57,6 +58,8 @@ export interface CrystalRecord {
   memoirEntries: MemoryEntry[];
   /** Meetings (節點ID = host, 參與節點ID = participant) the node took part in; all statuses (DESIGN.md §5.13). */
   meetingEntries: MemoryEntry[];
+  /** Session savepoints with the restore target marked (docs/架構.md §15). */
+  savepoints: CrystalSavepoint[];
 }
 
 export function profileHighlights(profile: ParsedEntry | undefined, stats: CrystalStats | null) {
@@ -222,6 +225,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       relatedEntries,
       memoirEntries: memoirsByNode.get(nodeId) ?? [],
       meetingEntries: meetingByNode.get(nodeId) ?? [],
+      savepoints: withRestoreTarget(statsNode?.savepoints ?? [], crystal.canWake && status === '封存'),
     });
     for (const [key, name] of projects) {
       const project = projectMembers.get(key) ?? { name, members: [] };

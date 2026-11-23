@@ -176,6 +176,7 @@ export class VaultSnapshot {
       archives: record.archives,
       relatedEntries: record.relatedEntries,
       memoirEntries: record.memoirEntries.filter((entry) => !entry.superseded).sort(compareMemoirChapters),
+      savepoints: record.savepoints,
       meetingEntries: record.meetingEntries.filter((entry) => !entry.superseded)
         .sort((a, b) => b.updatedAt - a.updatedAt || a.path.localeCompare(b.path, 'zh-Hant')),
       confirmedCaseCount: record.relatedEntries.filter((entry) =>

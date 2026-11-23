@@ -1,4 +1,6 @@
-import type { MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/types';
+import { useState } from 'react';
+import type { CrystalSavepoint, MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/types';
+import { savepointBackend, savepointSize, savepointStatus, savepointTime } from './savepoints';
 import { CrystalPortrait, crystalBadge } from './Crystal';
 import { GlowBadge } from './GlowBadge';
 import { localDate } from './local-date';
@@ -43,11 +45,12 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
   alsoIn?: string[];
   /** Opens the full profile over the star map (DESIGN.md §6.6.1). */
   onReadFull?: (trigger: HTMLButtonElement) => void;
-  /** Asks to wake an archived node that can resume (DESIGN.md §6.7). */
-  onWake?: (trigger: HTMLButtonElement) => void;
+  /** Asks to wake an archived node that can resume (DESIGN.md §6.7); savepoint: the restore target (§6.6.5). */
+  onWake?: (trigger: HTMLButtonElement, savepoint?: CrystalSavepoint) => void;
   wake?: WakeState;
 }) {
   const crystal = detail ?? node;
+  const restoreTarget = detail?.savepoints?.find((savepoint) => savepoint.restoreTarget);
   return <aside className={styles.gameFrame + ' ' + styles.detailPanel} data-sky-detail="" data-collapsed={!crystal}
     aria-label="節點履歷" aria-hidden={!crystal} inert={!crystal}>
     {crystal && <>
@@ -116,6 +119,8 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
           })}</ul>
           : <p className={styles.statsTotal} data-memoir-empty="">這個節點還沒有寫回憶錄。</p>}
       </section>}
+      {Boolean(detail?.savepoints?.length) && <Savepoints key={detail!.nodeId} detail={detail!} wake={wake}
+        onWake={onWake && detail!.status === '封存' && detail!.canWake ? onWake : undefined} />}
       {detail && <section className={styles.detailSection} data-meeting-entries="">
         <h3>參與的會議</h3>
         {detail.meetingEntries?.length
@@ -142,8 +147,10 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
         {crystal.cliRecordExists === false ? 'CLI 原始紀錄已清理，僅留存濃縮水晶履歷。' : '此封存節點無法喚醒，僅留存濃縮水晶履歷。'}
       </p>}
       {detail && onWake && crystal.status === '封存' && crystal.canWake && <div className={styles.wakeBlock} data-wake="">
-        <button type="button" className={styles.awardButton} data-wake-action="" disabled={wake?.phase === 'sending'}
-          onClick={(event) => onWake(event.currentTarget)}>{wake?.phase === 'sending' ? '正在送出…' : '⚡ 在主控台喚醒舊 Session'}</button>
+        {restoreTarget
+          ? <p className={styles.statsTotal} data-wake-by-savepoint="">原對話已被 {savepointBackend(restoreTarget)} 清除,可從上方的存點還原。</p>
+          : <button type="button" className={styles.awardButton} data-wake-action="" disabled={wake?.phase === 'sending'}
+            onClick={(event) => onWake(event.currentTarget)}>{wake?.phase === 'sending' ? '正在送出…' : '⚡ 在主控台喚醒舊 Session'}</button>}
         {wake?.phase === 'sent' && <p role="status" data-wake-result="sent" data-fading={wake.fading ? '' : undefined}
           className={wake.fading ? styles.wakeFading : undefined}>{wakeSentText}</p>}
         {wake?.phase === 'failed' && <p role="alert" data-wake-result="failed">{wake.message}
@@ -158,4 +165,38 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
       </div>}
     </>}
   </aside>;
+}
+
+const shownSavepoints = 3;
+
+/** 存點 (DESIGN.md 6.6.5): metadata only, in the console's order; only the restore target gets a button. */
+function Savepoints({ detail, wake, onWake }: {
+  detail: NodeCrystalDetail;
+  wake?: WakeState;
+  onWake?: (trigger: HTMLButtonElement, savepoint: CrystalSavepoint) => void;
+}) {
+  const savepoints = detail.savepoints ?? [];
+  // The restore target must stay reachable: start expanded when it sits below the first rows.
+  const [expanded, setExpanded] = useState(() => savepoints.findIndex((savepoint) => savepoint.restoreTarget) >= shownSavepoints);
+  const visible = expanded ? savepoints : savepoints.slice(0, shownSavepoints);
+  const hidden = savepoints.length - visible.length;
+  const hasTarget = savepoints.some((savepoint) => savepoint.restoreTarget);
+  return <section className={styles.detailSection} data-savepoints="">
+    <h3>存點({savepoints.length})</h3>
+    <p className={styles.statsTotal}>終止時保存的原始對話,只列紀錄,內容不在此顯示。</p>
+    <ul>{visible.map((savepoint, index) => {
+      const label = [savepointTime(savepoint), savepointBackend(savepoint), savepointSize(savepoint)].join(' · ');
+      const status = savepointStatus(savepoint, detail);
+      return <li key={savepoint.time + ':' + index} className={styles.linkCard} data-savepoint="">
+        <span>{label}<span className={styles.srOnly}> · </span>
+          <span className={styles.archiveRole} data-savepoint-status="">◆ {status}</span></span>
+        {savepoint.restoreTarget && onWake && <button type="button" className={styles.awardButton} data-wake-action=""
+          data-savepoint-restore="" disabled={wake?.phase === 'sending'} onClick={(event) => onWake(event.currentTarget, savepoint)}>
+          {wake?.phase === 'sending' ? '正在送出…' : '從這份存點還原並喚醒'}</button>}
+      </li>;
+    })}</ul>
+    {hidden > 0 && <button type="button" className={styles.linkCard} data-savepoints-more="" aria-expanded={false}
+      onClick={() => setExpanded(true)}>較舊的存點 +{hidden}</button>}
+    {hasTarget && <p className={styles.statsTotal}>主控台一律使用最新一份可還原的存點。</p>}
+  </section>;
 }

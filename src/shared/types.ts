@@ -239,7 +239,22 @@ export interface CrystalStats {
   cases: number | null;
 }
 
+/**
+ * A session savepoint from the console's stats (docs/架構.md §15): metadata only, no path or contents. originalExists is
+ * null for savepoints of an older session. restoreTarget marks the one copy that gets the restore button.
+ */
+export interface CrystalSavepoint {
+  time: number;
+  backend: 'claude' | 'codex' | 'antigravity' | 'other';
+  size: number | null;
+  originalExists: boolean | null;
+  restorable: boolean;
+  restoreTarget: boolean;
+}
+
 export interface NodeCrystalDetail extends NodeCrystal {
+  /** Session savepoints, newest first as the console wrote them (DESIGN.md 6.6.5). Optional for older view fixtures. */
+  savepoints?: CrystalSavepoint[];
   profile: MemoryEntryDetail | null;
   stats: CrystalStats | null;
   archives: Array<{ path: string; archivedAt: string }>;

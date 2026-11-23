@@ -16,6 +16,7 @@ import { alsoInProjects } from './galaxy-geometry';
 import type { GalaxyExit } from './galaxy-geometry';
 import type { AwardFailure } from './AwardDialog';
 import { useSystemMotion } from './use-system-motion';
+import { savepointTime } from './savepoints';
 import styles from './Sky.module.css';
 
 /** How long 「已送出」 stays when no new stats snapshot arrives (review M5d-b #5). */
@@ -53,7 +54,7 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
   /** Full profile reader/editor over the star map, and the button to return focus to. */
   const [reader, setReader] = useState<{ nodeId: string; name: string } | null>(null);
   const readerTrigger = useRef<HTMLButtonElement | null>(null);
-  const [wakeAsk, setWakeAsk] = useState<{ nodeId: string; name: string } | null>(null);
+  const [wakeAsk, setWakeAsk] = useState<{ nodeId: string; name: string; savepointTime?: string } | null>(null);
   const [wakeState, setWakeState] = useState<{ nodeId: string; state: WakeState } | null>(null);
   // The wake button is disabled while sending, which drops focus; once the result is shown, hand focus back to it.
   const wakePhase = wakeState?.state.phase;
@@ -316,10 +317,10 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
         readerTrigger.current = trigger;
         setReader({ nodeId: node.nodeId, name: node.name });
       }}
-      onWake={(trigger) => {
+      onWake={(trigger, savepoint) => {
         if (!node || wakeState?.state.phase === 'sending') return;
         wakeTrigger.current = trigger;
-        setWakeAsk({ nodeId: node.nodeId, name: node.name });
+        setWakeAsk({ nodeId: node.nodeId, name: node.name, savepointTime: savepoint && savepointTime(savepoint) });
       }}
       wake={node && wakeState?.nodeId === node.nodeId ? wakeState.state : undefined}
       onAward={(mode, trigger) => {
@@ -338,7 +339,9 @@ export function Sky({ active, reducedMotion, vaultExists, refreshToken, clock = 
         { label: '取消', onClick: () => { setWakeAsk(null); focusLater(wakeTrigger.current, '[data-wake-action]'); } },
         { label: '確認接回舊 Session', primary: true, onClick: () => void sendWake(wakeAsk.nodeId, wakeAsk.name) },
       ]}>
-      <p>會請主控台接回〈{wakeAsk.name}〉的舊對話,主控台會再請你確認。</p>
+      <p>{wakeAsk.savepointTime
+        ? <>會請主控台從 {wakeAsk.savepointTime} 的存點還原〈{wakeAsk.name}〉的對話並接回;主控台會再請你確認。</>
+        : <>會請主控台接回〈{wakeAsk.name}〉的舊對話,主控台會再請你確認。</>}</p>
     </SkyDialog>}
     <button type="button" className={styles.skylight} onClick={onReturn}>▼ 向下俯視，回到大圖書館判例卷宗室 ▼</button>
   </div>;
