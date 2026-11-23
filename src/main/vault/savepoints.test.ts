@@ -49,7 +49,7 @@ describe('還原對象', () => {
     expect(targets(withRestoreTarget(decoded({ 可還原: false, 原檔還在: null }, {}, {}), true))).toEqual([false, true, false]);
   });
 
-  it('不可喚醒(主控台 S3 前原檔沒了)、原檔還在或 null 時沒有還原對象', () => {
+  it('不可喚醒(例如主控台關閉還原支援時原檔沒了)、原檔還在或 null 時沒有還原對象', () => {
     expect(targets(withRestoreTarget(decoded({}), false))).toEqual([false]);
     expect(targets(withRestoreTarget(decoded({ 原檔還在: true }), true))).toEqual([false]);
     expect(targets(withRestoreTarget(decoded({ 原檔還在: null }), true))).toEqual([false]);
