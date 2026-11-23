@@ -2,7 +2,7 @@ import type { MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/t
 import { CrystalPortrait, crystalBadge } from './Crystal';
 import { GlowBadge } from './GlowBadge';
 import { localDate } from './local-date';
-import { dateLabel } from '../library/catalog';
+import { dateLabel, memoirPeriodLabel, memoirReviewLabel } from '../library/catalog';
 import { NodePortraitControl } from '../brand/NodePortraitControl';
 import styles from './Sky.module.css';
 
@@ -100,20 +100,21 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
           </li>;
         })}</ul>
       </section>}
-      {detail && <section className={styles.detailSection} data-archive-entries="">
+      {detail && <section className={styles.detailSection} data-memoir-entries="">
         <h3>典藏回憶</h3>
-        {detail.archiveEntries?.length
-          ? <ul>{detail.archiveEntries.map((entry) => {
-            // 撰寫 = the entry's 節點ID is this node; 參與 = it is listed in 參與節點ID (DESIGN.md §6.6.4).
-            const role = entry.nodeId === detail.nodeId ? '撰寫' : '參與';
-            const label = (entry.kind === 'preference' ? '偏好' : '知識') + ' · ' + entry.title;
+        {detail.memoirEntries?.length
+          ? <ul>{detail.memoirEntries.map((entry) => {
+            const label = '回憶錄 · ' + memoirPeriodLabel(entry) + ' · ' + entry.title;
+            const review = memoirReviewLabel(entry);
+            const content = <span>{label}
+              {review && <><span className={styles.srOnly}> · </span><span className={styles.archiveRole} data-memoir-status="">{review}</span></>}</span>;
             return <li key={entry.path}>{onOpenEntry
-              ? <button type="button" className={styles.linkCard} data-archive-entry={role} onClick={() => onOpenEntry(entry)}>
-                <span><span className={styles.archiveRole}>{role}</span>{label}</span><span className={styles.toLibrary}>前往典藏書架 →</span></button>
-              : <span className={styles.linkCard}><span className={styles.archiveRole}>{role}</span>{label}</span>}
+              ? <button type="button" className={styles.linkCard} data-memoir-entry="" onClick={() => onOpenEntry(entry)}>
+                {content}<span className={styles.toLibrary}>前往典藏書架 →</span></button>
+              : <span className={styles.linkCard}>{content}</span>}
             </li>;
           })}</ul>
-          : <p className={styles.statsTotal} data-archive-empty="">典藏書架上還沒有這個節點撰寫或參與的卷宗。</p>}
+          : <p className={styles.statsTotal} data-memoir-empty="">這個節點還沒有寫回憶錄。</p>}
       </section>}
       {detail && <section className={styles.detailSection} data-meeting-entries="">
         <h3>參與的會議</h3>

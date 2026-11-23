@@ -6,7 +6,7 @@ import type { Shelf } from './shelves';
 export type { HeatInfo, HeatLevel } from './heat';
 
 /** meeting: a console meeting transcript (meetings/<專案>/<日期>-<主題>.md; 記憶設計討論 第五輪, DESIGN.md §5.13). */
-export type MemoryKind = 'node' | 'case' | 'knowledge' | 'preference' | 'meeting';
+export type MemoryKind = 'node' | 'case' | 'knowledge' | 'preference' | 'meeting' | 'memoir';
 export type MemoryScope = '全域' | '專案';
 export type VaultStatusUpdate = '已確認' | '退回' | '已完成';
 export type FrontMatterValue = string | string[];
@@ -73,6 +73,7 @@ export interface MemoryEntry extends FileVersion {
   previousCount: number;
   /** Meeting transcripts only (kind 'meeting'): header facts for the card, the desk and the profile panel. */
   meeting?: MeetingInfo;
+  memoir?: { coverage: { start: number; end: number | null } | null; coverageText: string };
 }
 
 /** One participant of a meeting. name is '' when 參與者 and 參與節點ID differ in length (never paired by position then). */
@@ -130,6 +131,7 @@ export interface MemoryEntryDetail extends MemoryEntry {
   caseReferences: string[];
   /** Meeting transcripts only. */
   transcript?: MeetingTranscript;
+  memoirSections?: { uncertain: string | null; sources: string | null; body: string };
 }
 
 export interface CrystalProject {
@@ -242,12 +244,8 @@ export interface NodeCrystalDetail extends NodeCrystal {
   stats: CrystalStats | null;
   archives: Array<{ path: string; archivedAt: string }>;
   relatedEntries: MemoryEntry[];
-  /**
-   * The node's 典藏 entries on the downstairs archive shelf: knowledge/preferences whose 節點ID (written by) or
-   * 參與節點ID (took part) names this node; newest first, superseded versions left out (DESIGN.md §6.6.4).
-   * Optional for older view fixtures.
-   */
-  archiveEntries?: MemoryEntry[];
+  /** Chapters authored by this node, in reading order. Includes every status and excludes superseded chapters. */
+  memoirEntries?: MemoryEntry[];
   /**
    * Meetings this node hosted (節點ID) or took part in (參與節點ID); newest first (DESIGN.md §5.13). Like the
    * shelves, every status is listed (the panel marks 未確認/已退回). Optional for older view fixtures.

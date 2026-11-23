@@ -53,11 +53,8 @@ export interface CrystalRecord {
   stats: CrystalStats | null;
   archives: Array<{ path: string; archivedAt: string }>;
   relatedEntries: MemoryEntry[];
-  /**
-   * The node's 典藏 entries (DESIGN.md §6.6.4): archive-shelf knowledge and preferences whose 節點ID (author) is this
-   * node or whose 參與節點ID lists it. Only these structured fields count; free text such as 來源節點 is not used.
-   */
-  archiveEntries: MemoryEntry[];
+  /** Memoir chapters authored by this node, joined by 節點ID only (DESIGN.md §5.15). */
+  memoirEntries: MemoryEntry[];
   /** Meetings (節點ID = host, 參與節點ID = participant) the node took part in; all statuses (DESIGN.md §5.13). */
   meetingEntries: MemoryEntry[];
 }
@@ -123,16 +120,14 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
   const files = new Map<string, NodeFiles>();
   const idByPath = new Map<string, string>();
   const casesByNode = new Map<string, MemoryEntry[]>();
-  const archiveByNode = new Map<string, MemoryEntry[]>();
+  const memoirsByNode = new Map<string, MemoryEntry[]>();
   const meetingByNode = new Map<string, MemoryEntry[]>();
   for (const parsed of entries) {
     const { entry } = parsed;
-    if (entry.shelf === 'archive') {
-      for (const id of new Set([entry.nodeId, ...entry.participantNodeIds].filter(Boolean))) {
-        const related = archiveByNode.get(id) ?? [];
-        related.push(entry);
-        archiveByNode.set(id, related);
-      }
+    if (entry.kind === 'memoir' && entry.nodeId) {
+      const chapters = memoirsByNode.get(entry.nodeId) ?? [];
+      chapters.push(entry);
+      memoirsByNode.set(entry.nodeId, chapters);
     }
     if (entry.kind === 'meeting') {
       for (const id of new Set([entry.nodeId, ...entry.participantNodeIds].filter(Boolean))) {
@@ -225,7 +220,7 @@ export function buildCrystals(entries: ParsedEntry[], links: VaultLinks, snapsho
       stats,
       archives: archives.map(({ parsed, archivedAt }) => ({ path: parsed.entry.path, archivedAt })),
       relatedEntries,
-      archiveEntries: archiveByNode.get(nodeId) ?? [],
+      memoirEntries: memoirsByNode.get(nodeId) ?? [],
       meetingEntries: meetingByNode.get(nodeId) ?? [],
     });
     for (const [key, name] of projects) {

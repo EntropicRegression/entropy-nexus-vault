@@ -18,6 +18,7 @@ const requiredGraphics = [
   { source: 'assets/ui/crystal-ring-mask.svg', name: /^crystal-ring-mask-[\w-]+\.svg$/ },
   // Meeting card coil binding (DESIGN.md §5.13; Hagemi M6 sketch, M6b): a file, not a data: URL.
   { source: 'assets/ui/meeting-coil.svg', name: /^meeting-coil-[\w-]+\.svg$/ },
+  { source: 'assets/ui/memoir-binding.svg', name: /^memoir-binding-[\w-]+\.svg$/ },
 ];
 const fontFamilies = ['noto-serif-tc', 'noto-sans-tc', 'jetbrains-mono'];
 const requiredEntries = ['package.json', 'out/main/index.js', 'out/preload/index.js', renderer + 'index.html'];

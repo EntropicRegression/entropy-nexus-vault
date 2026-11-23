@@ -9,6 +9,8 @@ const { setTimeout: delay } = require('node:timers/promises');
 const repo = resolve(__dirname, '..');
 const entry = join(repo, 'out-dev', 'main', 'index.js');
 const prefix = 'entropy-vault-smoke-';
+const m7Flag = '--m7-screenshots';
+const captureM7 = process.argv.includes(m7Flag);
 const casePath = 'cases/月汐溫室/2026-0002-日報按採樣日期歸檔.md';
 const caseTitle = '日報按採樣日期歸檔';
 const card = '[data-entry=' + JSON.stringify(casePath) + ']';
@@ -36,7 +38,8 @@ function runElectron(root) {
   return new Promise((resolve, reject) => {
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
-    const child = spawn(require('electron'), [__filename, root], { cwd: repo, env, stdio: 'inherit' });
+    const args = [__filename, root, ...(captureM7 ? [m7Flag] : [])];
+    const child = spawn(require('electron'), args, { cwd: repo, env, stdio: 'inherit' });
     let stopped;
     function stop(reason) {
       if (!child.pid || stopped || child.exitCode !== null || child.signalCode !== null) return;
@@ -76,7 +79,7 @@ async function launch() {
     await mkdir(join(root, 'empty-app'));
     await cp(join(repo, 'fixtures', 'memory-vault'), vault, { recursive: true });
     await writeFile(join(userData, 'settings.dev.json'), JSON.stringify({ vaultPath: vault, reducedMotion: true }));
-    console.log('冒煙驗收開始。將開啟 Electron 視窗並操作合成記憶庫複本。');
+    console.log((captureM7 ? 'M7 截圖驗收' : '冒煙驗收') + '開始。將開啟 Electron 視窗並操作合成記憶庫複本。');
     process.exitCode = await runElectron(root) ? 0 : 1;
   } finally {
     await rm(verifiedScratch(root), { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
@@ -86,6 +89,11 @@ async function launch() {
 
 async function exercise(root) {
   const { app, BrowserWindow } = require('electron');
+  if (process.platform === 'win32') {
+    const disabledFeatures = app.commandLine.getSwitchValue('disable-features');
+    app.commandLine.appendSwitch('disable-features', [disabledFeatures, 'CalculateNativeWinOcclusion'].filter(Boolean).join(','));
+  }
+  if (captureM7) app.commandLine.appendSwitch('force-device-scale-factor', '1');
   const errors = [];
   const previousError = console.error;
   console.error = (...args) => {
@@ -93,6 +101,7 @@ async function exercise(root) {
     previousError(...args);
   };
   app.on('web-contents-created', (_event, contents) => {
+    contents.setBackgroundThrottling(false);
     contents.on('console-message', ({ level, message }) => {
       if (level === 'error') errors.push('介面：' + message);
     });
@@ -128,16 +137,17 @@ async function exercise(root) {
     assert.ok(!staged.brandPortraitPath);
     require(entry);
 
-    const contents = await check(step, async () => {
+    const window = await check(step, async () => {
       const window = await waitFor(() => BrowserWindow.getAllWindows().find((win) =>
         win.webContents.getURL() === 'vault-app://app/index.html' && !win.webContents.isLoadingMainFrame()), '寶庫視窗載入');
       const info = await window.webContents.executeJavaScript('window.vault.getVaultInfo()');
       assert.equal(info.exists && info.path, '自訂記憶庫', '未使用暫存記憶庫');
       assert.deepEqual(errors, [], '啟動出現錯誤');
       window.focus();
-      return window.webContents;
+      return window;
     });
 
+    const contents = window.webContents;
     const js = (expression) => contents.executeJavaScript(expression);
     const exists = (selector) => 'document.querySelector(' + JSON.stringify(selector) + ')';
     const visible = (selector) => 'Boolean(' + exists(selector) + ')';
@@ -159,6 +169,10 @@ async function exercise(root) {
     function escape() {
       contents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
       contents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    }
+    if (captureM7) {
+      await captureMemoirViews(window, { check, clickLabel, wait, js, visible, exists, escape });
+      return;
     }
     async function openCase() {
       await click(card + ' [data-entry-title]');
@@ -250,6 +264,77 @@ async function exercise(root) {
     for (const window of BrowserWindow.getAllWindows()) window.destroy();
     console.log('已關閉驗收視窗，結束 Electron 程序。');
     app.exit(success ? 0 : 1);
+  }
+}
+
+async function captureMemoirViews(window, { check, clickLabel, wait, js, visible, exists, escape }) {
+  const directory = join(repo, 'docs', '設計稿', '驗收', 'M7');
+  const tabBar = '[aria-label="卷宗類別"]';
+  const memoirFace = '[data-entry] [data-shelf="archive"]';
+  const draftBoard = 'section[aria-labelledby="draft-board"]';
+  const knowledgeFace = '[data-entry] [data-shelf="knowledge"]';
+  const chapters = '[aria-label="這本回憶錄"]';
+  const selectedChapter = chapters + ' [aria-current="page"]';
+  const chapterTitle = '和夜苔交接的那一夜';
+  const deskTitle = exists(desk + ' h2') + '?.textContent === ';
+
+  await mkdir(directory, { recursive: true });
+  for (const [width, height] of [[1600, 900], [1280, 760]]) {
+    const size = `${width}x${height}`;
+    window.setContentSize(width, height);
+    await wait(`innerWidth === ${width} && innerHeight === ${height}`, size + ' 畫面尺寸');
+    async function capture(name) {
+      await js('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');
+      // Chromium can return the preceding compositor frame on the first capture after loading the board.
+      await window.webContents.capturePage();
+      await delay(150);
+      const png = (await window.webContents.capturePage()).toPNG();
+      assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [width, height], '截圖像素尺寸不正確');
+      await writeFile(join(directory, `${size}-${name}.png`), png);
+    }
+    async function focusShelf(selector) {
+      await wait(visible(selector), '書架卡片');
+      await js(exists('[aria-label="藏書架"]') + '.scrollTop = 0');
+    }
+
+    await check(size + ' 案頭分開計數回憶錄', async () => {
+      await wait(visible(tabBar), '卷宗類別頁籤');
+      await clickLabel(tabBar, '全部');
+      await wait(`/(未完書籤 \\d+).*?(會議 \\d+).*?(回憶錄 [1-9]\\d*)/.test(${exists(draftBoard)}?.textContent)`, '案頭獨立計數');
+      await js(exists('[aria-label="藏書架"]') + '.scrollTop = 0');
+      await capture('drafts');
+    });
+    await check(size + ' 知識書架同時收錄知識與偏好', async () => {
+      await clickLabel(tabBar, '知識');
+      await focusShelf(knowledgeFace);
+      const labels = await js(`Array.from(document.querySelectorAll(${JSON.stringify(knowledgeFace)}), card => card.textContent)`);
+      assert.ok(labels.some((label) => label.includes('知識')) && labels.some((label) => label.includes('偏好')));
+      assert.equal(await js(visible(memoirFace)), false);
+      await capture('knowledge');
+    });
+    await check(size + ' 典藏書架只列回憶錄', async () => {
+      await clickLabel(tabBar, '典藏');
+      await focusShelf(memoirFace);
+      assert.equal(await js(visible(knowledgeFace)), false);
+      const paths = await js('Array.from(document.querySelectorAll("[data-entry]"), card => card.dataset.entry)');
+      assert.ok(paths.length >= 3 && paths.every((path) => path.startsWith('memoirs/')));
+      await capture('archive');
+    });
+    await check(size + ' 回憶錄閱讀桌顯示章節、來源與不確定之處', async () => {
+      await clickLabel('[data-entry]', chapterTitle);
+      await wait(deskTitle + JSON.stringify(chapterTitle), '回憶錄閱讀桌');
+      await wait(visible(selectedChapter) + ' && ' + visible('[data-memoir-sources]'), '目前的回憶錄章與來源');
+      assert.ok((await js(exists(selectedChapter) + '.textContent')).includes(chapterTitle));
+      assert.match(await js(exists('[data-memoir-uncertain]') + '?.textContent'), /前一輪的採樣時間/);
+      assert.match(await js(exists(chapters) + '.textContent'), /觀測日報的第一課.*和夜苔交接的那一夜.*把溫室留給下一位/s);
+      await capture('reader');
+      await clickLabel(chapters, '下一章 →');
+      await wait(deskTitle + JSON.stringify('把溫室留給下一位'), '下一章');
+      await clickLabel(chapters, '← 上一章');
+      await wait(deskTitle + JSON.stringify(chapterTitle), '上一章');
+      escape();
+      await wait('!' + visible(desk), '閱讀桌關閉');
+    });
   }
 }
 

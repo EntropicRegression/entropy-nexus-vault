@@ -33,12 +33,18 @@ export function nodeName(entry: MemoryEntry, id: string, nodes: ReadonlyMap<stri
     || entry.meeting?.participants.find((participant) => participant.nodeId === id)?.name || id;
 }
 
+export function nodeRoleLabel(entry: MemoryEntry, id: string): string {
+  if (entry.kind === 'memoir') return '撰寫：';
+  if (entry.nodeId !== id) return '參與：';
+  return entry.shelf === 'meeting' ? '主持：' : '承辦：';
+}
+
 function Seal({ id, entry, nodes, onNode }: AvatarProps & { id: string }) {
   const node = nodes.get(id);
   // Avatar → brand default (cropped round by .seal) → the name's first character.
   const { current, generation, fail } = usePortraitChain(node, 'avatar');
   const name = nodeName(entry, id, nodes);
-  const label = (entry.nodeId === id ? (entry.shelf === 'meeting' ? '主持：' : '承辦：') : '參與：') + name;
+  const label = nodeRoleLabel(entry, id) + name;
   const initial = Array.from(name.trim())[0]?.toUpperCase() || '？';
   const content = current
     ? <img key={current.url + '#' + generation} src={current.url} alt="" loading="lazy" width="20" height="20"
@@ -69,12 +75,13 @@ export function EndBadge({ reason }: { reason: MeetingInfo['endReason'] }) {
 
 export function AvatarSeals(props: AvatarProps) {
   const { entry } = props;
-  if (!entry.nodeIds.length) return null;
+  const ids = entry.kind === 'memoir' ? (entry.nodeId ? [entry.nodeId] : []) : entry.nodeIds;
+  if (!ids.length) return null;
   return <span className={styles.seals}>
-    {entry.nodeIds.slice(0, 3).map((id) => <span className={styles.sealLayer} key={id}>
+    {ids.slice(0, 3).map((id) => <span className={styles.sealLayer} key={id}>
       <Seal id={id} {...props} />
     </span>)}
-    {entry.nodeIds.length > 3 && <span className={styles.sealMore} title={'另有 ' + (entry.nodeIds.length - 3) + ' 位節點'}>+{entry.nodeIds.length - 3}</span>}
+    {ids.length > 3 && <span className={styles.sealMore} title={'另有 ' + (ids.length - 3) + ' 位節點'}>+{ids.length - 3}</span>}
   </span>;
 }
 

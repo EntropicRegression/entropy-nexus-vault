@@ -14,7 +14,7 @@ import { buildProfileBytes, editPlaceholders, profilePath, restorePlaceholders, 
 
 const recyclePrefix = '_回收/';
 const renameDelays = [25, 50, 100, 200];
-const shelfFolder = /^(?:cases|knowledge|preferences|meetings)\//i;
+const shelfFolder = /^(?:cases|knowledge|preferences|meetings|memoirs)\//i;
 
 function failed(reason: VaultWriteFailure['reason'], current?: FileVersion): VaultWriteFailure {
   return current ? { ok: false, reason, current } : { ok: false, reason };

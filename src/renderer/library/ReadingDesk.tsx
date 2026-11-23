@@ -1,13 +1,14 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { DeskMode, MemoryEntry, MemoryEntryDetail, NodeCrystal } from '../../shared/types';
 import { canSetStatus, primaryStatus } from '../../shared/vault-actions';
-import { categoryLabel, dateLabel, entryIdentifier, isProjectIdAttribute, projectDisplayName } from './catalog';
-import { HeatSlot, nodeName, PreviousVersion, StatusMark } from './Paper';
+import { categoryLabel, dateLabel, entryIdentifier, isProjectIdAttribute, memoirPeriodLabel, projectDisplayName } from './catalog';
+import { HeatSlot, nodeName, nodeRoleLabel, PreviousVersion, StatusMark } from './Paper';
 import type { Feedback, WriteRequest } from './use-vault-writes';
 import { legacyWriteMessage } from './use-vault-writes';
 import { WriteFeedback } from './WriteFeedback';
 import { Markdown } from './Markdown';
 import { MeetingView } from './MeetingView';
+import { MemoirChapters, MemoirDocument } from './MemoirView';
 import styles from './Library.module.css';
 
 export { Markdown } from './Markdown';
@@ -58,6 +59,8 @@ export function ReadingDesk(props: Props) {
   const name = entry && projectDisplayName(entry);
   const attributes = entry?.attributes.filter(([key]) => !isProjectIdAttribute(key)) ?? [];
   const primary = entry && primaryStatus(entry);
+  const isMemoir = entry?.kind === 'memoir';
+  const nodeIds = entry && (isMemoir ? (entry.nodeId ? [entry.nodeId] : []) : entry.nodeIds);
   const sourceMeeting = entry && entry.shelf === 'decision' ? sourceMeetingPath(entry.attributes) : null;
   const blocked = error || checking || writeState?.phase === 'pending' ||
     (writeState?.phase === 'failure' && ['conflict', 'missing', 'legacy'].includes(writeState.reason));
@@ -76,16 +79,17 @@ export function ReadingDesk(props: Props) {
             <div className={styles.sheetMeta}>
               <span>{entryIdentifier(entry)}</span>
               {entry.shelf === 'case' && <><span>{categoryLabel(entry)}</span><time>{dateLabel(entry.updatedAt)}</time></>}
+              {entry.memoir?.coverage && <span>涵蓋期間：{memoirPeriodLabel(entry)}</span>}
               {name && <span>{name}</span>}
               <StatusMark status={entry.status} /><HeatSlot heat={entry.heat} />
-              {entry.nodeIds.map((id) => {
+              {nodeIds?.map((id) => {
                 const node = nodes.get(id);
-                const label = (entry.nodeId === id ? (entry.shelf === 'meeting' ? '主持：' : '承辦：') : '參與：') + nodeName(entry, id, nodes);
+                const label = nodeRoleLabel(entry, id) + nodeName(entry, id, nodes);
                 return node && onNode
                   ? <button key={id} type="button" className={styles.inlineLink} onClick={() => onNode(node)}>{label}</button>
                   : <span key={id}>{label}</span>;
               })}
-              {!entry.nodeId && entry.nodeLabel && <span>{entry.shelf === 'meeting' ? '主持：' : '承辦：'}{entry.nodeLabel}</span>}
+              {!entry.nodeId && entry.nodeLabel && <span>{nodeRoleLabel(entry, entry.nodeId)}{entry.nodeLabel}</span>}
             </div>
             <h2 tabIndex={-1} ref={title}>{entry.title}</h2>
           </>}
@@ -102,20 +106,21 @@ export function ReadingDesk(props: Props) {
       {showLoading && <p className={styles.paperMessage} role="status">正在翻閱…</p>}
       {error && <p className={styles.paperMessage} role="alert">{entry ? '無法重新讀取，以下是上次讀取的內容。' : '無法讀取這卷記憶。'}</p>}
       {entry && <>
-        <div className={styles.sheetBody}>
+        <div className={styles.sheetBody} data-memoir={isMemoir || undefined}>
           <div className={styles.document}>
             {entry.transcript
               ? <MeetingView key={entry.path} entry={entry} entries={entries} nodes={nodes} related={related} onOpen={onOpen} onNode={onNode} />
-              : <>
+              : isMemoir ? <MemoirDocument entry={entry} related={related} onOpen={onOpen} /> : <>
                 {entry.summary && <div className={styles.conclusion}><strong>結論摘要</strong><p>{entry.summary}</p></div>}
                 <Markdown body={entry.body.replace(/^摘要[:：].*(?:\r?\n|$)/m, '')} related={related} onOpen={onOpen} lineBreaks={entry.shelf === 'meeting'} />
               </>}
-            {entry.review && <section className={styles.review}>
+            {!isMemoir && entry.review && <section className={styles.review}>
               <h3>回顧</h3>
               <Markdown body={entry.review} related={related} onOpen={onOpen} />
             </section>}
           </div>
           <aside className={styles.sheetAside}>
+            {isMemoir && <MemoirChapters entry={entry} entries={entries} onOpen={onOpen} />}
             <section>
               <h3>取代演化線</h3>
               <ol className={styles.lineage}>

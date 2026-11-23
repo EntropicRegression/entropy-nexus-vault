@@ -20,7 +20,7 @@ const baseEntry: MemoryEntry = {
   heat: { level: 'tepid', count: 1, lastRecalledAt: null },
 };
 const archive: MemoryEntry = { ...baseEntry, path: 'preferences/排版.md', title: '直式頁碼', summary: '右下方排頁碼。',
-  kind: 'preference', shelf: 'archive', scope: '全域', caseId: null, projectId: '', projectName: '', previousCount: 0 };
+  kind: 'preference', shelf: 'knowledge', scope: '全域', caseId: null, projectId: '', projectName: '', previousCount: 0 };
 const bookmark: MemoryEntry = { ...baseEntry, path: 'knowledge/試驗/追蹤.md', title: '追蹤故障讀值', kind: 'knowledge',
   shelf: 'bookmark', subtype: '書籤', status: '未完', caseId: null, previousCount: 0 };
 const previous: MemoryEntry = { ...baseEntry, path: 'cases/試驗/2025-0002.md', title: '舊採樣記錄',
@@ -480,7 +480,7 @@ describe('典藏室', () => {
     expect(container.textContent).toContain('這裡還沒有任何記憶');
   });
 
-  it('案頭包含典藏草稿與未完書籤，開卷可閱讀摘要、回顧及演化線', async () => {
+  it('案頭包含偏好草稿與未完書籤，開卷可閱讀摘要、回顧及演化線', async () => {
     const vault = await renderApp();
     const board = container.querySelector('[aria-labelledby="draft-board"]')!;
     expect(board.textContent).toContain('待核閱 2 · 未完書籤 1');
@@ -502,9 +502,9 @@ describe('典藏室', () => {
     vi.useFakeTimers();
     const vault = await renderApp();
     expect(container.querySelectorAll('[data-entry]')).toHaveLength(3);
-    act(() => button('典藏', container.querySelector('[aria-label="卷宗類別"]')!).click());
+    act(() => button('知識', container.querySelector('[aria-label="卷宗類別"]')!).click());
     expect(container.querySelectorAll('[data-entry]')).toHaveLength(1);
-    expect(card(archive).textContent).toContain('典藏・偏好 · ');
+    expect(card(archive).textContent).toContain('偏好 · ');
     act(() => {
       const select = container.querySelector('select')!;
       select.value = select.options[1].value;

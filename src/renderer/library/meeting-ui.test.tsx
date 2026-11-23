@@ -46,7 +46,7 @@ describe('會議書架', () => {
     await act(async () => { root.render(<Library query="" deskMode="B" onToggleMode={() => {}} active refreshToken={0} />); });
   }
 
-  it('第五個書架與「會議」分頁;卡片顯示識別、輪數與中止/逾時標籤', async () => {
+  it('會議書架與「會議」分頁顯示識別、輪數與中止和逾時標籤', async () => {
     await mount([base, m1, m2, m3]);
     const heading = [...container.querySelectorAll('h2')].map((item) => item.textContent);
     expect(heading.indexOf('會議書架')).toBeGreaterThan(heading.indexOf('判例書架'));
@@ -67,7 +67,7 @@ describe('會議書架', () => {
   it('案頭:會議不計入待核閱,另計「會議 K」,標籤為待核閱會議,照更新時間與其他便箋混排', async () => {
     await mount([m2, m3, base, m1]);
     const board = container.querySelector('[aria-labelledby="draft-board"]')!;
-    expect(board.querySelector('[aria-live]')!.textContent).toBe('待核閱 1 · 未完書籤 0 · 會議 2');
+    expect(board.querySelector('[aria-live]')!.textContent).toBe('待核閱 1 · 未完書籤 0 · 會議 2 · 回憶錄 0');
     const labels = [...board.querySelectorAll('article strong')].map((item) => item.textContent);
     expect(labels).toEqual(['待核閱會議', '待核閱會議', '待核閱判例']);
   });
@@ -75,7 +75,7 @@ describe('會議書架', () => {
 
 const crystal = { nodeId: 'host', name: '霧苔', role: null, status: '線上', canWake: false, projectNames: [], glow: 'white' } as NodeCrystal;
 const detail = (meetingEntries?: MemoryEntry[]): NodeCrystalDetail => ({
-  ...crystal, profile: null, stats: null, archives: [], relatedEntries: [], archiveEntries: [], meetingEntries,
+  ...crystal, profile: null, stats: null, archives: [], relatedEntries: [], memoirEntries: [], meetingEntries,
   confirmedCaseCount: 0, specialty: '', workflow: '', review: '', notRejectedRate: null, consoleAppendixCount: 0,
 } as unknown as NodeCrystalDetail);
 

@@ -1,6 +1,7 @@
 import { searchTerms } from '../../shared/node-search';
 import { join } from 'node:path';
 import { heatDecayAt } from '../../shared/heat';
+import { compareMemoirChapters } from '../../shared/shelves';
 import type { EntryFilter, MemoryEntry, MemoryEntryDetail, NodeCrystalDetail, NodeHit, ReadableNodeProfile } from '../../shared/types';
 import type { GalaxyInput } from '../../shared/galaxies';
 import { buildCrystals, profileHighlights } from './crystals';
@@ -174,9 +175,7 @@ export class VaultSnapshot {
       stats: record.stats,
       archives: record.archives,
       relatedEntries: record.relatedEntries,
-      // Newest first; replaced (superseded) versions are left out, as on the shelves.
-      archiveEntries: record.archiveEntries.filter((entry) => !entry.superseded)
-        .sort((a, b) => b.updatedAt - a.updatedAt || a.path.localeCompare(b.path, 'zh-Hant')),
+      memoirEntries: record.memoirEntries.filter((entry) => !entry.superseded).sort(compareMemoirChapters),
       meetingEntries: record.meetingEntries.filter((entry) => !entry.superseded)
         .sort((a, b) => b.updatedAt - a.updatedAt || a.path.localeCompare(b.path, 'zh-Hant')),
       confirmedCaseCount: record.relatedEntries.filter((entry) =>
@@ -196,6 +195,7 @@ export class VaultSnapshot {
       body: parsed.body,
       review: parsed.review,
       ...(parsed.transcript ? { transcript: parsed.transcript } : {}),
+      ...(parsed.memoirSections ? { memoirSections: parsed.memoirSections } : {}),
       supersessionChain,
       caseReferences: this.links.caseReferences(parsed),
     };

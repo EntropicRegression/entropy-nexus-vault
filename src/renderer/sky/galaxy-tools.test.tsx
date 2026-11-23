@@ -45,12 +45,14 @@ function galaxyMap(): EnabledMap {
     bridges: [],
   };
 }
-const entry = (path: string, title: string, nodeId: string, kind: 'knowledge' | 'preference', nodeIds: string[] = [nodeId]) =>
-  ({ path, title, nodeId, nodeIds, kind, shelf: 'archive', subtype: '', status: '已確認', summary: '', updatedAt: 1 }) as unknown as MemoryEntry;
+const chapter = (title: string, status: string, day: number) => ({
+  path: 'memoirs/金穗-a1/' + title + '.md', title, nodeId: 'a1', nodeIds: ['a1'], kind: 'memoir', shelf: 'archive',
+  subtype: '', status, summary: '', updatedAt: Date.UTC(2026, 10, day),
+  memoir: { coverage: { start: Date.UTC(2026, 10, day), end: null }, coverageText: '' },
+}) as MemoryEntry;
 const detail = (id: string): NodeCrystalDetail => ({
   ...data.crystals.find((node) => node.nodeId === id)!, profile: null, stats: null, archives: [], relatedEntries: [],
-  archiveEntries: id === 'a1' ? [entry('knowledge/阿爾法/採樣間隔.md', '採樣間隔', 'a1', 'knowledge'),
-    entry('preferences/報表格式.md', '報表格式', 'a2', 'preference', ['a2', 'a1'])] : [],
+  memoirEntries: id === 'a1' ? [chapter('採樣間隔', '已確認', 20), chapter('報表格式', '未確認', 21), chapter('完成交接', '退回', 22)] : [],
   confirmedCaseCount: 0, specialty: '', workflow: '', review: '', notRejectedRate: null, consoleAppendixCount: 0,
 });
 
@@ -230,7 +232,7 @@ describe('星系總覽:顏色篩選、彩虹展示、節點搜尋、典藏回憶
     expect(q('[data-dust="lost"]')!.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('履歷欄「典藏回憶」:列出撰寫/參與的典藏卷宗,點了前往樓下典藏書架;沒有時顯示空狀態;畫面沒有路徑', async () => {
+  it('履歷欄「典藏回憶」列回憶錄、狀態與開卷按鈕，無資料時顯示空狀態', async () => {
     await render();
     const input = q<HTMLInputElement>('[data-galaxy-finder] input')!;
     await act(async () => {
@@ -239,17 +241,18 @@ describe('星系總覽:顏色篩選、彩虹展示、節點搜尋、典藏回憶
     });
     await act(async () => q<HTMLButtonElement>('[data-finder-result="a1"]')!.click());
     await fly();
-    const section = q('[data-archive-entries]')!;
-    const items = [...section.querySelectorAll<HTMLButtonElement>('[data-archive-entry]')];
-    expect(items.map((item) => item.dataset.archiveEntry)).toEqual(['撰寫', '參與']);
-    expect(items[0].textContent).toBe('撰寫知識 · 採樣間隔前往典藏書架 →');
-    expect(items[1].textContent).toBe('參與偏好 · 報表格式前往典藏書架 →');
+    const section = q('[data-memoir-entries]')!;
+    const items = [...section.querySelectorAll<HTMLButtonElement>('[data-memoir-entry]')];
+    expect(items.map((item) => item.querySelector('[data-memoir-status]')?.textContent)).toEqual([undefined, '待核閱', '已退回']);
+    expect(items[0].textContent).toBe('回憶錄 · 2026-11-20 · 採樣間隔前往典藏書架 →');
+    expect(items[1].textContent).toContain('回憶錄 · 2026-11-21 · 報表格式');
+    expect(section.textContent).not.toMatch(/撰寫|參與/);
     await act(async () => items[1].click());
-    expect(opened.map((item) => item.path)).toEqual(['preferences/報表格式.md']);
-    expect(section.innerHTML).not.toMatch(/knowledge\/|preferences\/|\b[a-z]:[\\/]/i);
+    expect(opened.map((item) => item.path)).toEqual(['memoirs/金穗-a1/報表格式.md']);
+    expect(section.innerHTML).not.toMatch(/memoirs\/|\b[a-z]:[\\/]/i);
 
     await act(async () => q<HTMLButtonElement>('[aria-label="收起節點履歷"]')!.click());
     await act(async () => q<HTMLButtonElement>('[data-galaxy-interior] [data-crystal="a4"]')!.click());
-    expect(q('[data-archive-empty]')!.textContent).toBe('典藏書架上還沒有這個節點撰寫或參與的卷宗。');
+    expect(q('[data-memoir-empty]')!.textContent).toBe('這個節點還沒有寫回憶錄。');
   });
 });

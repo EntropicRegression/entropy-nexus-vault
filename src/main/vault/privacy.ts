@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { win32 } from 'node:path';
 import type { FrontMatterValue } from '../../shared/types';
+import { memoryPath } from './scan';
 
 export function opaqueKey(namespace: 'p' | 'v', value: string): string {
   if (!value) return '';
@@ -47,6 +48,15 @@ export function publicAttributes(attributes: ReadonlyMap<string, FrontMatterValu
   return result;
 }
 
+function isVaultPathField(key: string, value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  if (key === 'path' || key === 'originalPath') return memoryPath(value) === value;
+  const prefix = '_回收/';
+  if (key !== 'recycledPath' || !value.startsWith(prefix)) return false;
+  const path = value.slice(prefix.length);
+  return memoryPath(path) === path;
+}
+
 /** Final IPC boundary for vault DTOs, including future profile or archive fields. */
 export function redactForRenderer<T>(value: T): T {
   if (typeof value === 'string') return replaceLocalPaths(value, () => '[本機路徑已隱藏]') as T;
@@ -55,7 +65,7 @@ export function redactForRenderer<T>(value: T): T {
     return Object.fromEntries(Object.entries(value).filter(([key, item]) =>
       (key === 'projectId' && typeof item === 'string' && /^(?:p_[a-f0-9]{24})?$/.test(item)) ||
       (!isPrivateVaultField(key) && !containsLocalPath(key)))
-      .map(([key, item]) => [key, redactForRenderer(item)])) as T;
+      .map(([key, item]) => [key, isVaultPathField(key, item) ? item : redactForRenderer(item)])) as T;
   }
   return value;
 }

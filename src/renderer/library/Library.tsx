@@ -4,7 +4,7 @@ import { shelves } from '../../shared/shelves';
 import type { Shelf } from '../../shared/shelves';
 import type { DeskMode, FileVersion, MemoryEntry, MemoryEntryDetail, NodeCrystal, NodeHit } from '../../shared/types';
 import { primaryStatus } from '../../shared/vault-actions';
-import { dateLabel, deskNoteLabel, entryIdentifier, isOpenBookmark, isPending, projectDisplayName, shelfNames, tabNames, tabs } from './catalog';
+import { dateLabel, deskNoteLabel, entryIdentifier, isOpenBookmark, isPending, memoirPeriodLabel, projectDisplayName, shelfNames, tabNames, tabs } from './catalog';
 import type { CatalogTab } from './catalog';
 import { NodeMatches } from './NodeMatches';
 import { AvatarSeals, EndBadge, HeatSlot, PreviousVersion, StatusMark } from './Paper';
@@ -72,28 +72,30 @@ function DraftBoard({ notes, feedback, onOpen, onWrite, onReload }: {
   onReload: (request: WriteRequest) => void;
 }) {
   const [limit, setLimit] = useState(batchSize);
-  // Meeting notes keep the desk's newest-first order (so they are not buried behind 「顯示更多」) but are counted apart.
+  // Meetings and memoirs keep newest-first order on the desk and have separate counts.
   const bookmarks = notes.filter(isOpenBookmark).length;
   const meetings = notes.filter((entry) => entry.shelf === 'meeting' && entry.status === '未確認').length;
-  const pending = notes.filter((entry) => entry.status === '未確認' && entry.shelf !== 'bookmark' && entry.shelf !== 'meeting').length;
+  const memoirs = notes.filter((entry) => entry.kind === 'memoir' && entry.status === '未確認').length;
+  const pending = notes.filter((entry) => entry.status === '未確認' && entry.shelf !== 'bookmark' && entry.shelf !== 'meeting' && entry.kind !== 'memoir').length;
   return <section className={styles.board} aria-labelledby="draft-board">
     <div className={styles.boardHeader}>
       <h2 id="draft-board">待核閱案頭</h2>
-      <span aria-live="polite">待核閱 {pending} · 未完書籤 {bookmarks} · 會議 {meetings}</span>
+      <span aria-live="polite">待核閱 {pending} · 未完書籤 {bookmarks} · 會議 {meetings} · <span className={styles.memoirCount}>回憶錄 {memoirs}</span></span>
     </div>
     {!notes.length ? <p className={styles.quiet}>目前沒有待核閱的卷宗。</p> : <div className={styles.notes}>
       {notes.slice(0, limit).map((entry) => {
         const state = feedback.get(entry.path);
         const status = primaryStatus(entry);
+        const empty = emptySummary(entry);
         const processed = entry.status === '已確認' || entry.status === '已完成';
         const locked = !entry.writable || !status || state?.phase === 'pending' ||
           (state?.phase === 'failure' && ['conflict', 'missing', 'legacy'].includes(state.reason));
         // data-foil: confirmed in this session (not on reload) — one gold-leaf sweep (DESIGN.md §10.1).
-        return <article key={entry.path} className={styles.note} data-processed={processed}
+        return <article key={entry.path} className={styles.note} data-processed={processed} data-memoir={entry.kind === 'memoir' || undefined}
           data-foil={processed && state?.phase === 'saved' ? '' : undefined}>
         <div className={styles.noteMeta}><strong>{deskNoteLabel(entry)}</strong><span>{entryIdentifier(entry)}</span></div>
         <button type="button" className={styles.noteTitle} onClick={(event) => onOpen(entry.path, event.currentTarget)}>{entry.title}</button>
-        <p className={styles.noteSummary} data-empty={noConclusion(entry) || undefined}>{meetingSummary(entry)}</p>
+        <p className={styles.noteSummary} data-empty={Boolean(empty) || undefined}>{empty ?? entry.summary}</p>
         <div className={styles.noteActions}>
           <button type="button" className={styles.paperButton} onClick={(event) => onOpen(entry.path, event.currentTarget)}>看詳情</button>
           <button type="button" className={styles.primaryButton} aria-disabled={locked} data-write-action={status || undefined}
@@ -126,15 +128,17 @@ interface CardProps {
   onNode?: (node: NodeCrystal) => void;
 }
 
-/** Meetings without a closing statement (no `## 結論`) say so on the card and the desk note (DESIGN.md §5.13). */
-const noConclusion = (entry: MemoryEntry) => entry.shelf === 'meeting' && !!entry.meeting && !entry.meeting.hasConclusion;
-function meetingSummary(entry: MemoryEntry): string {
-  return noConclusion(entry) ? '(主持人未寫結論)' : entry.summary;
+/** Display the same empty-content state on the shelf and the desk note. */
+function emptySummary(entry: MemoryEntry): string | undefined {
+  if (entry.shelf === 'meeting' && entry.meeting && !entry.meeting.hasConclusion) return '(主持人未寫結論)';
+  if (entry.kind === 'memoir' && !entry.summary) return '(沒有正文)';
+  return undefined;
 }
 
 const Plaque = memo(function Plaque({ entry, active, selected, stackOpen, revision, nodes, onOpen, onToggleStack, onFocus, onNode }: CardProps) {
   const stack = useEntry(stackOpen ? entry.path : null, revision);
   const previousButton = useRef<HTMLButtonElement>(null);
+  const empty = emptySummary(entry);
   return <article data-entry={entry.path} data-selected={selected} data-stack-root={stackOpen ? '' : undefined}
     className={styles.plaque + ' heat-' + entry.heat.level + ' ' + (stackOpen ? styles.stackOwner : '')}>
     <div className={styles.plaqueFace} data-shelf={entry.shelf}>
@@ -148,7 +152,8 @@ const Plaque = memo(function Plaque({ entry, active, selected, stackOpen, revisi
       <h3><button type="button" className={styles.plaqueTitle} data-entry-title="" tabIndex={active ? 0 : -1}
         onFocus={() => onFocus(entry.path)}
         onClick={(event) => onOpen(entry.path, event.currentTarget)}>{entry.title}</button></h3>
-      <p className={styles.plaqueSummary} data-empty={noConclusion(entry) || undefined}>{meetingSummary(entry)}</p>
+      <p className={styles.plaqueSummary} data-empty={Boolean(empty) || undefined}>{empty ?? entry.summary}</p>
+      {entry.memoir?.coverage && <p className={styles.memoirCoverage}>涵蓋期間：{memoirPeriodLabel(entry)}</p>}
       <div className={styles.plaqueFooter}>
         <HeatSlot heat={entry.heat} />
         <div className={styles.plaqueActions}>

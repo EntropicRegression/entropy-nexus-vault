@@ -1,7 +1,7 @@
 import { calculateHeat } from '../../shared/heat';
 import type { HeatRecall } from '../../shared/heat';
 import { shelfOf } from '../../shared/shelves';
-import type { MeetingTranscript, MemoryEntry, MemoryKind, MemoryScope } from '../../shared/types';
+import type { MeetingTranscript, MemoryEntry, MemoryEntryDetail, MemoryKind, MemoryScope } from '../../shared/types';
 import { field, parseFrontMatter } from './frontmatter';
 import { meetingInfo, parseMeetingTranscript } from './meeting';
 import type { FrontMatter } from './frontmatter';
@@ -16,6 +16,7 @@ const kinds = new Map<string, MemoryKind>([
   ['knowledge', 'knowledge'], ['專案知識', 'knowledge'], ['知識', 'knowledge'],
   ['preference', 'preference'], ['使用者偏好', 'preference'], ['偏好', 'preference'],
   ['meeting', 'meeting'], ['會議紀錄', 'meeting'],
+  ['memoir', 'memoir'], ['回憶錄', 'memoir'],
 ]);
 
 export interface ParsedEntry {
@@ -26,6 +27,7 @@ export interface ParsedEntry {
   review: string;
   /** Meeting transcripts only. */
   transcript?: MeetingTranscript;
+  memoirSections?: MemoryEntryDetail['memoirSections'];
   mtime: number;
   size: number;
 }
@@ -102,6 +104,43 @@ function firstBodyParagraph(body: string): string {
   return Array.from(paragraph.join(' ')).slice(0, 80).join('');
 }
 
+function memoirCoverage(value: string): NonNullable<MemoryEntry['memoir']>['coverage'] {
+  const parts = /^(\d{4}-\d{2}-\d{2})(?:\/(\d{4}-\d{2}-\d{2})?)?$/.exec(value);
+  if (!parts) return null;
+  const day = (text: string) => {
+    const date = new Date(text + 'T00:00:00.000Z');
+    const timestamp = date.getTime();
+    return Number.isFinite(timestamp) && date.toISOString().slice(0, 10) === text ? timestamp : null;
+  };
+  const start = day(parts[1]);
+  const end = parts[2] ? day(parts[2]) : null;
+  if (start === null || (parts[2] && (end === null || start > end))) return null;
+  return { start, end };
+}
+
+function splitMemoirSections(lines: string[], headings: MarkdownHeading[]): NonNullable<MemoryEntryDetail['memoirSections']> {
+  const sections = headings.filter(({ level }) => level <= 2);
+  const body: string[] = [];
+  const sources: string[] = [];
+  const uncertain: string[] = [];
+  let start = 0;
+  for (const [index, heading] of sections.entries()) {
+    if (heading.level !== 2 || !['來源', '不確定之處', '回顧'].includes(heading.title)) continue;
+    const end = sections[index + 1]?.line ?? lines.length;
+    body.push(lines.slice(start, heading.line).join('\n'));
+    if (heading.title !== '回顧') {
+      (heading.title === '來源' ? sources : uncertain).push(lines.slice(heading.line + 1, end).join('\n').trim());
+    }
+    start = end;
+  }
+  body.push(lines.slice(start).join('\n'));
+  return {
+    body: body.join('\n').trim(),
+    sources: sources.length ? sources.join('\n\n') : null,
+    uncertain: uncertain.length ? uncertain.join('\n\n') : null,
+  };
+}
+
 export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, now: number): ParsedEntry {
   const { path, text, mtime, size } = file;
   const { attributes, body: markdown } = parseFrontMatter(text);
@@ -112,20 +151,27 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
   const parts = path.split('/');
   const folder = parts[0] as keyof typeof vaultFolders;
   const filename = (parts.at(-1) ?? '').replace(/\.md$/i, '');
-  const kind = kinds.get(field(attributes, '種類', 'kind', 'type').toLowerCase()) ?? vaultFolders[folder];
+  const declaredKind = kinds.get(field(attributes, '種類', 'kind', 'type').toLowerCase());
+  // Memoirs have their own shelf and storage location; a legacy knowledge entry is never reclassified in place.
+  const kind = !declaredKind || (declaredKind === 'memoir' && folder !== 'memoirs') ? vaultFolders[folder] : declaredKind;
+  const isMemoir = kind === 'memoir';
+  const coverageText = isMemoir ? field(attributes, '涵蓋期間') : '';
+  const memoirSections = isMemoir ? splitMemoirSections(lines, headings) : undefined;
   const folderProject = (folder === 'cases' || folder === 'knowledge' || folder === 'meetings') && parts.length > 2 ? parts[1] : '';
   const projectName = field(attributes, '專案', 'project', 'projectName') || folderProject;
   const projectId = field(attributes, '專案ID', '專案id', 'project-id', 'projectId') || projectName;
-  const scope = entryScope(field(attributes, '範圍', 'scope'), kind, projectId);
+  const scope = isMemoir ? '全域' : entryScope(field(attributes, '範圍', 'scope'), kind, projectId);
   const subtypeText = field(attributes, '子類', 'subtype');
   const subtype = /^decision$/i.test(subtypeText) ? '決策' : /^bookmark$/i.test(subtypeText) ? '書籤' : subtypeText;
-  const nodeId = field(attributes, '節點ID', '節點id', 'node-id', 'nodeId');
+  const nodeId = isMemoir ? field(attributes, '節點ID') : field(attributes, '節點ID', '節點id', 'node-id', 'nodeId');
   const isMeeting = kind === 'meeting';
   const transcript = isMeeting ? parseMeetingTranscript(markdown) : undefined;
-  const nodeLabel = isMeeting ? field(attributes, '主持人', 'host') : field(attributes, '節點', '承辦節點', 'nodeLabel', 'nodeName', 'node');
-  const participantNodeIds = field(attributes, '參與節點ID', 'participantNodeIds')
+  const nodeLabel = isMemoir ? field(attributes, '節點') :
+    isMeeting ? field(attributes, '主持人', 'host') : field(attributes, '節點', '承辦節點', 'nodeLabel', 'nodeName', 'node');
+  const participantNodeIds = isMemoir ? [] : field(attributes, '參與節點ID', 'participantNodeIds')
     .split(/[,，、]/).map((part) => part.trim()).filter(Boolean);
   const status = field(attributes, '狀態', 'status');
+  const title = isMemoir ? field(attributes, '標題') : field(attributes, ...(isMeeting ? ['主題', 'topic'] : []), '標題', '案由', 'title', 'name');
 
   return {
     entry: {
@@ -133,8 +179,9 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
       mtime,
       size,
       writable: hasWritableHeader(text),
-      title: field(attributes, ...(isMeeting ? ['主題', 'topic'] : []), '標題', '案由', 'title', 'name') || headings.find((heading) => heading.level === 1)?.title || filename,
-      summary: isMeeting ? field(attributes, '摘要', 'summary') : /^摘要[:：][ \t]*(.+)$/m.exec(body)?.[1].trim() || (kind === 'case' ? '' : firstBodyParagraph(body)),
+      title: title || headings.find((heading) => heading.level === 1)?.title || filename,
+      summary: memoirSections ? firstBodyParagraph(memoirSections.body) :
+        isMeeting ? field(attributes, '摘要', 'summary') : /^摘要[:：][ \t]*(.+)$/m.exec(body)?.[1].trim() || (kind === 'case' ? '' : firstBodyParagraph(body)),
       kind,
       shelf: shelfOf({ kind, subtype }),
       scope,
@@ -153,12 +200,14 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
       superseded: false,
       previousCount: 0,
       ...(transcript ? { meeting: meetingInfo(attributes, transcript.conclusion !== null, filename) } : {}),
+      ...(isMemoir ? { memoir: { coverage: memoirCoverage(coverageText), coverageText } } : {}),
     },
     attributes,
     markdown,
     body,
     review,
     ...(transcript ? { transcript } : {}),
+    ...(memoirSections ? { memoirSections } : {}),
     mtime,
     size,
   };

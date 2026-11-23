@@ -171,8 +171,8 @@ describe('主程序 IPC 來源驗證', () => {
     registerVaultIpc(() => ({ webContents: sender }) as BrowserWindow);
     const [, invoke] = electron.handle.mock.calls.find(([channel]) => channel === vaultChannels.listEntries)!;
     const senderFrame = { url: appUrl + '#/library', parent: null };
-    expect(await invoke({ sender, senderFrame }, { shelf: 'archive' })).toEqual(expect.arrayContaining([
-      expect.objectContaining({ shelf: 'archive', kind: 'preference' }),
+    expect(await invoke({ sender, senderFrame }, { shelf: 'knowledge' })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ shelf: 'knowledge', kind: 'preference' }),
     ]));
     expect(() => invoke({ sender: {}, senderFrame }, {})).toThrow('無法驗證');
     expect(() => invoke({ sender, senderFrame: { ...senderFrame, parent: {} } }, {})).toThrow('無法驗證');

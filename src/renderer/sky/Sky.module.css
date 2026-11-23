@@ -274,7 +274,7 @@
 .skyScene .nodePortrait button:disabled { opacity: 0.55; cursor: default; }
 .nodePortrait p { flex-basis: 100%; margin: 0; }
 .nodePortrait p[role='alert'] { color: #fda4af; }
-/* 典藏回憶 (DESIGN.md §6.6.4): 撰寫 / 參與 tag before each entry. */
+/* 履歷的主持 / 參與與待核閱標記。 */
 .archiveRole { margin-right: 6px; padding: 0 5px; border: 1px solid rgba(217, 164, 65, 0.45); color: #fde68a; font-size: 10.5px; }
-.archiveRole[data-meeting-status] { margin: 0 0 0 6px; }
+.archiveRole:is([data-meeting-status], [data-memoir-status]) { margin: 0 0 0 6px; }
 .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

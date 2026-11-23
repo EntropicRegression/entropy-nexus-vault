@@ -9,6 +9,7 @@ export const vaultFolders = {
   knowledge: 'knowledge',
   preferences: 'preference',
   meetings: 'meeting',
+  memoirs: 'memoir',
 } as const satisfies Record<string, MemoryKind>;
 
 export interface VaultFile extends FileVersion {
