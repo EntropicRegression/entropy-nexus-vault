@@ -76,6 +76,16 @@ describe('履歷欄存點(DESIGN.md 6.6.5)', () => {
     expect(host.querySelectorAll('[data-savepoint]')).toHaveLength(5);
   });
 
+  it('在有存點與沒有存點的節點之間切換,節點圖片列不會重複(同層 key 不可相同)', () => {
+    vi.stubGlobal('vault', { chooseNodePortrait: vi.fn(), clearNodePortrait: vi.fn() });
+    const withSavepoint = (nodeId: string) => ({ ...detail('封存', false, [savepoint()]), nodeId });
+    for (const id of ['a', 'b', 'c', 'a', 'd', 'b']) {
+      show(id === 'c' ? { ...detail('線上', false, []), nodeId: id } : withSavepoint(id));
+      expect(host.querySelectorAll('[data-node-portrait]')).toHaveLength(1);
+      expect(host.querySelectorAll('[data-savepoints]')).toHaveLength(id === 'c' ? 0 : 1);
+    }
+  });
+
   it('大小顯示', () => {
     expect([null, 512, 2048, 3 * 1024 * 1024, 5 * 1024 ** 3].map((size) => savepointSize(savepoint({ size }))))
       .toEqual(['—', '512 B', '2.0 KB', '3.0 MB', '5.0 GB']);

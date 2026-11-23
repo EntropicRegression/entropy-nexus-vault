@@ -69,7 +69,8 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
             onClick={(event) => onReadFull(event.currentTarget)}>閱讀全文</button>}
         </div>
       </div>
-      <NodePortraitControl key={crystal.nodeId} node={crystal} className={styles.nodePortrait} />
+      {/* Sibling keys must differ (the 存點 section below is keyed by node too); equal keys left stray picture rows. */}
+      <NodePortraitControl key={'portrait:' + crystal.nodeId} node={crystal} className={styles.nodePortrait} />
       {loading && <p role="status">正在讀取履歷…</p>}
       {error && <p role="alert">無法讀取節點履歷。</p>}
       {detail && <>
@@ -119,7 +120,7 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
           })}</ul>
           : <p className={styles.statsTotal} data-memoir-empty="">這個節點還沒有寫回憶錄。</p>}
       </section>}
-      {Boolean(detail?.savepoints?.length) && <Savepoints key={detail!.nodeId} detail={detail!} wake={wake}
+      {Boolean(detail?.savepoints?.length) && <Savepoints key={'savepoints:' + detail!.nodeId} detail={detail!} wake={wake}
         onWake={onWake && detail!.status === '封存' && detail!.canWake ? onWake : undefined} />}
       {detail && <section className={styles.detailSection} data-meeting-entries="">
         <h3>參與的會議</h3>
