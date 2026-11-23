@@ -32,3 +32,6 @@ Thumbs.db
 docs/設計稿/驗收/M5*/
 docs/設計稿/驗收/M6*/
 docs/設計稿/驗收/M7*/
+
+# CodeGraph 索引(本機工具,不入庫)
+.codegraph/
