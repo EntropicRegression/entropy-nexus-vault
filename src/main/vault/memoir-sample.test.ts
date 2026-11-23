@@ -66,3 +66,18 @@ describe('主控台回憶錄樣本(9d6b1b6)', () => {
     expect(await readFile(join(root, ...rel.split('/')), 'utf8')).toBe(sample.replace('狀態: "未確認"', '狀態: "已確認"'));
   });
 });
+
+describe('主控台接受的章節標題寫法(回憶錄審查必修 2)', () => {
+  it('「## 來源:」「## **不確定之處**:」也拆得出來;整行註解裡的標題不算', async () => {
+    const variant = sample
+      .replace('## 來源', '## 來源:')
+      .replace('## 不確定之處', '## **不確定之處**:')
+      .replace('學到的事:', '<!--\n## 來源\n這段被註解掉了\n-->\n\n學到的事:');
+    const snapshot = await new VaultReader(await setup({ [rel]: variant })).read();
+    const detail = (await snapshot.readEntry(rel))!;
+    expect(detail.memoirSections!.uncertain).toBe('- 北河二號提醒舊 Cookie 的時間,我記得是第二天下午,但不確定。');
+    expect(detail.memoirSections!.sources).toContain('會議紀錄:meetings/star-app/');
+    expect(detail.memoirSections!.sources).not.toContain('這段被註解掉了');
+    expect(detail.memoirSections!.body).not.toMatch(/不確定之處|北河二號提醒/);
+  });
+});

@@ -41,7 +41,17 @@ interface MarkdownHeading {
 export function markdownHeadings(lines: string[]): MarkdownHeading[] {
   const headings: MarkdownHeading[] = [];
   let fence: string | undefined;
+  /** Inside an HTML comment block that starts a line (`<!--` … `-->`): headings there are not structure. */
+  let comment = false;
   for (const [index, line] of lines.entries()) {
+    if (!fence) {
+      if (comment) {
+        if (line.includes('-->')) comment = false;
+        continue;
+      }
+      const open = /^ {0,3}<!--/.exec(line);
+      if (open && !line.slice(open[0].length).includes('-->')) { comment = true; continue; }
+    }
     const marker = /^ {0,3}(\x60{3,}|~{3,})(.*)$/.exec(line);
     if (marker) {
       if (!fence) fence = marker[1];
@@ -118,6 +128,15 @@ function memoirCoverage(value: string): NonNullable<MemoryEntry['memoir']>['cove
   return { start, end };
 }
 
+/**
+ * The console accepts 「## 來源:」「## **來源**」 and similar spellings of the fixed memoir sections (memoir.ts h2Name),
+ * so they are normalised the same way here: emphasis markers and a trailing colon are ignored.
+ */
+export function memoirSectionTitle(title: string): string {
+  const unwrap = (text: string) => text.replace(/^(\*\*|__)(.*)\1$/, '$2').trim();
+  return unwrap(unwrap(title).replace(/[:：]\s*$/, ''));
+}
+
 function splitMemoirSections(lines: string[], headings: MarkdownHeading[]): NonNullable<MemoryEntryDetail['memoirSections']> {
   const sections = headings.filter(({ level }) => level <= 2);
   const body: string[] = [];
@@ -125,11 +144,12 @@ function splitMemoirSections(lines: string[], headings: MarkdownHeading[]): NonN
   const uncertain: string[] = [];
   let start = 0;
   for (const [index, heading] of sections.entries()) {
-    if (heading.level !== 2 || !['來源', '不確定之處', '回顧'].includes(heading.title)) continue;
+    const title = memoirSectionTitle(heading.title);
+    if (heading.level !== 2 || !['來源', '不確定之處', '回顧'].includes(title)) continue;
     const end = sections[index + 1]?.line ?? lines.length;
     body.push(lines.slice(start, heading.line).join('\n'));
-    if (heading.title !== '回顧') {
-      (heading.title === '來源' ? sources : uncertain).push(lines.slice(heading.line + 1, end).join('\n').trim());
+    if (title !== '回顧') {
+      (title === '來源' ? sources : uncertain).push(lines.slice(heading.line + 1, end).join('\n').trim());
     }
     start = end;
   }
