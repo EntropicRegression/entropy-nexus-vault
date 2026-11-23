@@ -25,21 +25,22 @@ describe('經歷豐富度第 3 版(DESIGN.md §6.9,使用者 2026-11-24)', () =>
     expect(node({ completedPeak: score }).tier).toBe(tier);
   });
 
-  it('紫:200 分且承辦或參與至少 1 份;只有參與也可以', () => {
-    expect(node({ completedPeak: 250 }).tier).toBe('blue');
-    expect(node({ completedPeak: 250 }).caps).toEqual([{ kind: 'involvement', tier: 'violet', need: 1, have: 0 }]);
-    expect(node({ participatedCases: 1, completedPeak: 190 }).tier).toBe('violet');
-    expect(node({ confirmedCases: 1, completedPeak: 180 }).tier).toBe('violet');
+  it('紫:150 分且承辦或參與至少 1 份;只有參與也可以', () => {
+    expect(node({ completedPeak: 200 }).tier).toBe('blue');
+    expect(node({ completedPeak: 200 }).caps).toEqual([{ kind: 'involvement', tier: 'violet', need: 1, have: 0 }]);
+    expect(node({ participatedCases: 1, completedPeak: 139 }).tier).toBe('blue');
+    expect(node({ participatedCases: 1, completedPeak: 140 }).tier).toBe('violet');
+    expect(node({ confirmedCases: 1, completedPeak: 130 }).tier).toBe('violet');
   });
 
-  it('金:300 分、承辦+參與至少 2 份、專案至少 2 個', () => {
-    expect(node({ confirmedCases: 1, participatedCases: 1, projects: 2, completedPeak: 240 }).tier).toBe('gold');
-    expect(node({ confirmedCases: 1, projects: 2, completedPeak: 300 }).caps)
+  it('金:250 分、承辦+參與至少 2 份、專案至少 2 個', () => {
+    expect(node({ confirmedCases: 1, participatedCases: 1, projects: 2, completedPeak: 190 }).tier).toBe('gold');
+    expect(node({ confirmedCases: 1, projects: 2, completedPeak: 220 }).caps)
       .toEqual([{ kind: 'involvement', tier: 'gold', need: 2, have: 1 }]);
-    expect(node({ confirmedCases: 1, participatedCases: 1, projects: 1, completedPeak: 300 }).tier).toBe('violet');
+    expect(node({ confirmedCases: 1, participatedCases: 1, projects: 1, completedPeak: 230 }).tier).toBe('violet');
   });
 
-  it('紅:500 分、承辦至少 3 份、(專案至少 3 個或參與至少 5 份)、有效完成至少 201 件', () => {
+  it('紅:320 分、承辦至少 3 份、(專案至少 3 個或參與至少 5 份)、有效完成至少 201 件', () => {
     const red = { confirmedCases: 3, projects: 3, completedPeak: 201 };
     expect(node(red).tier).toBe('gold');
     expect(node({ ...red, completedPeak: 400 }).tier).toBe('red');

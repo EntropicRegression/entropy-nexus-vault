@@ -86,7 +86,7 @@ export interface GlowThresholds {
 /** Version 3 (user 2026-11-24): no caps, no rejection gate, no "own case" rule below gold's involvement. */
 export const defaultGlowThresholds: GlowThresholds = {
   weights: { confirmedCase: 20, participatedCase: 10, project: 15, completed: 1 },
-  minimumScore: { white: 0, green: 10, blue: 100, violet: 200, gold: 300, red: 500 },
+  minimumScore: { white: 0, green: 10, blue: 100, violet: 150, gold: 250, red: 320 },
   requirements: {
     violet: { involvement: 1 },
     gold: { involvement: 2, projects: 2 },
