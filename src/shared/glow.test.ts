@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capText, computeRichness, glowOf, normaliseAwardReason } from './glow';
+import { capText, computeRichness, glowOf, needText, nextTierNeeds, normaliseAwardReason } from './glow';
 import type { RichnessInput } from './glow';
 
 const base: RichnessInput = {
@@ -70,6 +70,21 @@ describe('經歷豐富度第 3 版(DESIGN.md §6.9,使用者 2026-11-24)', () =>
     expect(capText({ kind: 'breadth', tier: 'red', needProjects: 3, needParticipated: 5, projects: 2, participated: 4 }))
       .toBe('紅晶需要至少 3 個專案或 5 份參與的已確認判例(目前 2 個專案、4 份參與)');
     expect(capText({ kind: 'completed', tier: 'red', need: 201, have: 200 })).toBe('紅晶需要有效完成至少 201 件(目前 200 件)');
+  });
+
+  it('下一級要求:還差的分數與尚未滿足的條件;紅晶時沒有下一級', () => {
+    // claudia jr (2026-11-24): gold at 328; red needs 3 own cases and 3 projects or 5 participations.
+    const jr = node({ confirmedCases: 1, participatedCases: 1, projects: 2, completedPeak: 268 });
+    expect(jr.tier).toBe('gold');
+    expect(nextTierNeeds(jr)).toEqual({ tier: 'red', scoreGap: 0, caps: [
+      { kind: 'cases', tier: 'red', need: 3, have: 1 },
+      { kind: 'breadth', tier: 'red', needProjects: 3, needParticipated: 5, projects: 2, participated: 1 },
+    ] });
+    expect(nextTierNeeds(node({ completedPeak: 40 }))).toEqual({ tier: 'blue', scoreGap: 60, caps: [] });
+    expect(nextTierNeeds(node({ completedPeak: 120 }))).toEqual({ tier: 'violet', scoreGap: 30,
+      caps: [{ kind: 'involvement', tier: 'violet', need: 1, have: 0 }] });
+    expect(nextTierNeeds(node({ confirmedCases: 20, projects: 3, completedPeak: 300 }))).toBeNull();
+    expect(needText({ kind: 'projects', tier: 'gold', need: 2, have: 1 })).toBe('需要至少 2 個專案(目前 1 個)');
   });
 
   it('彩虹只來自手動頒發', () => {

@@ -278,3 +278,8 @@
 .archiveRole { margin-right: 6px; padding: 0 5px; border: 1px solid rgba(217, 164, 65, 0.45); color: #fde68a; font-size: 10.5px; }
 .archiveRole:is([data-meeting-status], [data-memoir-status]) { margin: 0 0 0 6px; }
 .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 升級要求 in the hero frame (DESIGN.md §6.9). */
+.nextTier { display: block; margin-top: 6px; color: var(--sky-muted); font-size: 12px; line-height: 1.5; }
+.nextTier small { color: var(--sky-gold); font-size: 12px; }
+.nextTier ul { margin: 2px 0 0; padding-left: 16px; }

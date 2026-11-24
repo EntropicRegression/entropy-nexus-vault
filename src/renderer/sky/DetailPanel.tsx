@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { CrystalSavepoint, MemoryEntry, NodeCrystal, NodeCrystalDetail } from '../../shared/types';
 import { savepointBackend, savepointSize, savepointStatus, savepointTime } from './savepoints';
+import { glowNames, needText, nextTierNeeds } from '../../shared/glow';
+import type { Richness } from '../../shared/glow';
 import { CrystalPortrait, crystalBadge } from './Crystal';
 import { GlowBadge } from './GlowBadge';
 import { localDate } from './local-date';
@@ -65,6 +67,7 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
           <p>{[crystal.role && '立繪 ' + crystal.role, crystalBadge(crystal).text].filter(Boolean).join(' · ')}</p>
           {detail?.specialty && <p>{detail.specialty}</p>}
           {Boolean(detail?.consoleAppendixCount) && <small>另有主控台補充 {detail!.consoleAppendixCount} 段</small>}
+          {detail?.richness && !detail.award && <NextTier richness={detail.richness} />}
           {detail?.profile && onReadFull && <button type="button" className={styles.readFull} data-read-full=""
             onClick={(event) => onReadFull(event.currentTarget)}>閱讀全文</button>}
         </div>
@@ -200,4 +203,15 @@ function Savepoints({ detail, wake, onWake }: {
       onClick={() => setExpanded(true)}>較舊的存點 +{hidden}</button>}
     {hasTarget && <p className={styles.statsTotal}>主控台一律使用最新一份可還原的存點。</p>}
   </section>;
+}
+
+/** 升級要求 (DESIGN.md §6.9): what the tier right above still needs, shown in the hero frame; nothing at red. */
+function NextTier({ richness }: { richness: Richness }) {
+  const next = nextTierNeeds(richness);
+  if (!next) return <small className={styles.nextTier} data-next-tier="top">已是自動計算的最高等級(紅晶)</small>;
+  const needs = [...(next.scoreGap > 0 ? ['還差 ' + next.scoreGap + ' 分'] : []), ...next.caps.map(needText)];
+  return <div className={styles.nextTier} data-next-tier={next.tier}>
+    <small>升級到{glowNames[next.tier]}:</small>
+    {needs.length > 0 && <ul>{needs.map((need) => <li key={need}>{need}</li>)}</ul>}
+  </div>;
 }

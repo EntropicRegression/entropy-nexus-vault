@@ -109,6 +109,18 @@ describe('經歷等級光暈與彩虹頒發(介面)', () => {
     ]);
   });
 
+  it('角色框自動顯示升到下一級的要求', async () => {
+    await render();
+    await open('n-blue');
+    const next = host.querySelector<HTMLElement>('[data-next-tier]')!;
+    expect(next.dataset.nextTier).toBe('red');
+    expect(next.querySelector('small')?.textContent).toBe('升級到紅晶:');
+    expect([...next.querySelectorAll('li')].map((item) => item.textContent)).toEqual([
+      '需要至少 3 份承辦的已確認判例(目前 0 份)',
+      '需要有效完成至少 201 件(目前 200 件)',
+    ]);
+  });
+
   it('頒發流程:確認視窗 → 理由(≤80 字)→ 寫入成功才改為虹晶 → 撤回', async () => {
     await render();
     await open('n-violet');

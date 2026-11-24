@@ -156,14 +156,38 @@ export function glowOf(richness: Pick<Richness, 'tier'>, award: GlowAward | null
 
 /** Human-readable explanation of a cap (badge tooltip). */
 export function capText(cap: GlowCap): string {
+  return glowNames[cap.tier] + needText(cap);
+}
+
+/** What is missing, without the tier name: 「需要至少 2 個專案(目前 1 個)」. */
+export function needText(cap: GlowCap): string {
   switch (cap.kind) {
-    case 'involvement': return glowNames[cap.tier] + '需要至少 ' + cap.need + ' 份承辦或參與的已確認判例(目前 ' + cap.have + ' 份)';
-    case 'cases': return glowNames[cap.tier] + '需要至少 ' + cap.need + ' 份承辦的已確認判例(目前 ' + cap.have + ' 份)';
-    case 'projects': return glowNames[cap.tier] + '需要至少 ' + cap.need + ' 個專案(目前 ' + cap.have + ' 個)';
-    case 'breadth': return glowNames[cap.tier] + '需要至少 ' + cap.needProjects + ' 個專案或 ' + cap.needParticipated +
+    case 'involvement': return '需要至少 ' + cap.need + ' 份承辦或參與的已確認判例(目前 ' + cap.have + ' 份)';
+    case 'cases': return '需要至少 ' + cap.need + ' 份承辦的已確認判例(目前 ' + cap.have + ' 份)';
+    case 'projects': return '需要至少 ' + cap.need + ' 個專案(目前 ' + cap.have + ' 個)';
+    case 'breadth': return '需要至少 ' + cap.needProjects + ' 個專案或 ' + cap.needParticipated +
       ' 份參與的已確認判例(目前 ' + cap.projects + ' 個專案、' + cap.participated + ' 份參與)';
-    case 'completed': return glowNames[cap.tier] + '需要有效完成至少 ' + cap.need + ' 件(目前 ' + cap.have + ' 件)';
+    case 'completed': return '需要有效完成至少 ' + cap.need + ' 件(目前 ' + cap.have + ' 件)';
   }
+}
+
+export interface NextTierNeeds {
+  tier: AutoGlowTier;
+  /** Points still missing for the tier's minimum score; 0 when the score is already enough. */
+  scoreGap: number;
+  /** The tier's extra requirements that are not met yet. */
+  caps: GlowCap[];
+}
+
+/** What the tier right above the current one still needs (DESIGN.md §6.9); null at red, the top automatic tier. */
+export function nextTierNeeds(richness: Richness, t: GlowThresholds = defaultGlowThresholds): NextTierNeeds | null {
+  const index = glowTiers.indexOf(richness.tier);
+  if (index < 0 || index === glowTiers.length - 1) return null;
+  const tier = glowTiers[index + 1];
+  const requirement = t.requirements[tier];
+  const have = { cases: richness.input.confirmedCases, participated: richness.input.participatedCases,
+    projects: richness.input.projects, completed: richness.effectiveCompleted };
+  return { tier, scoreGap: Math.max(0, t.minimumScore[tier] - richness.score), caps: requirement ? unmet(tier, requirement, have) : [] };
 }
 
 /** Maximum length of an award reason after normalisation. */
