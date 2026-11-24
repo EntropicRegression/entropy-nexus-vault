@@ -1,6 +1,6 @@
 {
   "name": "entropy-nexus-vault",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Entropy Nexus 記憶寶庫管理 App",
   "main": "./out/main/index.js",
