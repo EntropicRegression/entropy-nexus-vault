@@ -5,6 +5,7 @@ import type { CrystalLink, CrystalStats, NodeCrystal } from '../../shared/types'
 import { opaqueKey } from './privacy';
 import { memoryPath } from './scan';
 import { decodeSavepoints, type StatsSavepoint } from './savepoints';
+import { folderAliases } from './project-aliases';
 
 export const heatFilename = '.nexus-heat.json';
 export const statsFilename = '.nexus-stats.json';
@@ -45,6 +46,11 @@ export interface VaultStatsSnapshot {
   projectTypes: ReadonlyMap<string, ProjectType> | null;
   /** 專案表 names by opaque project key (display only). */
   projectNames: ReadonlyMap<string, string>;
+  /**
+   * Shared-folder projects merged because their IDs resolve to the same real folder (old key → kept key; user
+   * 2026-11-28). Already applied to projectTypes, projectNames and every node's projects; entries use it too.
+   */
+  projectAliases: ReadonlyMap<string, string>;
   /** 協作不含總管 / 同席不含總管 (last 30 days, chief already removed by the console); empty in older files. */
   galaxyActivity: { delegations: { from: string; to: string; count: number }[]; meetings: { nodeIds: string[]; count: number }[] };
 }
@@ -166,6 +172,7 @@ function decodeStats(value: unknown): VaultStatsSnapshot | undefined {
   const activity = decodeActivity(value.協作, value.同席);
   let projectTypes: Map<string, ProjectType> | null = null;
   const tableNames = new Map<string, string>();
+  const folderIds: string[] = [];
   if (isRecord(value.專案表)) {
     projectTypes = new Map();
     for (const [id, project] of Object.entries(value.專案表)) {
@@ -173,15 +180,40 @@ function decodeStats(value: unknown): VaultStatsSnapshot | undefined {
       const key = opaqueKey('p', id);
       projectTypes.set(key, project.類型);
       tableNames.set(key, stringValue(project.名稱) ?? '未命名專案');
+      if (project.類型 === '資料夾') folderIds.push(id);
     }
   }
+  // The same real folder under two IDs (renamed with a junction left behind) counts as one project.
+  const projectAliases = folderAliases(folderIds);
+  for (const key of projectAliases.keys()) {
+    projectTypes?.delete(key);
+    tableNames.delete(key);
+  }
+  if (projectAliases.size) for (const [id, node] of nodes) nodes.set(id, mergeNodeProjects(node, projectAliases, tableNames));
   const noChief = decodeActivity(Array.isArray(value.協作不含總管) ? value.協作不含總管 : [],
     Array.isArray(value.同席不含總管) ? value.同席不含總管 : []);
   const galaxyActivity = {
     delegations: noChief.flatMap((link) => link.kind === 'delegate' ? [{ from: link.from, to: link.to, count: link.count }] : []),
     meetings: noChief.flatMap((link) => link.kind === 'meeting' ? [{ nodeIds: link.nodeIds, count: link.count }] : []),
   };
-  return { updatedAt: value.更新時間, portraitsDir: value.圖像目錄, nodes, activity, projectTypes, projectNames: tableNames, galaxyActivity };
+  return { updatedAt: value.更新時間, portraitsDir: value.圖像目錄, nodes, activity, projectTypes, projectNames: tableNames, projectAliases, galaxyActivity };
+}
+
+/** A node's projects with merged folders folded together: first position kept, recent task counts added. */
+function mergeNodeProjects(node: VaultStatsNode, aliases: ReadonlyMap<string, string>, names: ReadonlyMap<string, string>): VaultStatsNode {
+  const merged = new Map<string, VaultStatsNode['projects'][number]>();
+  for (const project of node.projects) {
+    const key = aliases.get(project.key) ?? project.key;
+    const seen = merged.get(key);
+    if (!seen) {
+      merged.set(key, key === project.key ? project : { ...project, key, name: names.get(key) ?? project.name });
+      continue;
+    }
+    const tasks = seen.recentTasks === null && project.recentTasks === null ? null : (seen.recentTasks ?? 0) + (project.recentTasks ?? 0);
+    merged.set(key, { ...seen, recentTasks: tasks, hasProjectId: seen.hasProjectId || project.hasProjectId });
+  }
+  const projects = [...merged.values()];
+  return { ...node, projects, projectNames: projects.map(({ name }) => name) };
 }
 
 async function readSidecar<T>(path: string, decode: (value: unknown) => T | undefined, previous: T) {

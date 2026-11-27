@@ -272,6 +272,16 @@ export class VaultReader {
       if (decay >= readAt) nextHeatDecay = Math.min(nextHeatDecay, decay);
       return entryFromFile(file, recall, readAt);
     });
+    // Cases and meetings written under a merged folder's old ID belong to the kept project (user 2026-11-28).
+    const aliases = sidecars.stats?.projectAliases;
+    if (aliases?.size) {
+      for (const { entry } of parsed) {
+        const kept = aliases.get(entry.projectId);
+        if (!kept) continue;
+        entry.projectId = kept;
+        entry.projectName = sidecars.stats?.projectNames.get(kept) ?? entry.projectName;
+      }
+    }
     const snapshot = new VaultSnapshot(this.root, parsed, sidecars);
     if (scan.cacheable && sidecarRead.cacheable && revision === this.revision) {
       for (const [path, version] of sidecarVersions) scan.versions.set(path, version);
