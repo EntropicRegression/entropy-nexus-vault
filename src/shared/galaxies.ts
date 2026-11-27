@@ -25,6 +25,8 @@ export interface GalaxyInput {
   projects: ReadonlyMap<string, GalaxyProject>;
   /** Folder projects the user promoted to galaxies. */
   promoted: ReadonlySet<string>;
+  /** Projects the user marked as retired (DESIGN.md §6.10.3); their groups sit outside the outer belt. */
+  retired?: ReadonlySet<string>;
   nodes: GalaxyNodeInput[];
   /** 協作不含總管 (last 30 days). */
   delegations: { from: string; to: string; count: number }[];
@@ -34,7 +36,11 @@ export interface GalaxyInput {
 
 export interface GalaxyMembership { group: string | null; place: 'galaxy' | 'nebula' | 'outer' | 'hub'; rule: PlacementRule }
 
-export interface GalaxyGroup { key: string; name: string; kind: GroupKind; projectType: ProjectType; promoted: boolean; members: string[] }
+export interface GalaxyGroup {
+  key: string; name: string; kind: GroupKind; projectType: ProjectType; promoted: boolean; members: string[];
+  /** Marked retired by the user (DESIGN.md §6.10.3): placed outside the outer belt, links shown only on hover. Older fixtures omit it. */
+  retired?: boolean;
+}
 
 export interface GalaxyBridge {
   /** Group keys, a < b. */
@@ -117,7 +123,7 @@ export function assignGalaxies(input: GalaxyInput): GalaxyAssignment {
   const groups: GalaxyGroup[] = [...members].sort(([x], [y]) => (x < y ? -1 : 1)).map(([key, ids]) => {
     const project = input.projects.get(key)!;
     return { key, name: project.name, kind: kindOf(project, input.promoted), projectType: project.type,
-      promoted: project.type !== 'git' && input.promoted.has(key), members: ids };
+      promoted: project.type !== 'git' && input.promoted.has(key), members: ids, retired: input.retired?.has(key) ?? false };
   });
 
   // Bridges join galaxies only; nebulae, the outer belt and the hub never count.

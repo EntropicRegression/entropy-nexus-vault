@@ -250,3 +250,8 @@
 .miniControls button::before { content: ''; position: absolute; inset: -3px -2px; }
 .miniControls button:hover { border-color: #5ce1e6; color: #fff; }
 .miniControls button:focus-visible { outline: 1.5px solid #5ce1e6; outline-offset: 1px; }
+
+/* Retired projects (§6.10.3, user 2026-11-27): outside the outer belt, dimmed; full brightness on hover or focus. */
+.group[data-retired] { opacity: 0.55; }
+.group[data-retired]:hover, .group[data-retired]:focus-within { opacity: 1; }
+.overview .group:not(:hover):not(:focus-within) [data-retire] { opacity: 0; }

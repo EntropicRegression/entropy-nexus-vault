@@ -35,6 +35,9 @@ const relaxPasses = 120;
  */
 const beltGap = { x: 0.9 * spacing, y: 40 } as const;
 const beltMin = { x: 300, y: 200 } as const;
+/** Retired projects (§6.10.3): drawn at this share of their size, on a ring this far outside the belt. */
+export const retiredScale = 0.7;
+const retiredGap = 110;
 /** Room kept around the world when fitting. */
 const fitMargin = 24;
 
@@ -58,8 +61,9 @@ export interface WorldLayout {
  */
 export function worldLayout(map: EnabledMap): WorldLayout {
   const sizes = new Map(map.groups.map((group) => [group.key,
-    group.kind === 'galaxy' ? diameterOf(group.members.length, 1) : nebulaSize.width]));
-  const keys = map.groups.map((group) => group.key);
+    (group.kind === 'galaxy' ? diameterOf(group.members.length, 1) : nebulaSize.width) * (group.retired ? retiredScale : 1)]));
+  // Retired groups (§6.10.3) do not take part in the inner arrangement; they sit on a ring outside the belt.
+  const keys = map.groups.filter((group) => !group.retired).map((group) => group.key);
   const points = new Map(map.groups.map((group) => [group.key, { x: group.position[0] * pixelsPerUnit, y: group.position[1] * pixelsPerUnit }]));
   for (let pass = 0; pass < relaxPasses; pass++) {
     let moved = false;
@@ -98,6 +102,7 @@ export function worldLayout(map: EnabledMap): WorldLayout {
   const groups = new Map<string, PlacedGroup>();
   const edge = { x: hubRadius, y: hubRadius + plateSpace };
   for (const group of map.groups) {
+    if (group.retired) continue;
     const size = sizes.get(group.key)!;
     const point = points.get(group.key)!;
     const center = { x: Math.round(point.x * 10) / 10, y: Math.round(point.y * 10) / 10 };
@@ -106,6 +111,16 @@ export function worldLayout(map: EnabledMap): WorldLayout {
     groups.set(group.key, { key: group.key, center, size, ring: group.kind === 'galaxy' ? size * outerRingShare : size / 2 });
   }
   const beltRadius = { x: Math.round(Math.max(beltMin.x, edge.x + beltGap.x)), y: Math.round(Math.max(beltMin.y, edge.y + beltGap.y)) };
+  const retired = map.groups.filter((group) => group.retired).sort((x, y) => (x.key < y.key ? -1 : 1));
+  retired.forEach((group, index) => {
+    const size = sizes.get(group.key)!;
+    const angle = -0.8 + (2 * Math.PI * index) / retired.length;
+    const center = {
+      x: Math.round(Math.cos(angle) * (beltRadius.x + retiredGap + size / 2) * 10) / 10,
+      y: Math.round(Math.sin(angle) * (beltRadius.y + retiredGap + size / 2) * 10) / 10,
+    };
+    groups.set(group.key, { key: group.key, center, size, ring: group.kind === 'galaxy' ? size * outerRingShare : size / 2 });
+  });
   const sorted = [...map.outer].sort();
   const belt = new Map(sorted.map((id, index) => {
     const angle = -2.3 + (2 * Math.PI * index) / Math.max(1, sorted.length);

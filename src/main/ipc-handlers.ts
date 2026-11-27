@@ -17,7 +17,7 @@ import { CrystalLayoutStore } from './vault/crystal-layout-store';
 import { readAwards, writeAward } from './vault/awards';
 import type { AwardsState } from './vault/awards';
 import { GlowPeakStore } from './vault/glow-peaks';
-import { GalaxyLayoutStore, GalaxySettingsStore } from './vault/galaxy-store';
+import { GalaxyLayoutStore, GalaxyRetiredStore, GalaxySettingsStore } from './vault/galaxy-store';
 import { assignGalaxies } from '../shared/galaxies';
 import { computeRichness, glowOf } from '../shared/glow';
 import type { Richness } from '../shared/glow';
@@ -53,6 +53,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   const glowPeaks = new GlowPeakStore(join(app.getPath('userData'), 'glow-peaks.json'));
   const galaxySettings = new GalaxySettingsStore(join(app.getPath('userData'), 'galaxy-settings.json'));
   const galaxyLayout = new GalaxyLayoutStore(join(app.getPath('userData'), 'galaxy-layout.json'));
+  const galaxyRetired = new GalaxyRetiredStore(join(app.getPath('userData'), 'galaxy-retired.json'));
   const defaultPath = app.isPackaged ? join(app.getPath('appData'), 'entropy-nexus', 'memory-vault')
     : join(app.getAppPath(), 'fixtures', 'memory-vault');
   const readBrandPortraitFolder = () => readBrandPortraitPath(settingsFile);
@@ -117,7 +118,7 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
   /** Project galaxies for the active vault (DESIGN.md §6.10). Only an explicit request re-arranges the layout. */
   async function galaxyMap(context: Awaited<ReturnType<typeof readVaultContext>>, arrange = false): Promise<GalaxyMap> {
     const key = opaqueKey('v', context.root);
-    const input = context.snapshot.galaxyInput(await galaxySettings.promoted(key));
+    const input = context.snapshot.galaxyInput(await galaxySettings.promoted(key), await galaxyRetired.retired(key));
     if (!input) return { enabled: false };
     const { groups, hub, outer, membership, bridges } = assignGalaxies(input);
     const keys = groups.map((group) => group.key);
@@ -258,6 +259,16 @@ export function registerVaultIpc(getWindow: () => BrowserWindow | null) {
       const input = context.snapshot.galaxyInput(new Set());
       const project = typeof projectKey === 'string' ? input?.projects.get(projectKey) : undefined;
       if (project?.type === '資料夾' && typeof promoted === 'boolean') await galaxySettings.setPromoted(key, projectKey, promoted);
+      return galaxyMap(context);
+    },
+    setGalaxyRetired: async (_event, projectKey, retired) => {
+      const context = await readVaultContext();
+      const key = opaqueKey('v', context.root);
+      // Any project of this vault's 專案表 can be retired or brought back (DESIGN.md §6.10.3).
+      const input = context.snapshot.galaxyInput(new Set());
+      if (typeof projectKey === 'string' && input?.projects.has(projectKey) && typeof retired === 'boolean') {
+        await galaxyRetired.setRetired(key, projectKey, retired);
+      }
       return galaxyMap(context);
     },
     arrangeGalaxies: async () => galaxyMap(await readVaultContext(), true),

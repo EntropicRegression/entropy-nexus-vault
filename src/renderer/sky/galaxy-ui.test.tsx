@@ -288,6 +288,35 @@ describe('專案星系畫面(M5e-b)', () => {
     expect(q('[data-also-in]')!.textContent).toBe('同時參與的專案貝塔、伽瑪');
   });
 
+  it('退役(§6.10.3):手動標為退役、移到外圍;它的星橋只在懸停或聚焦時出現;可以移回', async () => {
+    vault.setGalaxyRetired = vi.fn(async (k: string, retired: boolean) => galaxyMap({
+      groups: galaxyMap().groups.map((group) => group.key === k ? { ...group, retired } : group),
+    }));
+    await render();
+    expect(q('[data-bridge]')).not.toBeNull();
+    await act(async () => q<HTMLButtonElement>('[data-retire="' + B + '"]')!.click());
+    expect(vault.setGalaxyRetired).toHaveBeenCalledWith(B, true);
+    const group = q('[data-group="' + B + '"]')!;
+    expect(group.parentElement!.hasAttribute('data-retired')).toBe(true);
+    expect(group.getAttribute('aria-label')).toContain(',已退役');
+    expect(q('[data-retire="' + B + '"]')!.textContent).toBe('移回星圖');
+    expect(q('[data-bridge]')).toBeNull();
+    await act(async () => group.focus());
+    expect(q('[data-bridge]')).not.toBeNull();
+    await act(async () => group.blur());
+    expect(q('[data-bridge]')).toBeNull();
+    expect(q('[data-galaxy-toast]')!.textContent).toContain('已將「貝塔」標為退役');
+    await act(async () => q<HTMLButtonElement>('[data-galaxy-toast] button')!.click());
+    expect(vault.setGalaxyRetired).toHaveBeenLastCalledWith(B, false);
+    expect(q('[data-group="' + B + '"]')!.parentElement!.hasAttribute('data-retired')).toBe(false);
+    expect(q('[data-bridge]')).not.toBeNull();
+  });
+
+  it('退役:沒有退役 API 時不顯示按鈕', async () => {
+    await render();
+    expect(q('[data-retire]')).toBeNull();
+  });
+
   it('升格:確認視窗 → 寫入 → 提示條含撤銷;寫入失敗顯示未儲存與重試', async () => {
     await render();
     await act(async () => q<HTMLButtonElement>('[data-promote="' + F + '"]')!.click());

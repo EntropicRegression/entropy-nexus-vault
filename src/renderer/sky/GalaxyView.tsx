@@ -113,6 +113,8 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
   const [shown, setShown] = useState<string | null>(target);
   const [moving, setMoving] = useState(false);
   const [chiefHover, setChiefHover] = useState(false);
+  /** The group under the pointer or holding focus: a retired group's bridges show only then (§6.10.3). */
+  const [hoverGroup, setHoverGroup] = useState<string | null>(null);
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [arranging, setArranging] = useState(false);
   const [announcement, setAnnouncement] = useState('');
@@ -520,6 +522,29 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
     }
   }
 
+  /** Retire a project or bring it back (DESIGN.md §6.10.3); direct action with an undo toast. */
+  async function retire(key: string, name: string, retired: boolean) {
+    const setRetired = window.vault.setGalaxyRetired;
+    if (!setRetired) return;
+    let next: GalaxyMap;
+    try {
+      next = await setRetired(key, retired);
+    } catch {
+      showToast('未儲存:' + (retired ? '移到外圍' : '移回') + '沒有寫入,請重試。');
+      return;
+    }
+    const group = next.enabled ? next.groups.find((item) => item.key === key) : undefined;
+    if (group && Boolean(group.retired) !== retired) {
+      showToast('未儲存:' + (retired ? '移到外圍' : '移回') + '沒有寫入,請重試。');
+      return;
+    }
+    fitAfterMapChange.current = true;
+    onMapChange(next);
+    setAnnouncement(retired ? '已將〈' + name + '〉標為退役,移到外圍' : '已將〈' + name + '〉移回');
+    showToast(retired ? '已將「' + name + '」標為退役,移到外環外圍。' : '已將「' + name + '」移回星圖。',
+      () => { setToast(null); void retire(key, name, !retired); });
+  }
+
   async function confirmDialog() {
     if (!dialog) return;
     setSaving(true);
@@ -563,6 +588,8 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
   const anchor = (x: number, y: number, graphicHeight: number) =>
     'translate(' + x.toFixed(1) + 'px, ' + y.toFixed(1) + 'px) translate(-50%, ' + (-(graphicHeight / 2 + 2)).toFixed(1) + 'px)';
   const hubNames = map.hub.map((id) => names.get(id) ?? '總管');
+  const retiredKeys = new Set(map.groups.filter((group) => group.retired).map((group) => group.key));
+  const canRetire = Boolean(window.vault.setGalaxyRetired);
   const insideOverview = target === null;
 
   return <div ref={stage} className={skyStyles.gameFrame + ' ' + styles.universe} data-galaxy-view="" data-moving={moving}
@@ -587,6 +614,8 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
           const curve = a && b ? bridgeCurve(a, b, bridge.weight, { x: 0, y: 0 }, [...placed.groups.values()]) : null;
           const look = bridgeStyle(level, bridge.weight);
           if (!curve || !look.show) return null;
+          // A retired project's bridges appear only while its group is hovered or focused (§6.10.3).
+          if ((retiredKeys.has(bridge.a) || retiredKeys.has(bridge.b)) && hoverGroup !== bridge.a && hoverGroup !== bridge.b) return null;
           const show = (event: MouseEvent) => {
             const box = stage.current!.getBoundingClientRect();
             setTip({ text: '跨專案協作 ' + bridge.count + ' 次', x: event.clientX - box.left, y: event.clientY - box.top });
@@ -626,11 +655,19 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
         const filterStyle = lit ? { opacity: lit.brightness } : undefined;
         const filterCount = lit && filter ? <em className={styles.glowCount} data-glow-count={lit.count}>
           <span className={styles.glowDiamond} data-glow={filter} aria-hidden="true" />{glowNames[filter]} × {lit.count}</em> : null;
+        const hover = {
+          onMouseEnter: () => setHoverGroup(group.key), onMouseLeave: () => setHoverGroup(null),
+          onFocus: () => setHoverGroup(group.key), onBlur: () => setHoverGroup(null),
+        };
+        const retireButton = canRetire && <button type="button" className={styles.promote} data-retire={group.key}
+          onClick={() => void retire(group.key, group.name, !group.retired)}>{group.retired ? '移回星圖' : '標為退役(移到外圍)'}</button>;
+        const retiredNote = group.retired ? ' · 退役' : '';
         if (group.kind === 'nebula') {
           return <div key={group.key} className={styles.group} data-filter-brightness={lit?.brightness.toFixed(2)}
+            data-retired={group.retired ? '' : undefined} {...hover}
             style={{ transform: anchor(point.center.x, point.center.y, size * 80 / 128), ...filterStyle }}>
             <button type="button" className={styles.groupButton} data-group={group.key} data-kind="nebula"
-              aria-label={'共用資料夾 ' + group.name + ',' + counts + ',按下展開'} onClick={() => onTarget(group.key)}>
+              aria-label={'共用資料夾 ' + group.name + ',' + counts + (group.retired ? ',已退役' : '') + ',按下展開'} onClick={() => onTarget(group.key)}>
               <svg width={size} height={size * 80 / 128} viewBox="0 0 128 80" aria-hidden="true">
                 <ellipse cx="64" cy="40" rx="52" ry="26" className={styles.cloudOuter} />
                 <ellipse cx="58" cy="38" rx="34" ry="18" className={styles.cloudInner} />
@@ -640,17 +677,19 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
                     r={1 + (index % 3) * 0.65} className={styles.cloudSpeck} opacity={0.45 + (index % 2) * 0.3} />;
                 })}
               </svg>
-              <span className={styles.plate}><strong>{group.name}</strong><small>共用資料夾 · {counts}</small>{filterCount}</span>
+              <span className={styles.plate}><strong>{group.name}</strong><small>共用資料夾 · {counts}{retiredNote}</small>{filterCount}</span>
             </button>
-            <button type="button" className={styles.promote} data-promote={group.key}
-              onClick={(event) => openDialog({ kind: 'promote', key: group.key, name: group.name }, event.currentTarget)}>升格為星系</button>
+            {!group.retired && <button type="button" className={styles.promote} data-promote={group.key}
+              onClick={(event) => openDialog({ kind: 'promote', key: group.key, name: group.name }, event.currentTarget)}>升格為星系</button>}
+            {retireButton}
           </div>;
         }
         const ring = size * outerRingShare;
         return <div key={group.key} className={styles.group} data-filter-brightness={lit?.brightness.toFixed(2)}
+          data-retired={group.retired ? '' : undefined} {...hover}
           style={{ transform: anchor(point.center.x, point.center.y, size), ...filterStyle }}>
           <button type="button" className={styles.groupButton} data-group={group.key} data-kind="galaxy"
-            aria-label={'專案星系 ' + group.name + ',' + counts + (group.promoted ? ',由共用資料夾升格' : '') + ',按下飛入'}
+            aria-label={'專案星系 ' + group.name + ',' + counts + (group.promoted ? ',由共用資料夾升格' : '') + (group.retired ? ',已退役' : '') + ',按下飛入'}
             onClick={() => onTarget(group.key)}>
             <svg className={styles.armillary} width={size} height={size} viewBox={'0 0 ' + size + ' ' + size} aria-hidden="true">
               <circle cx={size / 2} cy={size / 2} r={ring * 0.65} className={styles.halo} />
@@ -662,8 +701,9 @@ export function GalaxyView({ map, data, active, reduced, clock, selected, onSele
               {galaxySpecks(group.members.length, size).map((speck, index) =>
                 <circle key={index} cx={speck.x} cy={speck.y} r={speck.r} className={styles.speck} />)}
             </svg>
-            <span className={styles.plate}><strong>{group.name}</strong><small>{counts}{group.promoted ? ' · 升格' : ''}</small>{filterCount}</span>
+            <span className={styles.plate}><strong>{group.name}</strong><small>{counts}{group.promoted ? ' · 升格' : ''}{retiredNote}</small>{filterCount}</span>
           </button>
+          {retireButton}
         </div>;
       })}
 

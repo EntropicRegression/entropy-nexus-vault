@@ -46,8 +46,14 @@ export interface NodePortraitApi {
   clearNodePortrait(nodeId: string): Promise<NodePortraitResult>;
 }
 
+/** Retired projects (DESIGN.md §6.10.3, user 2026-11-27). */
+export interface GalaxyRetireApi {
+  /** Marks a project retired (its group moves outside the outer belt) or brings it back. */
+  setGalaxyRetired(projectKey: string, retired: boolean): Promise<GalaxyMap>;
+}
+
 // The M5d preload always provides these methods. Older consumers/test bridges can still use the base API.
-export interface VaultApi extends Partial<NodeProfileApi>, Partial<BrandPortraitApi>, Partial<NodePortraitApi> {
+export interface VaultApi extends Partial<NodeProfileApi>, Partial<BrandPortraitApi>, Partial<NodePortraitApi>, Partial<GalaxyRetireApi> {
   getVaultInfo(): Promise<VaultInfo>;
   chooseVault(): Promise<VaultInfo | null>;
   getSettings(): Promise<ViewSettings>;
@@ -75,8 +81,8 @@ export interface VaultApi extends Partial<NodeProfileApi>, Partial<BrandPortrait
   onVaultChanged(callback: (paths: string[]) => void): () => void;
 }
 
-export type VaultRequests = Omit<VaultApi, keyof NodeProfileApi | keyof BrandPortraitApi | keyof NodePortraitApi | 'onVaultChanged'> &
-  NodeProfileApi & BrandPortraitApi & NodePortraitApi;
+export type VaultRequests = Omit<VaultApi, keyof NodeProfileApi | keyof BrandPortraitApi | keyof NodePortraitApi | keyof GalaxyRetireApi | 'onVaultChanged'> &
+  NodeProfileApi & BrandPortraitApi & NodePortraitApi & GalaxyRetireApi;
 
 export const vaultChannels = {
   getVaultInfo: 'vault:get-info',
@@ -95,6 +101,7 @@ export const vaultChannels = {
   listCrystals: 'vault:list-crystals',
   listGalaxies: 'vault:list-galaxies',
   setGalaxyPromotion: 'vault:set-galaxy-promotion',
+  setGalaxyRetired: 'vault:set-galaxy-retired',
   arrangeGalaxies: 'vault:arrange-galaxies',
   readCrystal: 'vault:read-crystal',
   readNodeProfile: 'vault:read-node-profile',

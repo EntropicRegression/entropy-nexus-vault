@@ -109,7 +109,7 @@ export class VaultSnapshot {
    * Input for the project galaxies (DESIGN.md §6.10), or null when the stats have no 專案表 (the flat star map stays).
    * Every crystal of listCrystals() is a node here, so the two views always cover the same nodes.
    */
-  galaxyInput(promoted: ReadonlySet<string>): GalaxyInput | null {
+  galaxyInput(promoted: ReadonlySet<string>, retired: ReadonlySet<string> = new Set()): GalaxyInput | null {
     const stats = this.sidecars.stats;
     if (!stats?.projectTypes) return null;
     const projects = new Map([...stats.projectTypes].map(([key, type]) =>
@@ -128,7 +128,7 @@ export class VaultSnapshot {
           .map((entry) => entry.projectId),
       };
     });
-    return { projects, promoted, nodes, ...stats.galaxyActivity };
+    return { projects, promoted, retired, nodes, ...stats.galaxyActivity };
   }
 
   /** Richness inputs per node, without the userData peaks (docs/架構.md §9.2). */

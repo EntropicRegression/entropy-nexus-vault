@@ -143,6 +143,46 @@ export class GalaxySettingsStore extends VaultJsonStore<Set<string>> {
   }
 }
 
+/**
+ * Projects the user marked as retired (deprecated), per vault: userData/galaxy-retired.json `{ 版本, 記憶庫: { <v_>:
+ * { 退役: [p_…] } } }` (user 2026-11-27, DESIGN.md §6.10.3). Their groups move outside the outer belt; marking is
+ * manual and can be undone. Only opaque keys are stored.
+ */
+export class GalaxyRetiredStore extends VaultJsonStore<Set<string>> {
+  protected decode(value: unknown, skip: () => void): Set<string> | null {
+    if (!isRecord(value) || !Array.isArray(value.退役)) return null;
+    const keys = new Set<string>();
+    for (const item of value.退役) {
+      if (typeof item === 'string' && projectKey.test(item)) keys.add(item);
+      else skip();
+    }
+    return keys;
+  }
+
+  protected encode(value: Set<string>) {
+    return { 退役: [...value].sort() };
+  }
+
+  retired(key: string): Promise<ReadonlySet<string>> {
+    return this.run(() => new Set(this.vaults.get(key) ?? []));
+  }
+
+  setRetired(key: string, project: string, retired: boolean): Promise<ReadonlySet<string> | null> {
+    return this.run(async (writable) => {
+      if (!vaultKey.test(key) || !projectKey.test(project)) return null;
+      const keys = new Set(this.vaults.get(key) ?? []);
+      if (retired ? !keys.has(project) : keys.has(project)) {
+        if (retired) keys.add(project);
+        else keys.delete(project);
+        this.vaults.set(key, keys);
+        this.dirty = true;
+        await this.persist(writable);
+      }
+      return new Set(keys);
+    });
+  }
+}
+
 interface StoredPosition { 座標: Point2; 放置時間: string }
 
 function isPoint(value: unknown): value is Point2 {

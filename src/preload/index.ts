@@ -27,6 +27,7 @@ const vault: VaultRequests & Pick<VaultApi, 'onVaultChanged'> = {
   listCrystals: () => invoke('listCrystals'),
   listGalaxies: () => invoke('listGalaxies'),
   setGalaxyPromotion: (projectKey, promoted) => invoke('setGalaxyPromotion', projectKey, promoted),
+  setGalaxyRetired: (projectKey, retired) => invoke('setGalaxyRetired', projectKey, retired),
   arrangeGalaxies: () => invoke('arrangeGalaxies'),
   readCrystal: (nodeId) => invoke('readCrystal', nodeId),
   readNodeProfile: (nodeId) => invoke('readNodeProfile', nodeId),

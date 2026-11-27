@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { GalaxyBridge } from '../../shared/galaxies';
-import { GalaxyLayoutStore, GalaxySettingsStore } from './galaxy-store';
+import { GalaxyLayoutStore, GalaxyRetiredStore, GalaxySettingsStore } from './galaxy-store';
 
 const vaultA = 'v_' + 'a'.repeat(24);
 const vaultB = 'v_' + 'b'.repeat(24);
@@ -140,3 +140,18 @@ describe('userData/galaxy-settings.json(資料夾升格)', () => {
     expect(JSON.parse(await readFile(file, 'utf8')).記憶庫[vaultA].升格).toEqual([p('e')]);
   });
 });
+
+describe('userData/galaxy-retired.json(退役專案,§6.10.3)', () => {
+  it('標為退役後寫檔,新程序讀回;可以移回;不合法的代號不寫', async () => {
+    const file = join(await dir(), 'galaxy-retired.json');
+    const store = new GalaxyRetiredStore(file, noSleep);
+    expect([...(await store.setRetired(vaultA, p('a'), true))!]).toEqual([p('a')]);
+    expect(JSON.parse(await readFile(file, 'utf8'))).toEqual({ 版本: 1, 記憶庫: { [vaultA]: { 退役: [p('a')] } } });
+    expect([...await new GalaxyRetiredStore(file, noSleep).retired(vaultA)]).toEqual([p('a')]);
+    expect([...await new GalaxyRetiredStore(file, noSleep).retired(vaultB)]).toEqual([]);
+    expect([...(await store.setRetired(vaultA, p('a'), false))!]).toEqual([]);
+    expect(await store.setRetired(vaultA, 'C:/path', true)).toBeNull();
+    expect(JSON.parse(await readFile(file, 'utf8')).記憶庫[vaultA].退役).toEqual([]);
+  });
+});
+
