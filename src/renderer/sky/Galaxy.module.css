@@ -21,7 +21,7 @@
 
 /* Map overview (DESIGN.md §6.10.2): everything sits in one world layer at fixed world positions (hub = origin); the
    camera only changes that layer's transform. --zoom (set when the camera settles) keeps text at least 11px. */
-.overview { cursor: grab; touch-action: none; }
+.overview { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .overview[data-dragging] { cursor: grabbing; }
 .world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; --zoom: 1; }
 

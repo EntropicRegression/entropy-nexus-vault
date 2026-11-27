@@ -312,6 +312,10 @@ describe('專案星系畫面(M5e-b)', () => {
     expect(q('[data-bridge]')).not.toBeNull();
   });
 
+  it('拖動總覽時不會選取文字(使用者 2026-11-28 回報藍色選取框)', () => {
+    expect(galaxyCss).toContain('.overview { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }');
+  });
+
   it('退役:沒有退役 API 時不顯示按鈕', async () => {
     await render();
     expect(q('[data-retire]')).toBeNull();
