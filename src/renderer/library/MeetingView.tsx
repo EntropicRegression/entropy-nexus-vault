@@ -91,6 +91,8 @@ export function MeetingView({ entry, entries, nodes, related, onOpen, onNode }: 
   };
 
   return <div className={styles.meetingView} data-meeting-view="">
+    {/* The console writes a short 標題 since 2026-11-28; the full 主題 stays readable here when it differs. */}
+    {meeting?.topic && meeting.topic !== entry.title && <p className={styles.meetingTopic} data-meeting-topic="">完整主題:{meeting.topic}</p>}
     <div className={styles.meetingRoster}>
       {meeting?.endReason && <EndBadge reason={meeting.endReason} />}
       {meeting?.rounds !== null && meeting?.rounds !== undefined && <span>{meeting.rounds} 輪</span>}

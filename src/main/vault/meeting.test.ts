@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseFrontMatter } from './frontmatter';
 import { meetingInfo, parseMeetingTranscript } from './meeting';
+import { entryFromFile } from './entry';
 
 const header = (lines: string[]) => parseFrontMatter(['---', ...lines, '---', ''].join('\n')).attributes;
 
@@ -101,5 +102,16 @@ describe('主控台 dd820f4 格式', () => {
     const info = meetingInfo(header(['參與節點ID: ["a", "b", "c"]', '參與者: ["甲，副手", "乙、二號", "丙"]']), false, 'x');
     expect(info.participants).toEqual([{ nodeId: 'a', name: '甲，副手' }, { nodeId: 'b', name: '乙、二號' }, { nodeId: 'c', name: '丙' }]);
     expect(meetingInfo(header(['參與節點ID: [a, b]', '參與者: [甲，副手, 乙]']), false, 'x').participants.map((p) => p.name)).toEqual(['', '']);
+  });
+});
+
+describe('會議紀錄標題(主控台 2026-11-28 起寫短 標題)', () => {
+  const file = (lines: string[]) => entryFromFile({ path: 'meetings/觀測站/2026-11-28-排程.md',
+    text: ['---', '種類: 會議紀錄', ...lines, '---', '', '## 結論', '> 好', ''].join('\n'), mtime: 1, size: 1 }, undefined, 0);
+  it('有 標題 就用它,主題 全文留在 meeting.topic;沒有 標題 的舊紀錄用 主題', () => {
+    const short = file(['標題: 排程', '主題: 排程:把背景說明整段寫進來的很長的主題']);
+    expect(short.entry.title).toBe('排程');
+    expect(short.entry.meeting?.topic).toBe('排程:把背景說明整段寫進來的很長的主題');
+    expect(file(['主題: 舊紀錄的長主題']).entry.title).toBe('舊紀錄的長主題');
   });
 });

@@ -191,7 +191,8 @@ export function entryFromFile(file: VaultFile, recall: HeatRecall | undefined, n
   const participantNodeIds = isMemoir ? [] : field(attributes, '參與節點ID', 'participantNodeIds')
     .split(/[,，、]/).map((part) => part.trim()).filter(Boolean);
   const status = field(attributes, '狀態', 'status');
-  const title = isMemoir ? field(attributes, '標題') : field(attributes, ...(isMeeting ? ['主題', 'topic'] : []), '標題', '案由', 'title', 'name');
+  // Meetings: the console's short 標題 (2026-11-28) first; older transcripts only have the full 主題.
+  const title = isMemoir ? field(attributes, '標題') : field(attributes, ...(isMeeting ? ['標題', '主題', 'topic'] : []), '標題', '案由', 'title', 'name');
 
   return {
     entry: {

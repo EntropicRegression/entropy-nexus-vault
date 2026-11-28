@@ -131,7 +131,7 @@ export function DetailPanel({ node, detail, loading, error, onDismiss, onOpenEnt
           ? <ul>{detail.meetingEntries.map((entry) => {
             // 主持 = the meeting entry's 節點ID is this node; 參與 = it is among the participants.
             const role = entry.nodeId === detail.nodeId ? '主持' : '參與';
-            const label = '會議 · ' + dateLabel(entry.updatedAt) + ' · ' + (entry.meeting?.topic || entry.title);
+            const label = '會議 · ' + dateLabel(entry.updatedAt) + ' · ' + entry.title;
             const tag = entry.status === '未確認' ? '待核閱' : entry.status === '退回' ? '已退回' : '';
             const content = <span><span className={styles.archiveRole}>{role}</span><span className={styles.srOnly}> · </span>{label}
               {tag && <><span className={styles.srOnly}> · </span><span className={styles.archiveRole} data-meeting-status="">{tag}</span></>}</span>;

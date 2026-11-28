@@ -642,3 +642,6 @@ button.speakerName:hover { text-decoration-color: currentColor; }
 .speechBody > :last-child { margin-bottom: 0; }
 .speechBody pre { white-space: pre; }
 .quietLine { margin: 0 0 10px; font-size: 13px; color: var(--ink-paper-muted); }
+
+/* Full 主題 of a meeting whose 標題 is the console's short title (2026-11-28). */
+.meetingTopic { margin: 0 0 8px; font-size: 12.5px; line-height: 1.6; color: var(--ink-paper-muted); overflow-wrap: anywhere; }

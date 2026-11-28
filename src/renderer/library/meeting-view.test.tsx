@@ -217,3 +217,27 @@ describe('M6b 審查修正', () => {
   });
 });
 
+describe('會議閱讀檢視:完整主題(2026-11-28)', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+  });
+  afterEach(() => { act(() => root.unmount()); container.remove(); });
+  const show = async (detail: MemoryEntryDetail) => {
+    await act(async () => {
+      root.render(<MeetingView entry={detail} entries={new Map()} nodes={new Map()} related={new Map()} onOpen={vi.fn()} onNode={vi.fn()} />);
+    });
+  };
+
+  it('短標題與主題不同時顯示完整主題;相同時不重複', async () => {
+    const base = entry();
+    await show({ ...base, title: '排程', meeting: { ...base.meeting!, topic: '排程:把背景說明整段寫進來的主題' } });
+    expect(container.querySelector('[data-meeting-topic]')?.textContent).toBe('完整主題:排程:把背景說明整段寫進來的主題');
+    await show(entry());
+    expect(container.querySelector('[data-meeting-topic]')).toBeNull();
+  });
+});
